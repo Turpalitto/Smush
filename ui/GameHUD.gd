@@ -105,10 +105,16 @@ func _build_layout() -> void:
 	right_info.alignment = BoxContainer.ALIGNMENT_CENTER
 	row1.add_child(right_info)
 
+	# The timer/essence labels have no backing panel, so bright enemies passing behind the
+	# top-right corner used to wash them out. A dark outline keeps them readable over any world art.
+	var right_text_outline := Color(0.03, 0.07, 0.09, 0.92)
+
 	_timer_label = Label.new()
 	_timer_label.text = "00:00"
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_timer_label.add_theme_font_size_override("font_size", 19)
+	_timer_label.add_theme_constant_override("outline_size", 4)
+	_timer_label.add_theme_color_override("font_outline_color", right_text_outline)
 	right_info.add_child(_timer_label)
 
 	_essence_label = Label.new()
@@ -116,6 +122,8 @@ func _build_layout() -> void:
 	_essence_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_essence_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.86))
 	_essence_label.add_theme_font_size_override("font_size", 17)
+	_essence_label.add_theme_constant_override("outline_size", 4)
+	_essence_label.add_theme_color_override("font_outline_color", right_text_outline)
 	right_info.add_child(_essence_label)
 
 	_pause_btn = Button.new()
