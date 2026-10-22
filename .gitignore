@@ -36,3 +36,7 @@ Unselected files/
 *.tsbuildinfo
 next-env.d.ts
 !web/.env.example
+
+# Generated optional SDK and matching Android build template
+addons/admob/
+android/.build_version

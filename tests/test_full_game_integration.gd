@@ -195,6 +195,21 @@ func _test_defeat_revive_and_app_interruptions(tree: SceneTree, main: MainRoot) 
 	assert_true(bool(cb_box["doubled"]), "Post-run x2 Rewarded Ad succeeded")
 	assert_gt(float(SaveData.get_essence()), float(ess_pre_double), "x2 Essence credited cleanly")
 
+	# Once results are banked, reviving would allow the same run to pay twice.
+	main._start_run("quick")
+	await tree.process_frame
+	arena.player.invulnerable_timer = 0.0
+	arena.player.shield_ready = false
+	arena.player.take_damage(9999.0, "shadow_slime")
+	arena.commit_run_rewards()
+	var banked := SaveData.get_essence()
+	arena.commit_run_rewards()
+	assert_eq(SaveData.get_essence(), banked, "Result reward committed exactly once")
+	assert_false(bool(App.last_run_summary["can_revive"]), "Banking reward removes revive offer")
+	var denied := {"reason": ""}
+	arena.try_revive_with_ad(func(_ok: bool, reason: String) -> void: denied["reason"] = reason)
+	assert_eq(denied["reason"], "revive_not_allowed", "Committed run cannot revive and pay again")
+
 	# Return to menu
 	main._return_to_main_menu()
 	assert_eq(App.state, App.State.MAIN_MENU, "Cleanly returned to MAIN_MENU")

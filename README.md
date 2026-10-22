@@ -1,8 +1,13 @@
 # SLIME RUSH: EVOLUTION (Слайм Раш: Эволюция)
 
-Оригинальная коммерческая мобильная 2D-игра с видом сверху на **Godot 4.5 (GDScript)**, разработанная для **Android** (с архитектурной готовностью к выпуску на **iOS**).
+Оригинальная мобильная 2D-игра с видом сверху на **Godot 4.5 (GDScript)**, разработанная для **Android** (с архитектурной готовностью к выпуску на **iOS**).
 
 Игрок управляет мягкой биолюминесцентной слизью в стартовом биоме **Зачарованный лес**, поглощает существ и споры, нелинейно увеличивает массу, собирает мутации и синергии, адаптируется к ограничениям большой массы и сражается с трёхфазным боссом **Древний страж леса**.
+
+**Статус: разработка и QA, ещё не Android release candidate.** Проверено 268
+автоматических assertions из исходников и PCK. Debug APK пока не собран из-за
+неустановленного SDK; реальные Ads/Billing, производительность и визуал на телефоне
+требуют проверки. См. [RELEASE_STATUS.md](RELEASE_STATUS.md).
 
 ---
 
@@ -42,7 +47,7 @@ res://
 ├── scripts/                        # Корневой контроллер MainRoot.gd и build_android.sh
 ├── shaders/                        # Шейдеры тела слизи, лесного полога и телеграфов атак
 ├── systems/                        # Масса, поглощение, пулы, SpatialHashGrid, сохранения, звук, реклама, IAP, аналитика
-├── tests/                          # Автоматические юнит- и интеграционные тесты (222 проверки)
+├── tests/                          # Автоматические юнит- и интеграционные тесты (268 проверок)
 └── tools/                          # Генерация ассетов, синхронизация кэша классов, упаковщик .pck
 ```
 
@@ -60,16 +65,19 @@ godot4 --path .
 
 ### 2. Запуск автоматических тестов (CLI / Headless)
 ```bash
-python3 tools/sync_godot_cache.py
-godot4 --headless --quit-after 600 --path . res://tests/TestRunner.tscn
+./scripts/run_qa.sh
 ```
 
 ### 3. Сборка Android Debug APK и Release AAB
-Требуются установленные **JDK 17**, **Android SDK (API 35)** и шаблоны экспорта Godot 4.5 (`export_templates.tpz`). Подробная инструкция и чеклист релиза приведены в [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+Требуются установленные **JDK 17+**, **Android SDK (API 36)** и шаблоны экспорта Godot 4.5 (`export_templates.tpz`). Подробная инструкция и чеклист релиза приведены в [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ```bash
 export ANDROID_HOME=/path/to/Android/Sdk
-./scripts/build_android.sh
+./scripts/build_android.sh debug
+# Без нативных рекламных/платёжных библиотек:
+./scripts/build_android.sh offline
+# Только с ключом владельца:
+./scripts/build_android.sh release
 ```
 
 ---

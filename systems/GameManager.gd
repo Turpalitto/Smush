@@ -41,9 +41,12 @@ func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 			# Mobile backgrounding / interruption safety: auto-pause run and flush save immediately
+			Analytics.end_session()
 			SaveData.save_to_disk()
 			if state == State.PLAYING:
 				change_state(State.PAUSED)
+		NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN:
+			Analytics.start_session()
 		NOTIFICATION_WM_GO_BACK_REQUEST:
 			handle_back_navigation()
 		NOTIFICATION_WM_CLOSE_REQUEST:

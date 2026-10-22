@@ -21,8 +21,7 @@ jobs:
 
       - name: Run Automated GDScript Test Suite & Verify .pck Build
         run: |
-          python3 tools/sync_godot_cache.py
-          godot4 --headless --quit-after 600 --path . res://tests/TestRunner.tscn
+          ./scripts/run_qa.sh
           python3 tools/build_pck.py /tmp/slime_rush.pck
           cd /tmp && godot4 --headless --quit-after 600 --main-pack /tmp/slime_rush.pck res://tests/TestRunner.tscn
 

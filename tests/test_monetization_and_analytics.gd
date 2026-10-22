@@ -12,6 +12,9 @@ func run() -> void:
 	_test_commercial_mode_blocks_fakes()
 	_test_billing_entitlements_and_restore()
 	_test_analytics_consent_and_kpis()
+	_test_delayed_ad_callbacks()
+	_test_native_billing_payload()
+	_test_analytics_denominators()
 
 	# Restore clean defaults
 	BuildConfig.force_commercial_mode = false
@@ -110,3 +113,113 @@ func _test_analytics_consent_and_kpis() -> void:
 
 	var kpis := Analytics.get_kpi_snapshot()
 	assert_true(kpis.has("d1_retention") and kpis.has("d7_retention") and kpis.has("boss_win_rate") and kpis.has("arpdau_usd"), "KPI snapshot exposes retention, boss win rate, and ARPDAU")
+
+
+class DeferredAds extends RefCounted:
+	var requests: Array[Dictionary] = []
+	func is_available(_placement: String) -> bool:
+		return true
+	func show_rewarded(_placement: String, token: String, cb: Callable) -> void:
+		requests.append({"token": token, "cb": cb})
+	func finish(index: int, earned: bool) -> void:
+		requests[index]["cb"].call(earned, requests[index]["token"], "test_delayed")
+
+
+class NativeBillingFixture extends BillingClient:
+	var acknowledged_tokens: Array[String] = []
+	func acknowledge_purchase(purchase_token: String):
+		acknowledged_tokens.append(purchase_token)
+
+
+func _test_delayed_ad_callbacks() -> void:
+	var adapter := DeferredAds.new()
+	Ads.set_test_adapter(adapter)
+	Ads.reset_run_limits()
+	var state := {"grants": 0, "cancelled": 0, "busy": ""}
+	var callback := func(granted: bool, reason: String) -> void:
+		if granted:
+			state["grants"] += 1
+		elif reason == "run_changed":
+			state["cancelled"] += 1
+	Ads.request_rewarded_ad(Ads.PLACEMENT_REVIVE, callback)
+	Ads.request_rewarded_ad(Ads.PLACEMENT_DOUBLE_REWARD, func(_ok: bool, reason: String) -> void: state["busy"] = reason)
+	assert_eq(state["busy"], "ad_already_pending", "Concurrent ad request rejected without losing first callback")
+	Ads.reset_run_limits()
+	assert_eq(state["cancelled"], 1, "Run reset completes cancelled request once")
+	Ads.request_rewarded_ad(Ads.PLACEMENT_REVIVE, callback)
+	adapter.finish(0, false)
+	assert_false(Ads._pending_token.is_empty(), "Old failure does not cancel current ad")
+	adapter.finish(0, true)
+	assert_eq(state["grants"], 0, "Old success cannot reward new run")
+	adapter.finish(1, true)
+	adapter.finish(1, true)
+	assert_eq(state["grants"], 1, "Current reward delivered exactly once")
+	Ads.reset_run_limits()
+
+
+func _test_native_billing_payload() -> void:
+	SaveData.data = SaveData.create_default_data()
+	Billing._processed_tokens.clear()
+	var original_client: BillingClient = Billing._billing_client
+	var fixture := NativeBillingFixture.new()
+	Billing._billing_client = fixture
+	var no_ads := "com.turpalitto.slimerush.no_ads"
+	var skin := "com.turpalitto.slimerush.skin_astral_jelly"
+	Billing._on_product_details({"response_code": 0, "product_details": [{
+		"product_id": no_ads, "one_time_purchase_offer_details_list": [{
+			"formatted_price": "2,99 €", "purchase_option_id": "buy", "offer_id": ""
+		}]
+	}]})
+	assert_eq(Billing.get_display_price(no_ads), "2,99 €", "Native 3.3.0 offer list supplies localized price")
+	var payload := {"response_code": 0, "purchases": [{
+		"purchase_state": BillingClient.PurchaseState.PURCHASED,
+		"purchase_token": "native_fixture", "is_acknowledged": false,
+		"product_ids": [no_ads, skin]
+	}]}
+	Billing._on_purchases_updated(payload)
+	Billing._on_purchases_updated(payload)
+	assert_eq(fixture.acknowledged_tokens.size(), 1, "Repeated purchase update acknowledges token once")
+	assert_false(SaveData.has_no_ads(), "Unacknowledged purchase does not grant entitlement")
+	Billing._on_acknowledge_response({"response_code": 6, "token": "native_fixture"})
+	assert_false(SaveData.has_no_ads(), "Failed acknowledgement grants nothing")
+	Billing._on_purchases_updated(payload)
+	Billing._on_acknowledge_response({"response_code": 0, "token": "native_fixture"})
+	assert_true(SaveData.has_no_ads(), "Native token acknowledgement grants No Ads")
+	assert_true(Billing.is_sku_owned(skin), "Multiple products in one purchase token all granted")
+	Billing._on_acknowledge_response({"response_code": 0, "token": "native_fixture"})
+	assert_eq((SaveData.data["owned_skus"] as Array).size(), 2, "Duplicate acknowledgement does not duplicate products")
+	assert_eq(SaveData.data["stats"]["revenue_usd_total"], 0.0, "Store events never invent USD revenue")
+	SaveData.data = SaveData.create_default_data()
+	payload["purchases"][0]["is_acknowledged"] = true
+	Billing._on_purchases_updated(payload)
+	assert_true(SaveData.has_no_ads(), "Already acknowledged token restores after local save rollback")
+	Billing._finalize_verified_purchase("unknown.sku", "bad_token")
+	assert_false(Billing.is_sku_owned("unknown.sku"), "Unknown SKU never becomes owned")
+	Billing._billing_client = original_client
+	fixture.free()
+
+
+func _test_analytics_denominators() -> void:
+	SaveData.data = SaveData.create_default_data()
+	Analytics.start_session()
+	Analytics._session_start_unix = Time.get_unix_time_from_system() - 6.0
+	Analytics.end_session()
+	Analytics.end_session()
+	assert_eq(SaveData.data["stats"]["session_count"], 1, "Repeated lifecycle notifications end one session only")
+	Analytics.track("run_duration", {"seconds": 30})
+	Analytics.track("run_duration", {"seconds": 90})
+	Analytics.track("boss_encountered")
+	SaveData.data["stats"]["total_runs"] = 5
+	SaveData.data["stats"]["bosses_defeated"] = 1
+	SaveData.data["stats"]["rewarded_offered"] = 4
+	SaveData.data["stats"]["rewarded_started"] = 2
+	SaveData.data["stats"]["rewarded_completed"] = 1
+	var snapshot := Analytics.get_kpi_snapshot()
+	assert_approx(float(snapshot["avg_session_duration_sec"]), 6.0, 0.2, "Session mean uses ended sessions, not active days")
+	assert_eq(snapshot["avg_run_duration_sec"], 60.0, "Run mean uses finished run duration events")
+	assert_eq(snapshot["boss_win_rate"], 1.0, "Boss win rate uses encounters, not all runs")
+	assert_eq(snapshot["rewarded_ad_opt_in_rate"], 0.5, "Ad opt-in counts starts, not completions")
+	assert_eq(snapshot["rewarded_ad_completion_rate"], 0.5, "Ad completion has a separate denominator")
+	assert_eq(snapshot["arpdau_usd"], null, "ARPDAU unknown without verified revenue")
+	assert_eq(snapshot["d7_retention"], null, "New install not classified as a failed D7 retention")
+	Analytics.start_session()

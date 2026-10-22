@@ -751,3 +751,21 @@ func _build_privacy_page() -> void:
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 16)
 	card.add_child(body)
+
+	var privacy_options := Button.new()
+	privacy_options.text = "Настройки рекламной конфиденциальности" if Loc.current_locale == "ru" else "Ad privacy choices"
+	privacy_options.custom_minimum_size.y = 56
+	privacy_options.pressed.connect(Ads.show_privacy_options)
+	card.add_child(privacy_options)
+
+	var license_button := Button.new()
+	license_button.text = "Лицензия Godot (MIT)" if Loc.current_locale == "ru" else "Godot license (MIT)"
+	license_button.custom_minimum_size.y = 56
+	card.add_child(license_button)
+	var license_text := Label.new()
+	license_text.text = FileAccess.get_file_as_string("res://licenses/GODOT_LICENSE.txt")
+	license_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	license_text.add_theme_font_size_override("font_size", 14)
+	license_text.visible = false
+	card.add_child(license_text)
+	license_button.pressed.connect(func() -> void: license_text.visible = not license_text.visible)

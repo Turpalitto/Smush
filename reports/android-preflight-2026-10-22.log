@@ -1,0 +1,6 @@
+Android export blocked by missing toolchain components:
+  - JDK executable: javac
+  - Android platform-tools/adb
+  - Android build-tools/apksigner
+  - Android platform 36
+See RELEASE_CHECKLIST.md. SDK license acceptance requires the owner.

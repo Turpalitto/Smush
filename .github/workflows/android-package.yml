@@ -1,0 +1,61 @@
+name: Build Android offline debug APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      accept_android_sdk_license:
+        description: 'I accept the Android SDK terms: https://developer.android.com/studio/terms'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  offline-apk:
+    if: ${{ inputs.accept_android_sdk_license }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: 'platform-tools build-tools;36.0.0'
+      - name: Install official matching Godot and Android export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          TASK_DOWNLOAD_DIR="$(mktemp -d)"
+          cd "$TASK_DOWNLOAD_DIR"
+          RELEASE_URL=https://github.com/godotengine/godot/releases/download/4.6.3-stable
+          curl -fL "$RELEASE_URL/Godot_v4.6.3-stable_linux.x86_64.zip" -o Godot_v4.6.3-stable_linux.x86_64.zip
+          curl -fL "$RELEASE_URL/Godot_v4.6.3-stable_export_templates.tpz" -o Godot_v4.6.3-stable_export_templates.tpz
+          curl -fL "$RELEASE_URL/SHA512-SUMS.txt" -o SHA512-SUMS.txt
+          sha512sum --check --ignore-missing SHA512-SUMS.txt
+          unzip -q Godot_v4.6.3-stable_linux.x86_64.zip
+          sudo install Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot4
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.6.3.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          unzip -j -q Godot_v4.6.3-stable_export_templates.tpz templates/android_debug.apk templates/android_release.apk templates/android_source.zip templates/version.txt -d "$TEMPLATE_DIR"
+      - name: Create disposable debug signing key
+        shell: bash
+        run: |
+          DEBUG_KEY="$RUNNER_TEMP/smush-debug.keystore"
+          keytool -genkeypair -keystore "$DEBUG_KEY" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 3650
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$DEBUG_KEY" >> "$GITHUB_ENV"
+      - name: Test and export APK
+        run: ./scripts/build_android.sh offline
+      - name: Verify package signature
+        shell: bash
+        run: '"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose builds/android/slime-rush-offline.apk'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slime-rush-offline-debug-apk
+          path: builds/android/slime-rush-offline.apk
+          if-no-files-found: error

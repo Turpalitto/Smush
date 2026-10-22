@@ -64,3 +64,14 @@
 Каталог `resources/data/synergies.json` используется обеими реализациями.
 Адаптер ID сохраняет совместимость браузерных сохранений. Каталог `web/`
 исключён из Godot-импорта и Android/PCK-пакетов. См. [INTEGRATION.md](INTEGRATION.md).
+
+
+## Android release audit (22.10.2026)
+
+`PoingRewardedAdapter.gd` — optional real SDK bridge с UMP и отказом от показа
+без native плагинов/конфигурации. `AdService` сопоставляет токен до обработки
+любой callback-ветки. `BillingService` читает schema 3.3.0 и ждёт acknowledgement.
+Локальные session/run KPI считаются отдельно; оценочные цены не считаются выручкой.
+Для сборок есть source QA wrapper с проверкой ошибок, toolchain preflight,
+настройка локальных EditorSettings и installer matching Android Gradle template.
+Релизные ограничения: [RELEASE_STATUS.md](RELEASE_STATUS.md).

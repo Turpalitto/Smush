@@ -782,6 +782,7 @@ func commit_run_rewards() -> void:
 	if bool(App.last_run_summary.get("essence_committed", false)):
 		return
 	App.last_run_summary["essence_committed"] = true
+	App.last_run_summary["can_revive"] = false
 	var amt: int = int(App.last_run_summary.get("final_essence", 0))
 	SaveData.add_essence(amt)
 	var dur: float = float(App.last_run_summary.get("duration_sec", 0.0))
@@ -796,7 +797,7 @@ func commit_run_rewards() -> void:
 
 
 func try_revive_with_ad(done_cb: Callable = Callable()) -> void:
-	if App.state != App.State.DEFEAT or player.revive_used:
+	if App.state != App.State.DEFEAT or player.revive_used or bool(App.last_run_summary.get("essence_committed", false)):
 		if done_cb.is_valid():
 			done_cb.call(false, "revive_not_allowed")
 		return

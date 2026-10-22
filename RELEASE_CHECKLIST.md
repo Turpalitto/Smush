@@ -1,3 +1,77 @@
+# Актуальный Android release gate — 22.10.2026
+
+**APK и AAB пока не собраны; игру нельзя считать проверенным Android RC.**
+Текущий статус: [RELEASE_STATUS.md](RELEASE_STATUS.md), фактические проверки:
+[TEST_REPORT.md](TEST_REPORT.md). Материалы ниже — черновики для проверки владельцем.
+
+## Инструменты и воспроизводимая сборка
+
+Проверенный движок: Godot 4.6.3 stable. Использовать такие же official export templates.
+Для Gradle нужны полный JDK 17+, Android platform-tools, build-tools 36.0.0,
+platforms/android-36 и зависимости из matching `android_source.zip` (в текущем
+шаблоне NDK 29.0.14206865). Версии сверять с `android/build/config.gradle`.
+Не принимать SDK licenses за владельца без его согласия:
+https://developer.android.com/studio/terms.
+
+```bash
+# После принятия лицензий владельцем и установки компонентов:
+export JAVA_HOME=/path/to/jdk
+export ANDROID_HOME=/path/to/Android/Sdk
+export GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/private/path/debug.keystore
+./scripts/build_android.sh offline  # APK без native Ads/Billing; offline gameplay QA
+./scripts/build_android.sh debug    # Gradle APK с Billing
+```
+
+`tools/configure_android.py` задаёт пути только в локальном Godot EditorSettings.
+`tools/install_android_template.py` устанавливает matching Android Gradle template
+и `.gdignore`; не перезаписывает существующую непустую сборочную директорию.
+Release вызывается **отдельно**, чтобы debug-команда не создавала release случайно:
+
+```bash
+# Значения задать через защищённое окружение, не через Git/историю терминала:
+# GODOT_ANDROID_KEYSTORE_RELEASE_PATH
+# GODOT_ANDROID_KEYSTORE_RELEASE_USER
+# GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+./scripts/build_android.sh release
+```
+
+Application ID `com.turpalitto.slimerush` пока не согласован владельцем.
+Не создавать выпуск/товары до согласования ID. Release keystore не генерировался.
+Хранить его и пароль отдельно, резервные копии шифровать, использовать Play App Signing.
+
+В GitHub Actions подготовлен `Build Android offline debug APK`: **только ручной**
+`workflow_dispatch`, с отдельным подтверждением Android SDK terms. В этой сессии
+workflow не запускался. Он собирает, проверяет подпись и сохраняет debug APK artifact;
+ничего в Google Play не публикует. Релизный keystore в этот workflow не передаётся.
+
+## Проверенные текущие требования Google Play
+
+Официальные источники просмотрены 22.10.2026:
+- [Target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878):
+  с 31.08.2026 новые мобильные приложения и обновления должны target Android 16 / API 36.
+  Экспортные presets обновлены с 35 до 36. Повторно проверить перед подачей.
+- [Testing for new personal accounts](https://support.google.com/googleplay/android-developer/answer/14151465):
+  для личных аккаунтов, созданных после 13.11.2023, минимум 12 continuously opted-in
+  testers в закрытом тесте минимум 14 дней до заявки на production access.
+  Тип и дата аккаунта владельца неизвестны, applicability проверяется в Play Console.
+
+## Непройденные обязательные проверки
+
+- [ ] Сборка, подпись, установка и запуск Debug APK на устройстве.
+- [ ] Полный ручной забег, boss fight без принудительного damage, баланс первых 5–10 минут.
+- [ ] 60/90/120 Hz, input latency, pause/resume, kill/relaunch, offline, уведомления/звонок.
+- [ ] Реальные FPS/память/нагрев на бюджетном Android и тест нескольких пропорций экрана.
+- [ ] AdMob App ID/rewarded IDs/UMP, native test reward, no fill/dismiss/offline.
+- [ ] Play internal test: purchase, pending, cancel, restore/reinstall, acknowledgement и refunds.
+- [ ] Подписанный AAB, проверка package ID/target SDK/ABI, Play pre-launch report.
+- [ ] Скриншоты из реального Android, store listing, content rating, целевая аудитория.
+- [ ] Privacy policy с реальным контактом владельца, legal review, Data Safety по фактическим SDK.
+- [ ] Разрешение владельца на публикацию. В этой сессии публикаций не было.
+
+---
+
+## Черновики и материалы предыдущей реализации
+
 # ANDROID RELEASE CHECKLIST & GOOGLE PLAY PACKAGE — SLIME RUSH: EVOLUTION
 
 ## 1. Паспорт релиза

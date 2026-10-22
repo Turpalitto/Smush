@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 INCLUDE_EXTS = {".gd", ".tscn", ".tres", ".gdshader", ".json", ".png", ".wav", ".cfg", ".ttf"}
-EXCLUDE_DIRS = {".git", "builds", "node_modules", "__pycache__", "tools", "src", "web"}
+EXCLUDE_DIRS = {".git", "builds", "node_modules", "__pycache__", "tools", "src", "web", "android"}
 EXCLUDE_FILES = {"project.godot", "export_presets.cfg", "package.json", "package-lock.json", "tsconfig.json", "drizzle.config.json"}
 
 
@@ -34,7 +34,7 @@ def collect_files() -> list[tuple[str, bytes]]:
             continue
         if p.name in EXCLUDE_FILES:
             continue
-        if p.suffix.lower() in INCLUDE_EXTS:
+        if p.suffix.lower() in INCLUDE_EXTS or rel.parts[0] == "licenses" or p.name.startswith("LICENSE") or p.name == "LICENSE-DejaVu.txt":
             items.append((f"res://{rel.as_posix()}", p.read_bytes()))
     return items
 
