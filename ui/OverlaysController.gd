@@ -8,6 +8,7 @@ signal navigate_to_main_menu()
 var arena: ArenaController = null
 
 var _pause_root: Control
+var _pause_card: PanelContainer
 var _pause_title: Label
 var _pause_build_lbl: Label
 var _pause_resume_btn: Button
@@ -16,6 +17,7 @@ var _pause_restart_btn: Button
 var _pause_quit_btn: Button
 
 var _result_root: Control
+var _result_card: PanelContainer
 var _result_title: Label
 var _result_stats: Label
 var _result_essence: Label
@@ -33,7 +35,17 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_pause_panel()
 	_build_result_panel()
+	resized.connect(_adapt_modal_widths)
+	_adapt_modal_widths()
 	Events.game_state_changed.connect(_on_state_changed)
+
+
+func _adapt_modal_widths() -> void:
+	var target_w := clampf(size.x - 44.0, 290.0, 520.0)
+	if _pause_card != null:
+		_pause_card.custom_minimum_size = Vector2(target_w, 0.0)
+	if _result_card != null:
+		_result_card.custom_minimum_size = Vector2(target_w, 0.0)
 
 
 func bind_arena(p_arena: ArenaController) -> void:
@@ -65,7 +77,8 @@ func _build_pause_panel() -> void:
 	margin.add_child(center)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(520, 0)
+	_pause_card = card
+	card.custom_minimum_size = Vector2(300, 0)
 	center.add_child(card)
 
 	var vb := VBoxContainer.new()
@@ -134,7 +147,8 @@ func _build_result_panel() -> void:
 	margin.add_child(center)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(540, 0)
+	_result_card = card
+	card.custom_minimum_size = Vector2(300, 0)
 	center.add_child(card)
 
 	var vb := VBoxContainer.new()

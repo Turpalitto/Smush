@@ -3,9 +3,9 @@ extends RefCounted
 ## Manages run-scoped mutations (12 base mutations, levels 1..5) and data-driven synergies (5+ combos).
 
 const RARITY_WEIGHTS: Dictionary = {
-	"common": 60.0,
-	"rare": 30.0,
-	"epic": 14.0
+	"common": 48.0,
+	"rare": 34.0,
+	"epic": 24.0
 }
 
 var levels: Dictionary = {} # mutation_id -> int
@@ -131,9 +131,11 @@ func roll_draft_choices(count: int = 3, unlocked_override: Array = []) -> Array[
 		for mid in pool:
 			var cfg := ConfigDB.get_mutation(mid)
 			var rarity: String = str(cfg.get("rarity", "common"))
-			var w: float = float(RARITY_WEIGHTS.get(rarity, 30.0))
+			var w: float = float(RARITY_WEIGHTS.get(rarity, 34.0))
 			if not preview_synergy_for_candidate(mid).is_empty():
-				w += 18.0
+				w += 34.0
+			elif get_level(mid) > 0:
+				w += 10.0
 			weights.append(w)
 			total_w += w
 

@@ -41,6 +41,18 @@ static func evaluate(player_ctx: Dictionary, target_ctx: Dictionary) -> Dictiona
 			"cracks_shell": false
 		}
 
+	if category == "miniboss":
+		# Elite Mini-Bosses must be weakened below 22% HP before the finishing gulp
+		var mb_hp_ratio: float = float(target_ctx.get("hp_ratio", 1.0))
+		if mb_hp_ratio > 0.22:
+			return {
+				"can_absorb": false,
+				"required_ratio": 1.35,
+				"effective_ratio": mb_hp_ratio,
+				"reason": "miniboss_active",
+				"cracks_shell": false
+			}
+
 	var player_mass: float = maxf(1.0, float(player_ctx.get("mass", 10.0)))
 	var target_mass: float = maxf(0.5, float(target_ctx.get("mass", 8.0)))
 	var raw_ratio: float = player_mass / target_mass
