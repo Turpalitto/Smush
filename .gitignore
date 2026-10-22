@@ -19,6 +19,7 @@ local.properties
 android/build/
 android/.gradle/
 builds/
+deliverables/
 
 # OS / Editor / Temp files
 .DS_Store

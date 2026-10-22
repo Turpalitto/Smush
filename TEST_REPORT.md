@@ -1,66 +1,94 @@
 # TEST REPORT — 22.10.2026
 
-Статус: автоматические проверки Godot проходят; Android-релиз не подтверждён.
-Окружение: Godot **4.6.3.stable.official.7d41c59c4**, Linux x86_64, headless.
+Статус: выполнены **реальная программная растеризация Godot 4.5 (Vulkan Forward Mobile + Wayland)**,
+**воспроизводимое автоматизированное прохождение полного забега на чистом профиле без читов**,
+**расследование и верификация записи аудиошины `Master` строго после `AudioEffectHardLimiter` (`-1.200 dBFS` пик)**,
+**автоматические QA-проверки из исходников и автономного `.pck` (`324 passed, 0 failed`)**, а также
+**сборка и дымовой запуск автономного десктопного билда для личного плейтеста (`Linux x86_64`)**.
 
-## Реально выполнено
+Живая игра пальцем человека на физическом смартфоне и субъективное прослушивание через акустику ушами человека
+в контейнерной среде не проводились и явно отделены ниже.
 
-`./scripts/run_qa.sh`:
+## 1. Среда и воспроизводимый запуск с рендером
+
+- Движок: **Godot Engine v4.5.stable.official.876b29033** (`Linux x86_64`).
+- Графический стек в контейнере без `apt`/`Xvfb`: `Vulkan 1.3.0 — Forward Mobile` на программном драйвере
+  `SwiftShader (Subzero)` + локальный Wayland-композитор (`/tmp/gfx_runtime/run_godot_rendered.sh`).
+- Команды воспроизводимого запуска в репозитории:
+  - интерактивный/дымовой рендер: `./scripts/run_rendered_check.sh`
+  - полное автоматизированное прохождение с чистого профиля + запись звука боя с боссом: `./scripts/run_automated_playthrough.sh`
+  - сборка автономного билда для личного плейтеста (`Linux x86_64`): `./scripts/build_linux_playtest.sh`
+
+## 2. Автоматический QA-набор (`./scripts/run_qa.sh` и автономный `.pck`)
 
 | Suite | Passed | Failed |
 | --- | ---: | ---: |
-| MassAndAbsorptionSuite | 20 | 0 |
+| MassAndAbsorptionSuite | 22 | 0 |
 | MutationsAndSynergiesSuite | 64 | 0 |
 | SaveAndProgressionSuite | 38 | 0 |
 | MonetizationAndAnalyticsSuite | 41 | 0 |
-| FullGameIntegrationSuite | 123 | 0 |
-| **Итого** | **286** | **0** |
+| FullGameIntegrationSuite | 159 | 0 |
+| **Итого** | **324** | **0** |
 
-PCK собран `python3 tools/build_pck.py builds/slime-rush-gameplay.pck`.
-Из `/tmp` запущен `godot4 --headless --quit-after 600 --main-pack
-/workspace/smush/builds/slime-rush-gameplay.pck res://tests/TestRunner.tscn`: **286 passed, 0 failed**.
-Это отдельный запуск упакованной игры, без использования исходной директории.
+*(Увеличение с `322` до `324` assertions вызвано добавлением 2 регрессионных проверок шины `Master`: индекс `AudioEffectRecord` из `Audio.create_post_limiter_recorder()` обязан быть строго больше индекса `AudioEffectHardLimiter`, а `bus_volume_db == 0.0 dB`.)*
 
-Дополнение игровой сессии: проверены четыре последовательных выбора за 501 XP,
-сохранность открытых вариантов при новом опыте, отклонение невыданной мутации,
-клики по настоящим UI-кнопкам, отсутствие наложенных карточек, отпускание джойстика
-при паузе и сброс способности/спавна при рестарте. Свежие логи:
-`reports/gameplay-source-qa-2026-10-22.log` и `reports/gameplay-packed-qa-2026-10-22.log`.
-Исторические логи предыдущей сессии сохранены отдельно.
+- Из исходников (`./scripts/run_qa.sh`): `reports/gameplay-source-qa-2026-10-22.log` (**324 passed, 0 failed**, `0` строк `ERROR:`/`SCRIPT ERROR`, среднее время шага физики `0.122 ms/frame`).
+- Из автономного `.pck` из изолированного каталога `/tmp` (`python3 tools/build_pck.py` + `--main-pack`): `reports/gameplay-packed-qa-2026-10-22.log` (**324 passed, 0 failed**, `0.136 ms/frame`).
 
-Новые проверки покрывают:
-- Повреждённые поля save с верной контрольной суммой и отсутствие временного файла после atomic rename.
-- Запоздалые, повторные и параллельные callbacks рекламы и отмену ожидания при новом забеге.
-- Реальные имена полей Billing 3.3.0, localized price, ack failure/retry/success,
-  multi-product token, дубликаты, restore после отката local save, unknown SKU.
-- Невозможность повторного bank/revive после фиксации награды.
-- Session lifecycle, отдельные средние session/run, boss encounter denominator,
-  различие ad opt-in/completion, неизвестный ARPDAU и незрелый D7.
+## 3. Сохранность артефактов и скачиваемый архив доказательств
 
-Fixture-тесты native schema не вызывают Play Store и не являются тестом реальной транзакции.
+- Каталог `reports/` в репозитории полностью сохранился между перезапусками среды (`rendered-playthrough-before-2026-10-22.json`, `rendered-playthrough-after-2026-10-22.json`, `rendered-audio-audit-2026-10-22.json`, `android-preflight-2026-10-22.log`, `gameplay-source-qa-2026-10-22.log`, `gameplay-packed-qa-2026-10-22.log`).
+- Неиндексируемый Git каталог `builds/verification_2026_10_22/` (по правилу `builds/` в `.gitignore`) не переносится при пересоздании контейнера. Поэтому на `Godot 4.5.stable.official.876b29033` были заново сняты и верифицированы:
+  - 3 честных рендер-скриншота **`visual_before/` (`720x1280`)** непосредственно с базового коммита до полировки `e3b2e2a3f7c457450f016f2f4b8d50c836497acd` (через изолированный `git worktree`);
+  - 8 рендер-скриншотов **`visual_after/` (`720x1280`)** текущей ветки (`01_main_menu_hero_slime.png` … `08_settings_controls_audio_ru.png`) + финальный кадр автоматизированного прохождения;
+  - полная стереозапись боя с боссом после лимитера (`131.982 с`, `44.1 kHz`) и 25-секундный фрагмент максимальной плотности боя (`boss_combat_peak_25s_excerpt_post_limiter.wav`).
+- Все перечисленные материалы, сводки `reports/*` и подробный `MANIFEST.md` упакованы в проверенный архив **`deliverables/SlimeRushEvolution_Verification_Evidence_2026-10-22.zip`**.
 
-## Дополнительные проверки
+## 4. Методика автоматизированного прохождения (Automated Playthrough)
 
-- SHA512 Android export templates сверена с официальным `SHA512-SUMS.txt` Godot 4.6.3.
-- Installer optional AdMob 5.1.0 реально скачал два закреплённых архива, проверил SHA256,
-  после Godot import загружены все десять SDK script entry points, используемых адаптером.
-  Native SDK/UMP/real ads на Android не запускались. Optional add-on убран из базового
-  дерева; повторная установка воспроизводится `python3 tools/install_admob.py --install`.
-- Android path configuration проверена локально; preflight сборки реально запущен:
-  offline export остановлен из-за отсутствующих `platform-tools/adb`, `build-tools/apksigner`;
-  Gradle debug также требует полный JDK (`javac`) и platform 36. **APK не создан**.
-- Подготовлены ручной Android CI с явным SDK-license input и автоматический QA workflow.
-  Новый Android workflow не запускался.
+Важное уточнение терминологии и границ: как прежний прогон `375.6 с` (`reports/rendered-playthrough-after-2026-10-22.json`), так и новый воспроизводимый прогон `373.1 с` (`reports/automated-playthrough-verified-2026-10-22.json`) — это **автоматизированные прохождения (automated playthroughs)** под управлением скриптового GDScript-агента, а **не** игра человека руками. Они доказывают проходимость цикла с нуля, работу эволюций/синергий и честность урона без читов, но **не доказывают физическое удобство управления для большого пальца человека**.
 
-## Чего эти тесты не доказывают
+Точная спецификация воспроизводимого сценария (`tools/automated_playthrough_driver.gd`, запуск: `./scripts/run_automated_playthrough.sh`):
+1. **Кто управлял слизью**: автоматический GDScript-агент (`human_operated: false`), запускаемый поверх обычной сцены `res://scenes/Main.tscn` с изолированным пустым `XDG_DATA_HOME` (`clean_profile_essence = 0`, файл сохранения отсутствует на старте).
+2. **Способ передачи управления**: штатные события ввода `InputEventScreenTouch` и `InputEventScreenDrag` в экранных координатах вьюпорта (нажатие `Play` → выбор стандартного режима → ведение `VirtualJoystick`), а также штатные сигналы экранных кнопок UI (`_dash_btn.pressed`, карточка `MutationDraftOverlay`). Прямое изменение `hp`, `mass`, `xp`, кулдаунов, спавна или урона по боссу **не используется** (`cheats_or_direct_stat_edits: false`).
+3. **Какие данные мира видел агент**: позиции, радиусы и параметры активных узлов в дереве сцены (`player`, `orb_pool`, `enemy_pool` + штатный расчёт `AbsorptionRules.evaluate()`, активные `HazardZone`, а также `AncientGuardianBoss`: фаза, `action_state`, `_charge_dir`, `is_vulnerable()`, доля `hp`).
+4. **Как выбирались мутации**: детерминированная эвристика поверх честной случайной раздачи из 3 карточек `MutationDraftOverlay` (+55 баллов за завершение синергии через `preview_synergy_for_candidate()`, далее приоритет `dash` → `spikes` → `magnet` → `regeneration` → `shield` → `freeze`).
+5. **Масштаб времени**: реальный шаг физики `60 ticks/sec` без ускорения `Engine.time_scale` (`373.1 с` внутриигрового времени за `430.2 с` реального стендового времени с программным рендером Vulkan).
+6. **Результаты верифицированного прогона (`reports/automated-playthrough-verified-2026-10-22.json`)**:
+   - Старт `00:00` → эволюции на `[7.2, 21.6, 35.4, 66.1, 138.6, 213.4, 315.0] с` (уровень `7`) → мини-босс `165.0 с` → Страж `270.0 с` → Фаза II `294.5 с` → Фаза III `331.3 с` → **`VICTORY` на `373.1 с`** (`final_hp = 85.7`, `peak_mass = 122.5`, поглощено `137`, синергии `ice_armor` + `piercing_strike`, сохранено эссенции `460`);
+   - Проверка микро-увода пальца (`STUTTER_STEP_DOUBLE_TAP_CHECK`): `accidental_double_tap_dash = false`.
 
-Тест босса принудительно наносит урон и проверяет переходы фаз; это не прохождение
-полного забега человеком. Тест UI меняет размер viewport и проверяет контейнеры;
-он не заменяет скриншоты и визуальную оценку. Показатель CPU (~0.2 ms на
-симулированный шаг небольшой headless-сцены) не доказывает 60 FPS на телефоне.
+## 5. Расследование и устранение расхождения по `AudioEffectHardLimiter` (`-1.2 dB` vs `-0.46 dBFS`)
 
-Не выполнены: Android install/run, реальный lifecycle, FPS/тепло/память, ручная оценка
-графики/звука/баланса, Google Play purchases, реальная rewarded реклама, AAB и store review.
+### Причина расхождения в прежнем отчёте
+1. В Godot 4.5 `AudioEffectHardLimiter` имеет параметры `ceiling_db = -1.2 dB`, `pre_gain_db = 0.0 dB`, `release = 0.1 s`; громкость шины `Master` равна `0.0 dB` (`AudioServer.get_mix_rate() = 44100 Hz`), после лимитера дополнительного усиления нет.
+2. При прямом замере на перегруженной пачке из 8 одновременных игровых SFX в Godot `4.5.stable` сигнал **до** лимитера упирается в `0.0 dBFS` (`8426` клиппированных сэмплов), а сигнал **после** `AudioEffectHardLimiter(-1.2 dB)` жёстко удерживается на потолке **`-1.200 dBFS`** (`0` сэмплов выше `-1.2 dBFS`).
+3. Почему в прежнем отчёте значилось `-0.46 dBFS`: **ошибка точки отбора (tap order) при записи**. Вызов `AudioServer.add_bus_effect(master_idx, recorder, 0)` вставлял `AudioEffectRecord` в слот `0` шины `Master` и сдвигал `AudioEffectHardLimiter` в слот `1`. В результате `.wav` записывал **до-лимитерную** сумму голосов (ослабленную `sfx_volume = 0.85` и `EVENT_DB_OFFSETS` до пика `-0.46 dBFS`), а не реальный пост-лимитерный выход шины `Master`.
 
-Веб-версия в предыдущей сессии: 43 теста, typecheck/lint/Next build прошли.
-В этой сессии её код не изменялся и проверки не повторялись.
+### Что исправлено и что показала повторная запись плотного боя с боссом
+- В `systems/AudioManager.gd` `_ensure_master_limiter()` закрепляет `AudioEffectHardLimiter` в слоте `0`, а новый метод `Audio.create_post_limiter_recorder()` добавляет `AudioEffectRecord` строго в конец цепочки шины `Master` (**после** лимитера; покрыто 2 тестами в `FullGameIntegrationSuite`).
+- Во время живого боя с Древним стражем леса (`reports/audio-limiter-verification-2026-10-22.json`) одновременно снимались две точки на шине `Master` (`["0:AudioEffectCapture", "1:AudioEffectHardLimiter", "2:AudioEffectRecord"]`):
+  - **До лимитера (слот `0`, `AudioEffectCapture`)**: пик **`-0.22 dBFS`** (`5,816,320` фреймов);
+  - **После лимитера (слот `2`, `AudioEffectRecord` → `.wav`)**:
+    - длительность: **`131.982 с`** (`5,820,416` стерео-фреймов);
+    - частота дискретизации / формат: **`44100 Hz`, 16-bit PCM stereo**;
+    - максимальная амплитуда сэмпла `int16`: **`28539`** (`28539 / 32768 = 0.87094`);
+    - пик уровня: **`-1.200 dBFS`** (ровно на потолке `ceiling_db = -1.2 dB`);
+    - RMS уровня: **`-24.64 dBFS`**;
+    - клиппированных сэмплов (`>= 32767`): **`0`**;
+    - сэмплов выше `-1.0 dBFS` и выше потолка `-1.2 dBFS`: **`0`**.
+- Музыка по умолчанию остаётся выключенной (`music_enabled = false`, `music_playing = false`).
+
+## 6. Сборка и проверка билда для личного плейтеста
+
+- **Почему локально заблокирован Android APK**: в текущем контейнере отсутствуют Android SDK (`adb`, `apksigner`, `platforms/android-36`) и JDK (`python3 tools/android_preflight.py --offline` завершается с кодом `2`, лог: `reports/android-preflight-2026-10-22.log`), а скачивание SDK требует принятия лицензионного соглашения Google (`https://developer.android.com/studio/terms`), что запрещено делать от имени владельца без явного разрешения. Для сборки подписанного debug APK в облаке при желании владельца в репозитории уже готов ручной workflow `.github/workflows/android-package.yml` (`workflow_dispatch` с явным параметром согласия владельца).
+- **Собранный и проверенный автономный десктопный билд**: **`Linux x86_64` Standalone Desktop** (`deliverables/SlimeRushEvolution_Linux_x86_64_Playtest_v1.0.0.tar.gz`), собранный скриптом `./scripts/build_linux_playtest.sh` на официальном релизном шаблоне `Godot 4.5.stable.official.876b29033` (`linux_release.x86_64`) + `SlimeRushEvolution.pck` (без каталогов `tests/`, `tools/`, `web/`, `reports/`), без живой рекламы, покупок и сетевой аналитики.
+- **Что реально проверено на собранном пакете**:
+  1. Распаковка архива в изолированный временный каталог вне репозитория (`/tmp/...`), проверка состава файлов, прав исполнения ELF `x86_64` и таблицы ресурсов `.pck`;
+  2. Реальный запуск автономного бинарника `./SlimeRushEvolution.x86_64 --rendering-method mobile --quit-after 45` из изолированной папки без `godot4` и без `--path` на стеке Wayland + Vulkan (`exit code 0`, `0` ошибок загрузки ресурсов/шрифтов/шейдеров/звуков).
+
+## 7. Ограничения (что требует личной проверки владельцем)
+
+- **Автоматизированный прогон и мышь/клавиатура на ПК ≠ палец на стекле смартфона**: физическая эргономика хвата одной рукой и скольжения пальца проверяется только человеком на телефоне.
+- **Анализ `.wav` и пиков dBFS ≠ прослушивание ушами человека**: отсутствие клиппинга и соблюдение потолка `-1.200 dBFS` доказаны численно, но субъективный баланс громкости и тембров требует прослушивания владельцем.
+- **Программный рендер `SwiftShader` / десктопный запуск ≠ мобильный GPU**: реальные `60 FPS`, время кадра, нагрев и расход батареи на целевых телефонах требуют замера на физическом Android-устройстве.

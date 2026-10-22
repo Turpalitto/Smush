@@ -1,22 +1,18 @@
 Synced 28 global GDScript classes -> .godot/global_script_class_cache.cfg
-Godot Engine v4.6.3.stable.official.7d41c59c4 - https://godotengine.org
+Godot Engine v4.5.stable.official.876b29033 - https://godotengine.org
 
 ============================================================
  SLIME RUSH: EVOLUTION — AUTOMATED QA & INTEGRATION SUITE
 ============================================================
-WARNING: Camera2D overridden to physics process mode due to use of physics interpolation.
-     at: _update_process_callback (scene/2d/camera_2d.cpp:85)
-     GDScript backtrace (most recent call first):
-         [0] _ready (res://scenes/ArenaController.gd:83)
-         [1] _ready (res://scripts/MainRoot.gd:20)
-         [2] run_async (res://tests/test_full_game_integration.gd:23)
-         [3] _execute_all (res://tests/TestRunner.gd:41)
-  [Perf] 30 simulated arena frames avg physics CPU time: 0.188 ms/frame (pool reuse hits=38)
-  [PASS] MassAndAbsorptionSuite -> 20 passed, 0 failed
+GodotGooglePlayBilling singleton not found!
+  [Perf] 30 simulated arena frames avg physics CPU time: 0.122 ms/frame (pool reuse hits=31)
+  [PASS] MassAndAbsorptionSuite -> 22 passed, 0 failed
   [PASS] MutationsAndSynergiesSuite -> 64 passed, 0 failed
   [PASS] SaveAndProgressionSuite -> 38 passed, 0 failed
   [PASS] MonetizationAndAnalyticsSuite -> 41 passed, 0 failed
-  [PASS] FullGameIntegrationSuite -> 123 passed, 0 failed
+  [PASS] FullGameIntegrationSuite -> 159 passed, 0 failed
 ------------------------------------------------------------
- TOTAL ASSERTIONS: 286 PASSED, 0 FAILED
+ TOTAL ASSERTIONS: 324 PASSED, 0 FAILED
 ============================================================
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2514)

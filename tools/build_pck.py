@@ -13,11 +13,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 INCLUDE_EXTS = {".gd", ".tscn", ".tres", ".gdshader", ".json", ".png", ".wav", ".cfg", ".ttf"}
-EXCLUDE_DIRS = {".git", "builds", "node_modules", "__pycache__", "tools", "src", "web", "android"}
+EXCLUDE_DIRS = {".git", "builds", "deliverables", "reports", "node_modules", "__pycache__", "tools", "src", "web", "android"}
 EXCLUDE_FILES = {"project.godot", "export_presets.cfg", "package.json", "package-lock.json", "tsconfig.json", "drizzle.config.json"}
 
 
-def collect_files() -> list[tuple[str, bytes]]:
+def collect_files(exclude_tests: bool = False) -> list[tuple[str, bytes]]:
     items: list[tuple[str, bytes]] = []
     # Include project.godot and .godot/global_script_class_cache.cfg
     proj = ROOT / "project.godot"
@@ -26,11 +26,15 @@ def collect_files() -> list[tuple[str, bytes]]:
     if cache_cfg.exists():
         items.append(("res://.godot/global_script_class_cache.cfg", cache_cfg.read_bytes()))
 
+    excl_dirs = set(EXCLUDE_DIRS)
+    if exclude_tests:
+        excl_dirs.add("tests")
+
     for p in sorted(ROOT.rglob("*")):
         if not p.is_file():
             continue
         rel = p.relative_to(ROOT)
-        if rel.parts[0] in EXCLUDE_DIRS or rel.parts[0].startswith("."):
+        if rel.parts[0] in excl_dirs or rel.parts[0].startswith("."):
             continue
         if p.name in EXCLUDE_FILES:
             continue
@@ -39,8 +43,8 @@ def collect_files() -> list[tuple[str, bytes]]:
     return items
 
 
-def build_pck(out_path: Path, ver_major: int = 4, ver_minor: int = 5, ver_patch: int = 0) -> None:
-    files = collect_files()
+def build_pck(out_path: Path, ver_major: int = 4, ver_minor: int = 5, ver_patch: int = 0, exclude_tests: bool = False) -> None:
+    files = collect_files(exclude_tests=exclude_tests)
 
     # Pack format v2 (supported by Godot 4.0 - 4.7+):
     # Header: magic(4s="GDPC"), pack_version(u32=2), ver_major(u32), ver_minor(u32), ver_patch(u32),
@@ -100,5 +104,7 @@ def build_pck(out_path: Path, ver_major: int = 4, ver_minor: int = 5, ver_patch:
 
 
 if __name__ == "__main__":
-    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/slime_rush.pck")
-    build_pck(dest)
+    args = [a for a in sys.argv[1:] if a != "--exclude-tests"]
+    excl_t = "--exclude-tests" in sys.argv[1:]
+    dest = Path(args[0]) if args else Path("/tmp/slime_rush.pck")
+    build_pck(dest, exclude_tests=excl_t)

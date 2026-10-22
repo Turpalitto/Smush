@@ -1,44 +1,37 @@
 # Игровые требования и их реализация
 
-Рабочая ветка — `arena/6d0cda1c-smush`. Здесь сопоставлен исходный MASTER PROMPT
-с текущей Godot-игрой. Основные решения геймдизайна: [GAME_DESIGN.md](GAME_DESIGN.md).
-Наличие реализации и успешной автоматики отделяется от ручной оценки качества.
+Рабочая ветка — `arena/5c95bae5-smush` (продолжение `arena/6d0cda1c-smush`).
+Здесь сопоставлены игровые требования с текущей Godot-реализацией в корне репозитория.
+Основные решения геймдизайна: [GAME_DESIGN.md](GAME_DESIGN.md).
+Проверки явно разделены на: (а) автоматические unit/integration тесты, (б) реальный программный
+рендер Vulkan Forward Mobile + запись микса `AudioServer`, (в) ручную проверку человеком на смартфоне.
 
-| Требование | Реализация | Что проверено / что дальше |
+| Требование | Реализация | Что подтверждено рендером/тестами и что остаётся проверить вручную на телефоне |
 | --- | --- | --- |
-| Джойстик, инерция, fixed/floating | [VirtualJoystick](ui/VirtualJoystick.gd), [PlayerSlime](entities/PlayerSlime.gd), [HUD](ui/GameHUD.gd) | Сброс при паузе проверен; ощущения и touch требуют ручного запуска |
-| Поглощение с учётом брони и способностей | [AbsorptionRules](systems/AbsorptionRules.gd), [ArenaController](scenes/ArenaController.gd), [EnemyEntity](enemies/EnemyEntity.gd) | Пороги проверены; зрелищность и читаемость требуют оценки |
-| Нелинейный рост и ограничения массы | [MassSystem](systems/MassSystem.gd) | Формулы и узкие проходы проверены; игровой баланс требует прохождения |
-| 12 мутаций | [MutationManager](mutations/MutationManager.gd), [конфигурация](resources/data/mutations.json), [PlayerSlime](entities/PlayerSlime.gd) | Выдача, уровни и последовательные выборы проверены; полезность каждой — ручная задача |
-| 5 комбинаций | [конфигурация синергий](resources/data/synergies.json), [MutationManager](mutations/MutationManager.gd) | Активация проверена; эффекты и баланс проверить в бою |
-| Зачарованный лес, безопасный старт | [WorldGenerator](systems/WorldGenerator.gd) | Структура и стартовая зона проверены; композиция и проходимость — ручная оценка |
-| 8 базовых противников | [EnemyEntity](enemies/EnemyEntity.gd), [EnemyFSM](enemies/EnemyFSM.gd), [конфигурация](resources/data/enemies.json) | Спавн/FSM проверены; эскалация опасности требует забега |
-| Мини-босс и трёхфазный босс | [ArenaController](scenes/ArenaController.gd), [AncientGuardianBoss](bosses/AncientGuardianBoss.gd) | Переходы фаз и победа проверены принудительным damage; честное прохождение ещё не проверено |
-| Пауза, поражение, результат, рестарт | [GameManager](systems/GameManager.gd), [OverlaysController](ui/OverlaysController.gd), [ArenaController](scenes/ArenaController.gd) | Автоматические сценарии проходят; новая игра сбрасывает таймеры |
-| Постоянная прогрессия и сохранения | [SaveManager](systems/SaveManager.gd), [конфигурация](resources/data/meta_progression.json) | Запись/repair/backup проверены; темп первых открытий требует ручного забега |
-| Анимация, частицы и мутации на теле | [SlimeVisual](entities/SlimeVisual.gd), [шейдер](shaders/slime_body.gdshader), [BurstFX](entities/BurstFX.gd) | Код присутствует; визуальный аудит пока не выполнен |
-| UI, обучение, RU/EN | [MenuScreens](ui/MenuScreens.gd), [MutationDraftOverlay](ui/MutationDraftOverlay.gd), [TutorialManager](systems/TutorialManager.gd), [локализация](localization/LocalizationManager.gd) | Контейнеры и кнопки проверены; телефонная читаемость требует просмотра |
-| Звук и отключённая по умолчанию музыка | [AudioManager](systems/AudioManager.gd), [сохранения](systems/SaveManager.gd) | Настройки и события существуют; громкость и ощущения требуют прослушивания |
-| Ограничения нагрузки | [ObjectPool](systems/ObjectPool.gd), [SpatialHashGrid](systems/SpatialHashGrid.gd) | Headless CPU-проверка проходит; реальный FPS не измерен |
+| Джойстик одной рукой, инерция, fixed/floating | [VirtualJoystick](ui/VirtualJoystick.gd), [PlayerSlime](entities/PlayerSlime.gd), [GameHUD](ui/GameHUD.gd) | Подтверждены следование базы без мёртвого хода, контр-тяга разворота, охранные зоны `excluded_zones` вокруг `РЫВОК`/`ДВОЙНИК`, защита от ложного двойного тапа при микро-уводе пальца и сброс при паузе/драфте; эргономика большим пальцем на стекле требует теста на телефоне |
+| Поглощение с учётом брони, статусов и читаемости | [AbsorptionRules](systems/AbsorptionRules.gd), [ArenaController](scenes/ArenaController.gd), [EnemyEntity](enemies/EnemyEntity.gd), [SlimeVisual](entities/SlimeVisual.gd) | Подтверждены на реальном рендере: чёткие глаза и внутренние ядра слизи поверх шейдера (`_fg_overlay`), анимация втягивания добычи, ореолы съедобности/брони/угрозы, пороги мини-босса (`<=22% HP`) и босса (`<=6% HP` + подсказка `«ПОГЛОТИТЬ!»`) |
+| Нелинейный рост и ограничения массы | [MassSystem](systems/MassSystem.gd), [WorldGenerator](systems/WorldGenerator.gd) | Проверены кривая радиуса, `SOFT_CAP_MASS`, отдаление камеры, приплюснутая тень при движении и цветовая индикация узких корневых ворот |
+| 12 полезных мутаций | [MutationManager](mutations/MutationManager.gd), [mutations.json](resources/data/mutations.json), [PlayerSlime](entities/PlayerSlime.gd), [SlimeVisual](entities/SlimeVisual.gd) | Все 12 мутаций имеют боевой эффект и читаемый визуальный признак на теле слизи; щупальца `ranged_absorb` выходят из внешней мембраны и не закрывают глаза |
+| 5 синергий | [synergies.json](resources/data/synergies.json), [MutationManager](mutations/MutationManager.gd), [ArenaController](scenes/ArenaController.gd) | Подтверждены подсветка синергий в карточках драфта, повышенный шанс добора пары и ощутимая награда в позднем забеге без обесценивания телеграфов босса |
+| Зачарованный лес и ориентиры мира | [WorldGenerator](systems/WorldGenerator.gd), [forest_canopy.gdshader](shaders/forest_canopy.gdshader) | На реальном рендере проверены кромка лесной кроны вдоль границ `±1280 px`, мшистые пни `root_pillar`, рунные монолиты `rune_stone`, кристаллы эссенции и святилище Стража |
+| 8 базовых противников | [EnemyEntity](enemies/EnemyEntity.gd), [EnemyFSM](enemies/EnemyFSM.gd), [enemies.json](resources/data/enemies.json), [HazardZone](entities/HazardZone.gd) | На реальном рендере проверены все 8 силуэтов (включая пятнистые шляпки `tiny_mushroom` и зубастые лепестки `predator_flower`), полная ширина коридоров рывка и янтарно-оранжевый телеграф взрыва `electric_beetle` |
+| Мини-босс и честный 3-фазный босс | [ArenaController](scenes/ArenaController.gd), [AncientGuardianBoss](bosses/AncientGuardianBoss.gd), [GameHUD](ui/GameHUD.gd) | На рендере и в чистом забеге проверены все 3 фазы Стража (кора, рога, ядро, широкая полоса тарана 3-й фазы, верхние телеграфы ниже компактного HUD) и защита от мульти-удара мини-босса на перекрытии (`_contact_hit_cd` + pushback) |
+| Пауза, поражение, возрождение, рестарт | [GameManager](systems/GameManager.gd), [OverlaysController](ui/OverlaysController.gd), [ArenaController](scenes/ArenaController.gd) | Проверены автопауза, однократное добровольное возрождение, отсутствие зависших тостов поверх экранов победы/поражения и чистый рестарт |
+| Мета-прогрессия и сохранения | [SaveManager](systems/SaveManager.gd), [meta_progression.json](resources/data/meta_progression.json) | Чистый забег приносит `~134–281` эссенции к победе (или `~60–110` при первом поражении у мини-босса/босса) — достаточно для первых улучшений (`25–35`) уже после 1-го забега |
+| UI на разных экранах, RU/EN | [MenuScreens](ui/MenuScreens.gd), [MutationDraftOverlay](ui/MutationDraftOverlay.gd), [OverlaysController](ui/OverlaysController.gd), [GameHUD](ui/GameHUD.gd) | Проверены реальным рендером на `720x1280` (`9:16`) и узком `540x1200` (`9:20`), а также автотестами на `360x640`, `720x1280`, `1080x2400`, `1200x1920` (RU/EN) |
+| Звук и выключенная по умолчанию музыка | [AudioManager](systems/AudioManager.gd), [PlayerSlime](entities/PlayerSlime.gd), [SaveManager](systems/SaveManager.gd) | Музыка по умолчанию выключена; пост-лимитерная запись шины `Master` (`Audio.create_post_limiter_recorder()`) в бою с боссом подтвердила `0` клиппированных сэмплов и строгий потолок **`-1.200 dBFS`** (при пике `-0.22 dBFS` до лимитера), защиту важных событий в 10-голосном пуле и устранение гула `move`; требуется живое прослушивание ушами |
+| Производительность под нагрузкой | [ObjectPool](systems/ObjectPool.gd), [SpatialHashGrid](systems/SpatialHashGrid.gd) | Шаг физики в стресс-тесте с боссом, 32 врагами и 45 сферами занимает `< 1 ms` CPU; реальные 60 FPS и нагрев на мобильном GPU требуют замера на смартфоне |
 
-## Состав последнего прогона
+## Состав автоматического прогона
 
 | Набор | Assertions |
 | --- | ---: |
-| Масса и поглощение | 20 |
-| Мутации и синергии | 64 |
-| Сохранения и прогрессия | 38 |
-| Сохранённые коммерческие/аналитические regression tests | 41 |
-| Игровая интеграция и UI | 123 |
-| **Всего** | **286** |
+| Масса и поглощение (`MassAndAbsorptionSuite`) | 22 |
+| Мутации и синергии (`MutationsAndSynergiesSuite`) | 64 |
+| Сохранения и прогрессия (`SaveAndProgressionSuite`) | 38 |
+| Коммерческие/аналитические regression tests (`MonetizationAndAnalyticsSuite`) | 41 |
+| Полная игровая интеграция, управление, UI, честный бой с боссом и звук (`FullGameIntegrationSuite`) | 159 |
+| **Всего** | **324** |
 
-286 — число всех assertions, а не число отдельных игровых механик.
-Оба зафиксированных прогона (source/PCK) завершились без failures.
-Логи и условия: [TEST_REPORT.md](TEST_REPORT.md).
-
-## Как продолжать
-
-Следовать [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). Первым делом — обычный
-забег без тестовых усилений, затем конкретные игровые улучшения по наблюдениям.
-Рекламу, платежи, SDK и выпуск сейчас не развивать. Статус релиза хранится отдельно
-в [RELEASE_STATUS.md](RELEASE_STATUS.md) и не задаёт текущую очередь работы.
+Оба прогона — из исходного дерева (`./scripts/run_qa.sh`) и из автономного `.pck` вне
+репозитория — завершились с `0 FAILED` и без `ERROR:` в логе. Подробности: [TEST_REPORT.md](TEST_REPORT.md).
