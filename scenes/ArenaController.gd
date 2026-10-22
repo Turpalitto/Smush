@@ -43,6 +43,8 @@ var current_draft_choices: Array[Dictionary] = []
 var _enemy_spawn_timer: float = 0.5
 var _orb_spawn_timer: float = 0.3
 var _narrow_toast_cd: float = 0.0
+var _boss_ram_cd: float = 0.0
+var _tracked_miniboss: EnemyEntity = null
 
 var _entities_layer: Node2D
 var _hazards_layer: Node2D
@@ -79,6 +81,7 @@ func _ready() -> void:
 	_entities_layer.add_child(player)
 
 	camera = Camera2D.new()
+	camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 7.5
 	camera.limit_left = int(-WorldGenerator.ARENA_HALF_SIZE - 90.0)
@@ -119,6 +122,8 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	_enemy_spawn_timer = 0.5
 	_orb_spawn_timer = 0.3
 	_narrow_toast_cd = 0.0
+	_boss_ram_cd = 0.0
+	_tracked_miniboss = null
 	current_draft_choices.clear()
 	run_ended = false
 	miniboss_spawned = false
@@ -156,14 +161,14 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	player.initialize_for_run(self)
 
 	# Populate initial welcoming spores & passive creatures around central clearing
-	for _i in range(26):
-		var opos := world.pick_valid_spawn_point(Vector2.ZERO, 95.0, 620.0)
-		_spawn_orb(opos, "spore", 0.9, 6.0, 0)
-	for _i in range(7):
-		var mpos := world.pick_valid_spawn_point(Vector2.ZERO, 175.0, 480.0)
+	for _i in range(16):
+		var opos := world.pick_valid_spawn_point(Vector2.ZERO, 175.0, 620.0)
+		_spawn_orb(opos, "spore", 0.36, 4.8, 0)
+	for _i in range(6):
+		var mpos := world.pick_valid_spawn_point(Vector2.ZERO, 235.0, 510.0)
 		spawn_enemy_by_id("tiny_mushroom", mpos)
 	for _i in range(3):
-		var bpos := world.pick_valid_spawn_point(Vector2.ZERO, 240.0, 560.0)
+		var bpos := world.pick_valid_spawn_point(Vector2.ZERO, 280.0, 560.0)
 		spawn_enemy_by_id("forest_beetle", bpos)
 
 	SaveData.increment_stat("total_runs", 1.0)
@@ -181,16 +186,37 @@ func _physics_process(delta: float) -> void:
 	run_elapsed += delta
 	if _narrow_toast_cd > 0.0:
 		_narrow_toast_cd -= delta
+	if _boss_ram_cd > 0.0:
+		_boss_ram_cd = maxf(0.0, _boss_ram_cd - delta)
 
 	Events.run_timer_updated.emit(run_elapsed, boss_spawn_time)
-
-	if canopy_mat != null:
-		canopy_mat.set_shader_parameter("world_offset", player.global_position)
 
 	# Subtle camera zoom-out as slime grows so battlefield stays readable on phone screens
 	if camera != null:
 		var target_zoom_f := lerpf(1.04, 0.80, clampf((player.mass - 10.0) / 110.0, 0.0, 1.0))
 		camera.zoom = camera.zoom.lerp(Vector2(target_zoom_f, target_zoom_f), 1.0 - exp(-3.0 * delta))
+
+	if canopy_mat != null:
+		canopy_mat.set_shader_parameter("world_offset", player.global_position)
+		if camera != null:
+			canopy_mat.set_shader_parameter("camera_zoom", camera.zoom.x)
+		canopy_mat.set_shader_parameter("view_size", get_viewport_rect().size)
+
+	# Update diegetic compass chevron toward distant Boss or Miniboss
+	if player.visual != null:
+		var c_dir := Vector2.ZERO
+		var c_col := Color(1.0, 0.84, 0.36)
+		if active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
+			var diff := active_boss.global_position - player.global_position
+			if diff.length() > 260.0:
+				c_dir = diff.normalized()
+		elif _tracked_miniboss != null and is_instance_valid(_tracked_miniboss) and _tracked_miniboss.is_active_combatant() and _tracked_miniboss.is_miniboss:
+			var diff := _tracked_miniboss.global_position - player.global_position
+			if diff.length() > 260.0:
+				c_dir = diff.normalized()
+				c_col = Color(0.86, 0.45, 1.0)
+		player.visual.compass_dir = c_dir
+		player.visual.compass_color = c_col
 
 	if player.velocity.length() > 45.0:
 		tutorial.notify_player_moved()
@@ -225,10 +251,11 @@ func _process_spawning_and_waves(delta: float) -> void:
 		miniboss_spawned = true
 		var mb_cfg: Dictionary = ConfigDB.special_encounters.get("umbral_alpha", {})
 		if not mb_cfg.is_empty():
-			var pos := world.pick_valid_spawn_point(player.global_position, 340.0, 520.0)
+			var pos := world.pick_valid_spawn_point(player.global_position, 320.0, 480.0)
 			var en := enemy_pool.acquire() as EnemyEntity
 			if en != null:
-				en.setup_from_config(mb_cfg, pos, self, 1.0)
+				en.setup_from_config(mb_cfg, pos, self, 1.0, 1.0)
+				_tracked_miniboss = en
 				Events.miniboss_spawned.emit("umbral_alpha")
 				Events.toast_requested.emit(Loc.t("hud.miniboss_incoming"), Color(0.86, 0.55, 1.0))
 
@@ -237,19 +264,19 @@ func _process_spawning_and_waves(delta: float) -> void:
 
 	_orb_spawn_timer -= delta
 	if _orb_spawn_timer <= 0.0:
-		_orb_spawn_timer = 0.65
+		_orb_spawn_timer = 0.72
 		if orb_pool.active_count() < MAX_ACTIVE_ORBS - 6:
-			var opos := world.pick_valid_spawn_point(player.global_position, 150.0, 680.0)
-			var is_ess := randf() < (0.10 + SaveData.get_upgrade_bonus("essence_chance") * 0.25)
-			_spawn_orb(opos, "essence" if is_ess else "spore", 0.95, 6.5, 1 if is_ess else 0)
+			var opos := world.pick_valid_spawn_point(player.global_position, 155.0, 640.0)
+			var is_ess := randf() < (0.11 + SaveData.get_upgrade_bonus("essence_chance") * 0.25)
+			_spawn_orb(opos, "essence" if is_ess else "spore", 0.38, 5.8, 1 if is_ess else 0)
 
 	_enemy_spawn_timer -= delta
 	if _enemy_spawn_timer <= 0.0:
-		var pace := 1.55 if not boss_spawned else 2.8
+		var pace := 1.28 if not boss_spawned else 3.2
 		_enemy_spawn_timer = pace
 		if enemy_pool.active_count() < MAX_ACTIVE_ENEMIES - 4:
 			var chosen_id := _pick_weighted_enemy_for_time(run_elapsed)
-			var epos := world.pick_valid_spawn_point(player.global_position, 340.0, 680.0)
+			var epos := world.pick_valid_spawn_point(player.global_position, 300.0, 620.0)
 			spawn_enemy_by_id(chosen_id, epos)
 
 
@@ -280,8 +307,10 @@ func spawn_enemy_by_id(enemy_id: String, pos: Vector2) -> EnemyEntity:
 	var en := enemy_pool.acquire() as EnemyEntity
 	if en == null:
 		return null
-	var diff_scale := 1.0 + clampf(run_elapsed / 320.0, 0.0, 0.65)
-	en.setup_from_config(cfg, pos, self, diff_scale)
+	var t_equiv := run_elapsed * (1.85 if mode_id == "quick" else 1.0)
+	var diff_scale := 1.0 + clampf(t_equiv / 300.0, 0.0, 0.65)
+	var mass_scale := 1.0 + clampf((t_equiv - 45.0) / 185.0, 0.0, 1.02)
+	en.setup_from_config(cfg, pos, self, diff_scale, mass_scale)
 	return en
 
 
@@ -303,8 +332,17 @@ func spawn_boss_minions(boss_pos: Vector2, count: int) -> void:
 	for i in range(count):
 		var ang := (TAU / float(maxi(1, count))) * float(i)
 		var mpos := clamp_world_point(boss_pos + Vector2.from_angle(ang) * 115.0, 24.0)
-		var mid := "tiny_mushroom" if (i % 2 == 0) else "electric_beetle"
+		var mid := "tiny_mushroom" if (i % 2 == 0) else "forest_beetle"
 		spawn_enemy_by_id(mid, mpos)
+
+
+func spawn_boss_dew_spores(boss_pos: Vector2, count: int) -> void:
+	for i in range(count):
+		var ang := randf() * TAU
+		var dpos := clamp_world_point(boss_pos + Vector2.from_angle(ang) * randf_range(135.0, 195.0), 20.0)
+		var orb := orb_pool.acquire() as CollectibleOrb
+		if orb != null:
+			orb.setup(dpos, "dew", 0.6, 14.0, 1, 14.0)
 
 
 func _spawn_orb(pos: Vector2, otype: String, mass_val: float, xp_val: float, ess_val: int) -> CollectibleOrb:
@@ -314,14 +352,14 @@ func _spawn_orb(pos: Vector2, otype: String, mass_val: float, xp_val: float, ess
 	return orb
 
 
-func _spawn_burst(pos: Vector2, col: Color, count: int = 8, ring_r: float = 0.0) -> void:
+func _spawn_burst(pos: Vector2, col: Color, count: int = 8, ring_r: float = 0.0, callout: String = "") -> void:
 	var budget := App.get_fx_particle_budget()
-	if fx_pool.active_count() >= budget:
+	if fx_pool.active_count() >= budget and callout.is_empty():
 		return
 	var fx := fx_pool.acquire() as BurstFX
 	if fx != null:
 		var scaled_cnt := maxi(3, int(round(float(count) * (float(budget) / 80.0))))
-		fx.setup(pos, col, scaled_cnt, ring_r)
+		fx.setup(pos, col, scaled_cnt, ring_r, callout)
 
 
 # --- Player & World Interactions ---
@@ -367,11 +405,14 @@ func _process_orb_interactions(_delta: float) -> void:
 		if d <= pr + 12.0:
 			var pos := orb.global_position
 			var mv := orb.mass_value
-			var xv := orb.xp_value
+			var xv := orb.xp_value * (1.20 if orb.magnet_charged else 1.0)
 			var ev := orb.essence_value
+			var hv := orb.heal_value
 			var ocol := orb.orb_color
 			orb_pool.release(orb)
 			_spawn_burst(pos, ocol, 6, 0.0)
+			if hv > 0.0 and player.hp < player.max_hp:
+				player.heal(hv)
 			player.complete_absorption("spore_orb", mv, xv, ev, pos)
 			tutorial.notify_entity_absorbed()
 
@@ -399,26 +440,55 @@ func _process_enemy_interactions(delta: float) -> void:
 			en.crack_shell()
 
 		if bool(eval_res.get("can_absorb", false)):
+			if player.mimicry_ambush_ready:
+				player.consume_ambush_strike()
 			en.begin_suction_into(player)
 			continue
 
-		# Not yet absorbable: apply Spikes / Piercing Strike contact damage!
+		# Mimicry Ambush Burst Strike on non-edible target: cracks shell & chunks HP!
+		var ambush_dmg := player.consume_ambush_strike()
+		if ambush_dmg > 0.0:
+			en.crack_shell()
+			en.take_damage(ambush_dmg, 0.75)
+			var amb_lbl := "ЗАСАДА!" if Loc.current_locale == "ru" else "AMBUSH!"
+			_spawn_burst(en.global_position, Color(0.45, 1.0, 0.72), 10, 32.0, amb_lbl)
+			if not en.is_active_combatant():
+				continue
+
+		# Clear visual + callout feedback if blocked by intact Stone Slug shell
+		if str(eval_res.get("reason", "")) == "armored_shell" and en.block_callout_cd <= 0.0:
+			en.block_callout_cd = 2.2
+			var sh_lbl := "ПАНЦИРЬ!" if Loc.current_locale == "ru" else "SHELL!"
+			_spawn_burst(en.global_position, Color(0.75, 0.88, 1.0), 6, 22.0, sh_lbl)
+
+		# Body-ram / Dash / Spikes contact damage against dangerous enemies
+		var ram_dps := 14.0 + player.mass * 0.22
+		var pierce := 0.0
 		if player.mutations.has_mutation("spikes"):
-			var spike_dps := player.mutations.get_scaled_param("spikes", "contact_dps_base", "contact_dps_per_level", 18.0)
-			var pierce := float(player.mutations.get_level("spikes")) * 0.20
-			if player.is_dashing and player.mutations.has_synergy("piercing_strike"):
+			ram_dps += player.mutations.get_scaled_param("spikes", "contact_dps_base", "contact_dps_per_level", 18.0)
+			pierce = float(player.mutations.get_level("spikes")) * 0.22
+		if player.is_dashing:
+			if player.mutations.has_synergy("piercing_strike"):
 				en.crack_shell()
-				en.take_damage(48.0 * delta * 6.0, 1.0)
+				en.take_damage(52.0 * delta * 6.0, 1.0)
 			else:
-				en.take_damage(spike_dps * delta, pierce)
+				en.take_damage(ram_dps * 2.2 * delta, maxf(0.35, pierce))
+		elif player.mutations.has_mutation("spikes") or en.is_miniboss or en.is_vulnerable:
+			en.take_damage(ram_dps * delta, pierce)
 
-		# Enemy deals contact damage to player if able
-		if en.can_deal_contact_hit() and dist <= pr + en.get_body_radius():
+		# Enemy deals contact damage to player if able (unless stunned/vulnerable/dashing)
+		if en.can_deal_contact_hit() and not en.is_vulnerable and dist <= pr + en.get_body_radius():
 			en.mark_contact_hit_dealt()
-			player.take_damage(en.contact_damage, en.enemy_id, false, en.global_position)
+			var dealt := player.take_damage(en.contact_damage, en.enemy_id, false, en.global_position)
+			if dealt and (en.is_miniboss or en.mass >= 24.0):
+				var sep_dir := (player.global_position - en.global_position).normalized()
+				if sep_dir.length_squared() < 0.01:
+					sep_dir = Vector2.DOWN
+				player.global_position = clamp_world_point(en.global_position + sep_dir * (pr + en.get_body_radius() + 5.0), pr)
+				player.velocity = sep_dir * 205.0
 
 
-func _process_boss_interactions(delta: float) -> void:
+func _process_boss_interactions(_delta: float) -> void:
 	if active_boss == null or not is_instance_valid(active_boss) or active_boss.action_state == AncientGuardianBoss.ActionState.DEFEATED:
 		return
 	var pr := player.get_radius()
@@ -433,19 +503,38 @@ func _process_boss_interactions(delta: float) -> void:
 		active_boss.take_damage(9999.0, 1.0)
 		return
 
-	# Player contact / dash / spikes / collision damage against boss (especially strong when boss is vulnerable!)
-	var base_ram_dps := 22.0 + player.mass * 0.45
-	if player.mutations.has_mutation("spikes"):
-		base_ram_dps += player.mutations.get_scaled_param("spikes", "contact_dps_base", "contact_dps_per_level", 18.0)
-	if player.is_dashing:
-		base_ram_dps *= (2.4 if player.mutations.has_synergy("piercing_strike") else 1.5)
-	if player.mimicry_ambush_ready:
-		base_ram_dps *= 1.45
-	active_boss.take_damage(base_ram_dps * delta, float(player.mutations.get_level("spikes")) * 0.15)
-
-	if active_boss.can_deal_contact_hit() and not active_boss.is_vulnerable():
-		active_boss.mark_contact_hit_dealt()
-		player.take_damage(active_boss.contact_damage, active_boss.boss_id, false, active_boss.global_position)
+	# Elastic Impact Strike against Boss (prevents 60-Hz overlapping melt OR instant contact death!)
+	if _boss_ram_cd <= 0.0:
+		_boss_ram_cd = 0.48
+		var strike_dmg := 26.0 + player.mass * 0.22
+		var pierce := float(player.mutations.get_level("spikes")) * 0.18
+		if player.mutations.has_mutation("spikes"):
+			strike_dmg += player.mutations.get_scaled_param("spikes", "contact_dps_base", "contact_dps_per_level", 18.0) * 0.85
+		if player.is_dashing:
+			strike_dmg *= (2.25 if player.mutations.has_synergy("piercing_strike") else 1.65)
+			pierce = maxf(pierce, 0.55)
+		var ambush_bonus := player.consume_ambush_strike()
+		if ambush_bonus > 0.0:
+			strike_dmg += ambush_bonus * 1.25
+			pierce = maxf(pierce, 0.65)
+		var was_vuln := active_boss.is_vulnerable()
+		active_boss.take_damage(strike_dmg, pierce)
+		var away := (player.global_position - active_boss.global_position).normalized()
+		if away.length_squared() < 0.01:
+			away = Vector2.DOWN
+		player.global_position = clamp_world_point(active_boss.global_position + away * (pr + br + 6.0), pr)
+		player.velocity = away * 225.0
+		if player.visual != null:
+			player.visual.trigger_wall_bump(away)
+		var hit_lbl := ("УЯЗВИМ!" if Loc.current_locale == "ru" else "WEAK SPOT!") if was_vuln else ""
+		_spawn_burst(active_boss.global_position + away * br * 0.8, Color(0.48, 1.0, 0.76) if was_vuln else Color(1.0, 0.88, 0.45), 9, 28.0, hit_lbl)
+		Audio.play_sfx("attack", 1.18 if was_vuln else 0.95)
+		if active_boss == null or active_boss.action_state == AncientGuardianBoss.ActionState.DEFEATED:
+			return
+		# Safe melee punish window when Boss is Vulnerable, Dashing, or Ambushing!
+		if not was_vuln and not player.is_dashing and ambush_bonus <= 0.0 and active_boss.can_deal_contact_hit():
+			active_boss.mark_contact_hit_dealt()
+			player.take_damage(active_boss.get_active_contact_damage(), active_boss.boss_id, false, active_boss.global_position)
 
 
 func finalize_enemy_suction(en: EnemyEntity) -> void:
@@ -498,6 +587,8 @@ func apply_magnet_field(center: Vector2, radius: float, force: float, delta: flo
 	for node in orb_grid.query_radius(center, radius):
 		var orb := node as CollectibleOrb
 		if orb != null:
+			if orb.global_position.distance_to(center) > 55.0:
+				orb.magnet_charged = true
 			orb.global_position = orb.global_position.move_toward(center, force * delta)
 	if pull_enemies:
 		for node in enemy_grid.query_radius(center, radius * 0.85):
@@ -544,6 +635,8 @@ func trigger_freeze_pulse(center: Vector2, radius: float, slow_amt: float, dur: 
 
 func process_ranged_tendrils(p_slime: PlayerSlime, center: Vector2, rng: float, reel_spd: float, dt: float, has_vampirism: bool) -> Array[Vector2]:
 	var endpoints: Array[Vector2] = []
+	var lv := maxi(1, p_slime.mutations.get_level("ranged_absorb"))
+	var tether_dps := 13.0 + float(lv) * 5.5 + (6.0 if has_vampirism else 0.0)
 	var p_ctx := p_slime.mutations.build_player_absorption_context(p_slime.mass, p_slime.is_dashing, p_slime.mimicry_ambush_ready)
 	for node in enemy_grid.query_radius(center, rng):
 		if endpoints.size() >= 2:
@@ -555,17 +648,64 @@ func process_ranged_tendrils(p_slime: PlayerSlime, center: Vector2, rng: float, 
 		if bool(ev.get("can_absorb", false)):
 			en.global_position = en.global_position.move_toward(center, reel_spd * dt)
 			endpoints.append(en.global_position)
-		elif has_vampirism:
-			en.take_damage(18.0 * dt, 0.35)
-			p_slime.heal(8.0 * dt)
+		else:
+			en.apply_freeze(0.24, 0.35)
+			en.take_damage(tether_dps * dt, 0.30)
+			if has_vampirism:
+				p_slime.heal(3.6 * dt)
 			endpoints.append(en.global_position)
 
-	if has_vampirism and endpoints.size() < 2 and active_boss != null and is_instance_valid(active_boss):
+	if endpoints.size() < 2 and active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
 		if active_boss.global_position.distance_to(center) <= rng + active_boss.get_body_radius():
-			active_boss.take_damage(22.0 * dt, 0.35)
-			p_slime.heal(9.0 * dt)
+			var bev := AbsorptionRules.evaluate(p_ctx, active_boss.build_absorption_context())
+			if bool(bev.get("can_absorb", false)):
+				active_boss.take_damage(9999.0, 1.0)
+			else:
+				active_boss.take_damage((tether_dps * 1.15) * dt, 0.35)
+				if has_vampirism:
+					p_slime.heal(3.8 * dt)
 			endpoints.append(active_boss.global_position)
+
+	if endpoints.size() < 2:
+		for node in orb_grid.query_radius(center, rng):
+			if endpoints.size() >= 2:
+				break
+			var orb := node as CollectibleOrb
+			if orb != null and orb.visible:
+				orb.start_suction(p_slime)
+				endpoints.append(orb.global_position)
 	return endpoints
+
+
+func has_nearby_split_opportunity(center: Vector2) -> bool:
+	if active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
+		return active_boss.global_position.distance_to(center) <= 340.0
+	var count := 0
+	for node in enemy_grid.query_radius(center, 250.0):
+		var en := node as EnemyEntity
+		if en != null and en.is_active_combatant():
+			count += 1
+			if count >= 2 or en.is_miniboss:
+				return true
+	return false
+
+
+func trigger_slipstream_wave(center: Vector2, radius: float, damage: float) -> void:
+	var hit := false
+	for node in enemy_grid.query_radius(center, radius):
+		var en := node as EnemyEntity
+		if en != null and en.is_active_combatant():
+			en.take_damage(damage, 0.25)
+			var push := (en.global_position - center).normalized() * 68.0
+			en.global_position = clamp_world_point(en.global_position + push, en.get_body_radius())
+			hit = true
+	if active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
+		if active_boss.global_position.distance_to(center) <= radius + active_boss.get_body_radius():
+			active_boss.take_damage(damage, 0.2)
+			hit = true
+	_spawn_burst(center, Color(0.48, 1.0, 0.92), 8, radius * 0.85)
+	if hit:
+		Audio.play_sfx("attack", 1.42)
 
 
 func on_player_shield_burst(center: Vector2, is_ice_armor: bool) -> void:
@@ -591,13 +731,28 @@ func spawn_slime_clones(owner_slime: PlayerSlime, count: int, dur: float, dps: f
 		active_clones.append(cl)
 
 
+func find_nearest_clone_decoy(from_pos: Vector2, max_dist: float) -> Node2D:
+	var best: Node2D = null
+	var best_d := max_dist
+	for cl in active_clones:
+		if is_instance_valid(cl) and not cl.is_expired():
+			var d := cl.global_position.distance_to(from_pos)
+			if d < best_d:
+				best_d = d
+				best = cl
+	return best
+
+
 func find_clone_target(from_pos: Vector2) -> Variant:
+	var near_en := enemy_grid.query_nearest(from_pos, 290.0)
+	if near_en != null:
+		return near_en.global_position
+	if active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
+		if active_boss.global_position.distance_to(from_pos) <= 360.0:
+			return active_boss.global_position
 	var near_orb := orb_grid.query_nearest(from_pos, 260.0)
 	if near_orb != null:
 		return near_orb.global_position
-	var near_en := enemy_grid.query_nearest(from_pos, 280.0)
-	if near_en != null:
-		return near_en.global_position
 	return null
 
 
@@ -611,10 +766,13 @@ func process_clone_contacts(_clone: SlimeClone, pos: Vector2, radius: float, dmg
 			var opos := orb.global_position
 			orb_pool.release(orb)
 			player.complete_absorption("spore_orb", mv, xv, ev, opos)
-	for node in enemy_grid.query_radius(pos, radius + 22.0):
+	for node in enemy_grid.query_radius(pos, radius + 24.0):
 		var en := node as EnemyEntity
 		if en != null and en.is_active_combatant():
-			en.take_damage(dmg, 0.25)
+			en.take_damage(dmg, 0.30)
+	if active_boss != null and is_instance_valid(active_boss) and active_boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
+		if active_boss.global_position.distance_to(pos) <= radius + active_boss.get_body_radius():
+			active_boss.take_damage(dmg * 1.15, 0.25)
 
 
 func spawn_player_poison_pool(pos: Vector2, radius: float, dur: float, dps: float) -> void:

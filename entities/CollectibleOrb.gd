@@ -2,28 +2,34 @@ class_name CollectibleOrb
 extends Node2D
 ## Pooled nutrient spore / Forest Essence crystal pickup with suction animation.
 
-var orb_type: String = "spore" # "spore" or "essence"
+var orb_type: String = "spore" # "spore", "essence", or "dew"
 var mass_value: float = 0.85
 var xp_value: float = 5.0
 var essence_value: int = 0
+var heal_value: float = 1.2
+var magnet_charged: bool = false
 var orb_color: Color = Color(0.45, 1.0, 0.78, 0.95)
 var being_pulled_by: Node2D = null
 var _pull_time: float = 0.0
 var _bob_phase: float = 0.0
 
 
-func setup(p_pos: Vector2, p_type: String, p_mass: float, p_xp: float, p_essence: int = 0) -> void:
+func setup(p_pos: Vector2, p_type: String, p_mass: float, p_xp: float, p_essence: int = 0, p_heal: float = -1.0) -> void:
 	global_position = p_pos
 	orb_type = p_type
 	mass_value = p_mass
 	xp_value = p_xp
 	essence_value = p_essence
+	heal_value = p_heal if p_heal >= 0.0 else (10.0 if p_type == "dew" else (2.5 if p_type == "essence" else 1.2))
+	magnet_charged = false
 	being_pulled_by = null
 	_pull_time = 0.0
 	_bob_phase = randf() * TAU
 	scale = Vector2.ONE
 	if orb_type == "essence":
 		orb_color = Color(0.40, 0.98, 0.85, 1.0)
+	elif orb_type == "dew":
+		orb_color = Color(0.58, 1.0, 0.52, 1.0)
 	else:
 		orb_color = Color.from_hsv(randf_range(0.32, 0.55), 0.65, 1.0, 0.92)
 	queue_redraw()
@@ -59,6 +65,11 @@ func _draw() -> void:
 		])
 		draw_colored_polygon(pts, orb_color)
 		draw_circle(Vector2(-2, -3), 2.5, Color(1, 1, 1, 0.85))
+	elif orb_type == "dew":
+		draw_circle(Vector2.ZERO, 13.5 * pulse, Color(0.48, 1.0, 0.62, 0.28))
+		draw_circle(Vector2.ZERO, 7.8 * pulse, orb_color)
+		draw_line(Vector2(-3.5, 0.0), Vector2(3.5, 0.0), Color(1.0, 1.0, 0.90, 0.92), 2.0)
+		draw_line(Vector2(0.0, -3.5), Vector2(0.0, 3.5), Color(1.0, 1.0, 0.90, 0.92), 2.0)
 	else:
 		draw_circle(Vector2.ZERO, 9.5 * pulse, Color(orb_color.r, orb_color.g, orb_color.b, 0.22))
 		draw_circle(Vector2.ZERO, 5.8 * pulse, orb_color)

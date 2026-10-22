@@ -158,13 +158,32 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	# Arena enchanted border hedge & rune boundary
+	# Arena enchanted border treeline & living root hedge
 	var border_rect := Rect2(-ARENA_HALF_SIZE, -ARENA_HALF_SIZE, ARENA_HALF_SIZE * 2.0, ARENA_HALF_SIZE * 2.0)
-	draw_rect(border_rect, Color(0.24, 0.78, 0.62, 0.45), false, 8.0)
-	draw_rect(border_rect.grow(16.0), Color(0.04, 0.09, 0.11, 0.85), false, 24.0)
+	draw_rect(border_rect.grow(56.0), Color(0.03, 0.08, 0.10, 0.94), false, 96.0)
+	draw_rect(border_rect, Color(0.22, 0.74, 0.58, 0.42), false, 6.0)
+	var b_step: float = 96.0
+	var b_idx: int = 0
+	var coord: float = -ARENA_HALF_SIZE
+	while coord <= ARENA_HALF_SIZE:
+		var rad_b: float = 34.0 + float((b_idx * 13) % 14)
+		var c_dark := Color(0.07, 0.19, 0.17, 0.95)
+		var c_leaf := Color(0.13, 0.34, 0.27, 0.90)
+		for bpt: Vector2 in [Vector2(coord, -ARENA_HALF_SIZE - 14.0), Vector2(coord, ARENA_HALF_SIZE + 14.0), Vector2(-ARENA_HALF_SIZE - 14.0, coord), Vector2(ARENA_HALF_SIZE + 14.0, coord)]:
+			draw_circle(bpt, rad_b, c_dark)
+			draw_circle(bpt * 0.985, rad_b * 0.72, c_leaf)
+		coord += b_step
+		b_idx += 1
 
-	# Central sanctuary moss ring
-	draw_arc(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.75, 0.0, TAU, 48, Color(0.32, 0.85, 0.68, 0.16), 4.0)
+	# Central sanctuary moss ring & world-anchored glade stepping paths
+	draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.82, Color(0.14, 0.34, 0.29, 0.22))
+	draw_arc(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.75, 0.0, TAU, 48, Color(0.32, 0.85, 0.68, 0.22), 4.0)
+
+	# Northern Ancient Guardian Shrine circle (world landmark at (0, -480))
+	var shrine_p := Vector2(0.0, -480.0)
+	draw_circle(shrine_p, 145.0, Color(0.16, 0.30, 0.28, 0.24))
+	draw_arc(shrine_p, 145.0, 0.0, TAU, 40, Color(0.52, 0.92, 0.74, 0.22), 3.0)
+	draw_arc(shrine_p, 92.0, _anim_time * 0.15, _anim_time * 0.15 + PI * 1.5, 28, Color(0.88, 0.78, 0.42, 0.20), 2.5)
 
 	# Decorative flora (soft colors, glowing mushrooms, fern clusters)
 	for fl: Dictionary in decor_flora:
@@ -189,11 +208,19 @@ func _draw() -> void:
 				var la := float(leaf_i) * (PI * 0.5) + 0.4 + sway * 0.04
 				draw_line(p, p + Vector2.from_angle(la) * (14.0 * sc), Color(0.25, 0.68, 0.48, 0.55), 3.0)
 
-	# Narrow passage floor rune markers
+	# Narrow passage floor rune markers (reacts to player size for instant tactical clarity!)
+	var p_node: PlayerSlime = get_parent().get("player") if get_parent() != null else null
 	for gate: Dictionary in narrow_gates:
 		var gc: Vector2 = gate["center"]
-		draw_circle(gc, 24.0, Color(0.45, 0.95, 0.82, 0.14))
-		draw_arc(gc, 24.0, 0.0, TAU, 20, Color(0.55, 1.0, 0.88, 0.35), 2.0)
+		var hgap: float = float(gate["half_gap"])
+		var fits_walk := true
+		var fits_dash := true
+		if p_node != null:
+			fits_walk = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, false)
+			fits_dash = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, true)
+		var gcol := Color(0.48, 1.0, 0.84) if fits_walk else (Color(1.0, 0.84, 0.36) if fits_dash else Color(1.0, 0.38, 0.44))
+		draw_circle(gc, 26.0, Color(gcol.r, gcol.g, gcol.b, 0.14))
+		draw_arc(gc, 26.0, 0.0, TAU, 24, Color(gcol.r, gcol.g, gcol.b, 0.48), 2.5)
 
 	# Physical Obstacles (Rune Stones, Mana Crystals, Root Pillars)
 	for ob: Dictionary in obstacles:
@@ -214,11 +241,29 @@ func _draw() -> void:
 			draw_colored_polygon(poly, Color(0.28, 0.76, 0.94, 0.95))
 			draw_circle(p + Vector2(-r * 0.22, -r * 0.28), r * 0.22, Color(0.85, 0.98, 1.0, 0.78))
 		elif okind == "root_pillar":
-			draw_circle(p, r, Color(0.24, 0.42, 0.32, 0.98))
-			draw_arc(p, r * 0.72, 0.0, TAU, 18, Color(0.48, 0.92, 0.68, 0.55), 3.0)
+			# Ancient gnarled tree-root stump with buttress roots, bark rings & moss cap
+			for ri in range(5):
+				var ra := float(ri) * (TAU / 5.0) + 0.35
+				var rdir := Vector2.from_angle(ra)
+				var rtang := rdir.orthogonal() * (r * 0.24)
+				draw_colored_polygon(PackedVector2Array([p + rdir * (r * 0.55) - rtang, p + rdir * (r * 1.16), p + rdir * (r * 0.55) + rtang]), Color(0.22, 0.16, 0.12, 0.96))
+			draw_circle(p, r * 0.94, Color(0.28, 0.20, 0.14, 0.98))
+			draw_circle(p + Vector2(0.0, -2.0), r * 0.74, Color(0.38, 0.28, 0.19, 0.98))
+			draw_arc(p + Vector2(0.0, -2.0), r * 0.48, 0.0, TAU, 18, Color(0.26, 0.18, 0.12, 0.72), 2.0)
+			draw_circle(p + Vector2(-r * 0.32, -r * 0.34), r * 0.34, Color(0.24, 0.62, 0.42, 0.90))
+			draw_circle(p + Vector2(r * 0.28, r * 0.26), r * 0.24, Color(0.28, 0.70, 0.48, 0.85))
 		else:
-			draw_circle(p, r, Color(0.26, 0.33, 0.38, 0.98))
-			draw_arc(p, r * 0.58, 0.0, TAU, 16, Color(0.45, 0.95, 0.82, 0.62), 2.5)
+			# Carved forest rune monolith with moss & glowing sigil
+			var rock_pts := PackedVector2Array()
+			for si in range(7):
+				var sa := float(si) * (TAU / 7.0) + 0.2
+				var sr := r * (0.92 if si % 2 == 0 else 1.02)
+				rock_pts.append(p + Vector2.from_angle(sa) * sr)
+			draw_colored_polygon(rock_pts, Color(0.23, 0.30, 0.35, 0.98))
+			draw_circle(p + Vector2(-r * 0.16, -r * 0.18), r * 0.62, Color(0.30, 0.38, 0.43, 0.92))
+			var sig_a := 0.50 + 0.22 * sin(_anim_time * 2.2 + p.y * 0.02)
+			draw_arc(p, r * 0.38, 0.0, TAU, 6, Color(0.45, 0.96, 0.82, sig_a), 2.4)
+			draw_circle(p, r * 0.12, Color(0.65, 1.0, 0.90, sig_a))
 
 	# Drifting ambient bioluminescent spores
 	if str(SaveData.get_setting("fx_quality", "high")) != "low":

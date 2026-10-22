@@ -1,6 +1,8 @@
 shader_type canvas_item;
 
 uniform vec2 world_offset = vec2(0.0);
+uniform float camera_zoom = 1.0;
+uniform vec2 view_size = vec2(720.0, 1280.0);
 uniform vec4 moss_dark : source_color = vec4(0.06, 0.13, 0.16, 1.0);
 uniform vec4 moss_mid : source_color = vec4(0.09, 0.21, 0.22, 1.0);
 uniform vec4 canopy_glow : source_color = vec4(0.22, 0.58, 0.48, 1.0);
@@ -23,7 +25,8 @@ float value_noise(vec2 p) {
 }
 
 void fragment() {
-	vec2 wp = (UV * vec2(720.0, 1280.0) + world_offset) * 0.0045;
+	vec2 world_span = view_size / max(0.35, camera_zoom);
+	vec2 wp = ((UV - vec2(0.5)) * world_span + world_offset) * 0.0042;
 	float n1 = value_noise(wp);
 	float n2 = value_noise(wp * 2.3 + vec2(4.2, -1.7));
 	float patch = smoothstep(0.28, 0.78, n1 * 0.65 + n2 * 0.35);

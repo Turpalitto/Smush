@@ -12,9 +12,9 @@ var evolution_level: int = 0
 var absorbed_count: int = 0
 
 var move_input: Vector2 = Vector2.ZERO
-var base_move_speed: float = 225.0
-var base_accel: float = 980.0
-var base_friction: float = 680.0
+var base_move_speed: float = 232.0
+var base_accel: float = 1080.0
+var base_friction: float = 790.0
 
 var mutations: MutationManager = MutationManager.new()
 var visual: SlimeVisual
@@ -41,6 +41,9 @@ var _electro_timer: float = 1.5
 var _freeze_timer: float = 2.0
 var _tendril_tick: float = 0.0
 var _combat_quiet_timer: float = 5.0
+var _slipstream_charge: float = 0.0
+var _slipstream_wave_cd: float = 0.0
+var slipstream_active: bool = false
 var mimicry_ambush_ready: bool = false
 var is_dead: bool = false
 var revive_used: bool = false
@@ -77,6 +80,9 @@ func initialize_for_run(p_arena: Node) -> void:
 	_freeze_timer = 2.0
 	_tendril_tick = 0.0
 	_combat_quiet_timer = 5.0
+	_slipstream_charge = 0.0
+	_slipstream_wave_cd = 0.0
+	slipstream_active = false
 	mimicry_ambush_ready = false
 
 	var start_mass_bonus := SaveData.get_upgrade_bonus("start_mass")
@@ -119,6 +125,10 @@ func _sync_mass_metrics() -> void:
 
 func get_radius() -> float:
 	return MassSystem.radius_from_mass(mass)
+
+
+func build_absorption_context() -> Dictionary:
+	return mutations.build_player_absorption_context(mass, is_dashing, mimicry_ambush_ready)
 
 
 func get_effective_visibility_multiplier() -> float:
@@ -174,17 +184,28 @@ func trigger_split_clone() -> bool:
 	split_cooldown = split_cooldown_max
 
 	var loan := 0.0
-	if mass >= 13.0:
-		loan = mass * 0.10
+	if mass >= 16.0:
+		loan = minf(mass - 14.5, mass * 0.08)
 		mass = MassSystem.clamp_mass(mass - loan)
 		_sync_mass_metrics()
 
 	var clone_count: int = 2 if mutations.has_synergy("toxic_clones") else 1
-	var dps := mutations.get_scaled_param("split", "clone_damage_base", "clone_damage_per_level", 15.0)
-	arena_ref.call("spawn_slime_clones", self, clone_count, 6.5, dps, mutations.has_synergy("toxic_clones"), loan / float(clone_count))
+	var dps := mutations.get_scaled_param("split", "clone_damage_base", "clone_damage_per_level", 18.0)
+	arena_ref.call("spawn_slime_clones", self, clone_count, 7.0, dps, mutations.has_synergy("toxic_clones"), loan / float(clone_count))
 	Audio.play_sfx("absorb", 1.35)
 	Events.active_skill_cooldown_updated.emit("split", split_cooldown, split_cooldown_max)
 	return true
+
+
+func consume_ambush_strike() -> float:
+	if not mimicry_ambush_ready or not mutations.has_mutation("mimicry"):
+		return 0.0
+	mimicry_ambush_ready = false
+	_combat_quiet_timer = 0.0
+	if visual != null:
+		visual.stealth_alpha = 0.94
+	var lv := mutations.get_level("mimicry")
+	return 26.0 + float(lv - 1) * 11.0
 
 
 func refund_clone_mass(amount: float) -> void:
@@ -207,13 +228,17 @@ func _physics_process(delta: float) -> void:
 func _process_movement(delta: float) -> void:
 	var input_vec := move_input
 	if input_vec.length_squared() < 0.001:
-		# Desktop/keyboard convenience fallback
+		# Desktop/keyboard convenience fallback (Arrow keys + WASD)
 		var kx := Input.get_axis("ui_left", "ui_right")
 		var ky := Input.get_axis("ui_up", "ui_down")
+		if absf(kx) < 0.01 and absf(ky) < 0.01:
+			kx = (1.0 if Input.is_key_pressed(KEY_D) else 0.0) - (1.0 if Input.is_key_pressed(KEY_A) else 0.0)
+			ky = (1.0 if Input.is_key_pressed(KEY_S) else 0.0) - (1.0 if Input.is_key_pressed(KEY_W) else 0.0)
 		input_vec = Vector2(kx, ky).limit_length(1.0)
 
 	var upg_spd_mult := 1.0 + SaveData.get_upgrade_bonus("move_speed")
-	var mut_spd_mult := 1.0 + float(mutations.get_level("speed_boost")) * 0.09
+	var spd_lv := mutations.get_level("speed_boost")
+	var mut_spd_mult := 1.0 + float(spd_lv) * 0.09 + (0.12 if slipstream_active else 0.0)
 	if mutations.has_mutation("spikes"):
 		mut_spd_mult -= 0.03
 	var mass_maneuver := MassSystem.maneuverability_multiplier(mass)
@@ -222,14 +247,35 @@ func _process_movement(delta: float) -> void:
 	if is_dashing:
 		velocity = _dash_dir * (max_spd * 2.65)
 	elif input_vec.length() > 0.04:
-		var accel := base_accel * (1.0 + float(mutations.get_level("speed_boost")) * 0.12) * mass_maneuver
+		var accel := base_accel * (1.0 + float(spd_lv) * 0.14) * mass_maneuver
+		var pre_move_spd := velocity.length()
+		var sharp_turn := false
+		# Counter-traction turn assist: responsive direction reversals without losing organic glide
+		if pre_move_spd > 25.0:
+			var align := velocity.normalized().dot(input_vec.normalized())
+			if align < 0.35:
+				sharp_turn = true
+				if slipstream_active and align < -0.25 and _slipstream_wave_cd <= 0.0 and arena_ref != null and arena_ref.has_method("trigger_slipstream_wave"):
+					_slipstream_wave_cd = 1.9
+					_slipstream_charge = 0.25
+					arena_ref.call("trigger_slipstream_wave", global_position, 120.0, 16.0 + float(spd_lv) * 8.0)
+				accel *= lerpf(1.95, 1.0, clampf((align + 0.5) / 0.85, 0.0, 1.0))
 		var target_vel := input_vec * max_spd
 		velocity = velocity.move_toward(target_vel, accel * delta)
 		if visual != null:
 			visual.look_dir = input_vec.normalized()
+		if (pre_move_spd < 38.0 or sharp_turn) and Audio._move_cooldown > 0.38:
+			Audio._move_cooldown = 0.38
 		Audio.play_sfx("move", lerpf(1.15, 0.82, clampf((mass - 10.0) / 90.0, 0.0, 1.0)))
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, base_friction * delta)
+
+	# Build or decay Speed Boost slipstream state
+	if spd_lv > 0 and velocity.length() >= max_spd * 0.68:
+		_slipstream_charge = minf(1.0, _slipstream_charge + delta * 1.05)
+	else:
+		_slipstream_charge = maxf(0.0, _slipstream_charge - delta * 1.6)
+	slipstream_active = (spd_lv > 0 and _slipstream_charge >= 0.95)
 
 	var pre_vel := velocity
 	move_and_slide()
@@ -249,6 +295,7 @@ func _process_movement(delta: float) -> void:
 		visual.velocity_vec = velocity
 		visual.is_dashing = is_dashing
 		visual.shield_active = shield_ready
+		visual.slipstream_active = slipstream_active
 
 
 func _update_timers_and_passives(delta: float) -> void:
@@ -264,14 +311,18 @@ func _update_timers_and_passives(delta: float) -> void:
 		dash_cooldown = maxf(0.0, dash_cooldown - delta)
 		Events.active_skill_cooldown_updated.emit("dash", dash_cooldown, dash_cooldown_max)
 
+	if _slipstream_wave_cd > 0.0:
+		_slipstream_wave_cd = maxf(0.0, _slipstream_wave_cd - delta)
+
 	if split_cooldown > 0.0:
 		split_cooldown = maxf(0.0, split_cooldown - delta)
 		Events.active_skill_cooldown_updated.emit("split", split_cooldown, split_cooldown_max)
-	elif mutations.has_mutation("split") and velocity.length() > 35.0:
-		# Seamless one-finger option: auto-bud clone when off cooldown during active movement
-		trigger_split_clone()
+	elif mutations.has_mutation("split") and velocity.length() > 35.0 and mass >= 18.0:
+		# One-finger combat assist: auto-bud clone only when active combat/cluster is nearby
+		if arena_ref != null and arena_ref.has_method("has_nearby_split_opportunity") and bool(arena_ref.call("has_nearby_split_opportunity", global_position)):
+			trigger_split_clone()
 
-	_combat_quiet_timer += delta
+	_combat_quiet_timer += delta * (1.35 if velocity.length() < 90.0 else 1.0)
 
 	# Shield recharge
 	if mutations.has_mutation("shield") and not shield_ready:
@@ -372,9 +423,9 @@ func complete_absorption(entity_id: String, mass_gain: float, xp_gain: float, es
 	mass = MassSystem.clamp_mass(mass + eff_mass)
 	_sync_mass_metrics()
 
-	# Bio-vampirism heal on absorb
+	# Bio-vampirism heal on absorb (balanced so combat still rewards dodging)
 	if mutations.has_synergy("bio_vampirism"):
-		heal(8.5)
+		heal(4.5)
 
 	# Mimicry ambush resets briefly on strike
 	if mimicry_ambush_ready:
@@ -446,6 +497,8 @@ func take_damage(raw_amount: float, source_id: String, is_aoe_hazard: bool = fal
 	var final_dmg := raw_amount
 	if is_aoe_hazard:
 		final_dmg *= MassSystem.aoe_vulnerability_multiplier(mass)
+		if source_id == "poison_pool" and slipstream_active:
+			final_dmg *= 0.50
 
 	hp = maxf(0.0, hp - final_dmg)
 	invulnerable_timer = 0.32
