@@ -27,6 +27,12 @@ GODOT_VER="$("$GODOT_BIN" --version | head -n 1)"
 COMMIT_SHA="$(git rev-parse HEAD)"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
+# Godot scans every folder inside the project and, with the default "export all
+# resources" filter, packs what it finds. Without these markers the build output
+# and the verification screenshots end up inside the shipped .pck.
+mkdir -p "$ROOT_DIR/builds" "$ROOT_DIR/reports" "$OUT_DIR"
+touch "$ROOT_DIR/builds/.gdignore" "$ROOT_DIR/reports/.gdignore" "$OUT_DIR/.gdignore"
+
 python3 tools/sync_godot_cache.py
 
 BUILD_ROOT="$ROOT_DIR/builds/macos"

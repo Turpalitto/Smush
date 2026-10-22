@@ -18,8 +18,14 @@ local.properties
 .env.*
 android/build/
 android/.gradle/
-builds/
-deliverables/
+# Build outputs stay untracked, but Godot must skip them entirely: with the
+# default "export all resources" filter, anything inside the project folder is
+# packed into the .pck, so verification screenshots and old builds were being
+# shipped inside the game. `.gdignore` is the switch that prevents that.
+builds/*
+!builds/.gdignore
+deliverables/*
+!deliverables/.gdignore
 
 # OS / Editor / Temp files
 .DS_Store
