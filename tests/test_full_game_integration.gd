@@ -30,6 +30,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_defeat_revive_and_app_interruptions(tree, main_inst)
 	await _test_evolution_queue_and_restart(tree, main_inst)
 	await _test_verified_controls_visual_combat_and_audio_polish(tree, main_inst)
+	await _test_difficulty_multipliers(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -559,3 +560,59 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 
 	main._return_to_main_menu()
 
+
+
+func _test_difficulty_multipliers(tree: SceneTree, main: MainRoot) -> void:
+	# Difficulty is applied at spawn time on top of the existing time-based scaling.
+	# Both runs below are spawned at the same run_elapsed (0), so the only difference
+	# between them is the difficulty snapshot taken by start_new_run.
+	var arena := main.arena
+
+	SaveData.set_difficulty("normal")
+	main._start_run("standard")
+	await tree.process_frame
+	assert_eq(str(arena.difficulty_cfg.get("id", "")), "normal", "Run snapshots the selected difficulty")
+	var base_enemy := arena.spawn_enemy_by_id("forest_beetle", Vector2(120.0, 0.0))
+	assert_true(base_enemy != null, "Baseline enemy spawned")
+	var base_hp := base_enemy.max_hp
+	var base_dmg := base_enemy.contact_damage
+	var base_boss := arena.spawn_ancient_guardian_boss()
+	assert_true(base_boss != null, "Baseline boss spawned")
+	var base_boss_hp := base_boss.max_hp
+	var base_boss_dmg := base_boss.contact_damage
+
+	SaveData.set_difficulty("hunter")
+	main._start_run("standard")
+	await tree.process_frame
+	var hard_enemy := arena.spawn_enemy_by_id("forest_beetle", Vector2(120.0, 0.0))
+	# The enemy pool recycles nodes between runs, so the reference is reused by the next
+	# spawn; the value must be captured now or the comparison below reads itself.
+	var hard_hp := hard_enemy.max_hp
+	var hard_boss := arena.spawn_ancient_guardian_boss()
+	assert_approx(hard_enemy.max_hp / base_hp, 1.25, 0.02, "Hunter raises enemy HP by its multiplier")
+	assert_approx(hard_enemy.hp, hard_enemy.max_hp, 0.01, "Scaled enemy spawns at full HP")
+	assert_approx(hard_enemy.contact_damage / base_dmg, 1.2, 0.02, "Hunter raises enemy contact damage")
+	assert_approx(hard_boss.max_hp / base_boss_hp, 1.2, 0.02, "Hunter raises boss HP by its own multiplier")
+	assert_approx(hard_boss.contact_damage / base_boss_dmg, 1.2, 0.02, "Hunter raises boss contact damage")
+
+	SaveData.set_difficulty("nightmare")
+	main._start_run("standard")
+	await tree.process_frame
+	var nm_enemy := arena.spawn_enemy_by_id("forest_beetle", Vector2(120.0, 0.0))
+	assert_approx(nm_enemy.max_hp / base_hp, 1.5, 0.02, "Nightmare raises enemy HP by its multiplier")
+	assert_gt(nm_enemy.max_hp, hard_hp, "Nightmare enemies are tougher than Hunter ones")
+
+	# The run-level snapshot must not follow a later settings change mid-run.
+	SaveData.set_difficulty("normal")
+	await tree.process_frame
+	assert_eq(str(arena.difficulty_cfg.get("id", "")), "nightmare", "Mid-run difficulty change does not affect a live run")
+
+	SaveData.set_difficulty("normal")
+	main._return_to_main_menu()
+	await tree.process_frame
+	# The boss spawned for this check is not owned by a finished run, so free it here.
+	if is_instance_valid(arena.active_boss):
+		arena.active_boss.queue_free()
+		arena.active_boss = null
+	await tree.process_frame
+	assert_eq(App.state, App.State.MAIN_MENU, "Returned to menu after difficulty checks")
