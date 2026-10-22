@@ -47,3 +47,17 @@ describe("corrupted save recovery", () => {
     expect(result.settings.sfxVolume).toBeCloseTo(0.8);
   });
 });
+
+
+describe("invalid numeric progression", () => {
+  it("repairs non-finite counters and malformed upgrade levels", () => {
+    const p = sanitizeProfile("device-8", {
+      currency: Infinity, bestMass: NaN, totalRuns: Infinity,
+      upgrades: { startMass: 999, moveSpeed: "broken", essenceChance: -2, unknown: 8 },
+    });
+    expect(p.currency).toBe(0);
+    expect(p.bestMass).toBe(0);
+    expect(p.totalRuns).toBe(0);
+    expect(p.upgrades).toEqual({ startMass: 10, moveSpeed: 0, essenceChance: 0 });
+  });
+});

@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 INCLUDE_EXTS = {".gd", ".tscn", ".tres", ".gdshader", ".json", ".png", ".wav", ".cfg", ".ttf"}
-EXCLUDE_DIRS = {".git", "builds", "node_modules", "__pycache__", "tools", "src"}
+EXCLUDE_DIRS = {".git", "builds", "node_modules", "__pycache__", "tools", "src", "web"}
 EXCLUDE_FILES = {"project.godot", "export_presets.cfg", "package.json", "package-lock.json", "tsconfig.json", "drizzle.config.json"}
 
 

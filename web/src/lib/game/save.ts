@@ -1,4 +1,4 @@
-import { DEFAULT_UNLOCKED_MUTATIONS } from "./constants";
+import { UPGRADE_DEFS, DEFAULT_UNLOCKED_MUTATIONS } from "./constants";
 
 export interface PlayerSettings {
   joystickMode: "fixed" | "floating";
@@ -71,6 +71,11 @@ function isNumberArray(v: unknown): v is number[] {
  * wrong types from an older schema version, truncated JSON) by merging it
  * on top of sane defaults. Never throws.
  */
+function nonnegativeInteger(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.min(Math.floor(value), Number.MAX_SAFE_INTEGER) : 0;
+}
+
 export function sanitizeProfile(id: string, raw: unknown): PlayerProfile {
   const fallback = defaultProfile(id);
   if (!raw || typeof raw !== "object") return fallback;
@@ -99,18 +104,13 @@ export function sanitizeProfile(id: string, raw: unknown): PlayerProfile {
 
   return {
     id,
-    currency: typeof r.currency === "number" && r.currency >= 0 ? Math.floor(r.currency) : 0,
-    totalRuns: typeof r.totalRuns === "number" && r.totalRuns >= 0 ? Math.floor(r.totalRuns) : 0,
-    totalWins: typeof r.totalWins === "number" && r.totalWins >= 0 ? Math.floor(r.totalWins) : 0,
-    totalBossKills:
-      typeof r.totalBossKills === "number" && r.totalBossKills >= 0 ? Math.floor(r.totalBossKills) : 0,
-    bestMass: typeof r.bestMass === "number" && r.bestMass >= 0 ? Math.floor(r.bestMass) : 0,
-    bestDurationSec:
-      typeof r.bestDurationSec === "number" && r.bestDurationSec >= 0 ? Math.floor(r.bestDurationSec) : 0,
-    upgrades:
-      r.upgrades && typeof r.upgrades === "object" && !Array.isArray(r.upgrades)
-        ? (r.upgrades as Record<string, number>)
-        : {},
+    currency: nonnegativeInteger(r.currency),
+    totalRuns: nonnegativeInteger(r.totalRuns),
+    totalWins: nonnegativeInteger(r.totalWins),
+    totalBossKills: nonnegativeInteger(r.totalBossKills),
+    bestMass: nonnegativeInteger(r.bestMass),
+    bestDurationSec: nonnegativeInteger(r.bestDurationSec),
+    upgrades: sanitizeUpgrades(r.upgrades),
     unlockedMutations: isStringArray(r.unlockedMutations)
       ? Array.from(new Set([...r.unlockedMutations, ...DEFAULT_UNLOCKED_MUTATIONS]))
       : fallback.unlockedMutations,
@@ -122,4 +122,12 @@ export function sanitizeProfile(id: string, raw: unknown): PlayerProfile {
     ownedCosmetics: isStringArray(r.ownedCosmetics) ? r.ownedCosmetics : [],
     equippedCosmetic: typeof r.equippedCosmetic === "string" ? r.equippedCosmetic : null,
   };
+}
+
+function sanitizeUpgrades(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const source = raw as Record<string, unknown>;
+  return Object.fromEntries(UPGRADE_DEFS.filter((def) => def.key in source).map((def) => [
+    def.key, Math.min(nonnegativeInteger(source[def.key]), def.maxLevel),
+  ]));
 }

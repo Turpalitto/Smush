@@ -117,12 +117,9 @@ func save_to_disk() -> bool:
 				bf.flush()
 				bf.close()
 
-	var pf := FileAccess.open(save_path, FileAccess.WRITE)
-	if pf == null:
+	# Replace the primary only after the complete temporary file is flushed.
+	if DirAccess.rename_absolute(tmp_path, save_path) != OK:
 		return false
-	pf.store_string(raw_out)
-	pf.flush()
-	pf.close()
 
 	# Update backup if none exists yet
 	if not FileAccess.file_exists(backup_path):
@@ -177,7 +174,7 @@ func load_from_disk() -> void:
 
 	var defaults := create_default_data()
 	if loaded_dict != null and typeof(loaded_dict) == TYPE_DICTIONARY:
-		data = _merge_with_defaults(defaults, loaded_dict as Dictionary)
+		data = sanitize_save(loaded_dict as Dictionary)
 	else:
 		data = defaults
 
@@ -187,16 +184,72 @@ func load_from_disk() -> void:
 	_apply_loaded_settings()
 
 
-func _merge_with_defaults(defaults: Dictionary, loaded: Dictionary) -> Dictionary:
-	var result := defaults.duplicate(true)
-	for k in loaded.keys():
-		if result.has(k) and typeof(result[k]) == TYPE_DICTIONARY and typeof(loaded[k]) == TYPE_DICTIONARY:
-			var sub_def: Dictionary = result[k]
-			var sub_ld: Dictionary = loaded[k]
-			for sk in sub_ld.keys():
-				sub_def[sk] = sub_ld[sk]
-		else:
-			result[k] = loaded[k]
+# Borrowed from the browser profile repair approach: a valid checksum does not
+# imply valid field types. Repair partial/older payloads before gameplay reads them.
+func _repair_value(fallback: Variant, value: Variant) -> Variant:
+	match typeof(fallback):
+		TYPE_DICTIONARY:
+			var result: Dictionary = fallback.duplicate(true)
+			if typeof(value) == TYPE_DICTIONARY:
+				for key in result.keys():
+					if value.has(key):
+						result[key] = _repair_value(result[key], value[key])
+			return result
+		TYPE_INT, TYPE_FLOAT:
+			if (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) and is_finite(float(value)) and float(value) >= 0.0:
+				return int(value) if typeof(fallback) == TYPE_INT else float(value)
+		TYPE_ARRAY:
+			if typeof(value) == TYPE_ARRAY:
+				return value.duplicate(true)
+		_:
+			if typeof(value) == typeof(fallback):
+				return value
+	return fallback
+
+
+func _known_ids(value: Variant, allowed: Array, required: Array = []) -> Array:
+	var result: Array = required.duplicate()
+	if typeof(value) == TYPE_ARRAY:
+		for item in value:
+			if typeof(item) == TYPE_STRING and allowed.has(item) and not result.has(item):
+				result.append(item)
+	return result
+
+
+func sanitize_save(loaded: Dictionary) -> Dictionary:
+	var defaults := create_default_data()
+	var result: Dictionary = _repair_value(defaults, loaded)
+	result["version"] = SAVE_VERSION
+	var settings: Dictionary = result["settings"]
+	for volume in ["sfx_volume", "music_volume"]:
+		settings[volume] = clampf(float(settings[volume]), 0.0, 1.0)
+	var allowed: Dictionary = {"locale": ["ru", "en"], "joystick_mode": ["fixed", "floating"], "fx_quality": ["low", "medium", "high"]}
+	for field in allowed:
+		if not allowed[field].has(settings[field]):
+			settings[field] = defaults["settings"][field]
+	for uid in ConfigDB.upgrade_order:
+		result["upgrades"][uid] = mini(int(result["upgrades"][uid]), int(ConfigDB.upgrades[uid].get("max_level", 8)))
+	result["unlocked_mutations"] = _known_ids(result["unlocked_mutations"], ConfigDB.mutation_order, defaults["unlocked_mutations"])
+	result["unlocked_forms"] = _known_ids(result["unlocked_forms"], ConfigDB.form_order, defaults["unlocked_forms"])
+	result["unlocked_trails"] = _known_ids(result["unlocked_trails"], ConfigDB.trail_fx.keys(), defaults["unlocked_trails"])
+	result["achievements"] = _known_ids(result["achievements"], ConfigDB.achievement_order)
+	result["owned_skus"] = _known_ids(result["owned_skus"], ConfigDB.store_catalog.keys())
+	for field in ["form", "trail"]:
+		if not result["unlocked_" + field + "s"].has(result["selected_" + field]):
+			result["selected_" + field] = defaults["selected_" + field]
+	# Bestiary has dynamic creature IDs; validate its values separately.
+	var bestiary: Dictionary = {}
+	var raw_bestiary: Variant = loaded.get("bestiary", {})
+	if typeof(raw_bestiary) == TYPE_DICTIONARY:
+		for cid in raw_bestiary:
+			if ConfigDB.enemies.has(cid) or ConfigDB.special_encounters.has(cid):
+				bestiary[cid] = _repair_value(0, raw_bestiary[cid])
+	result["bestiary"] = bestiary
+	var days: Array = []
+	for day in result["stats"]["active_days"]:
+		if (typeof(day) == TYPE_INT or typeof(day) == TYPE_FLOAT) and is_finite(float(day)) and float(day) >= 0.0 and not days.has(int(day)):
+			days.append(int(day))
+	result["stats"]["active_days"] = days
 	return result
 
 

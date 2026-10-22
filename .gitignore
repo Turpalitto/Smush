@@ -30,3 +30,9 @@ __pycache__/
 *.pyc
 node_modules/
 Unselected files/
+
+# Browser build/cache artifacts
+.next/
+*.tsbuildinfo
+next-env.d.ts
+!web/.env.example

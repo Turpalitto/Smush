@@ -1,4 +1,20 @@
 import { RNG, pickWeighted } from "./rng";
+import canonicalSynergies from "../../../../resources/data/synergies.json";
+
+// Keep existing web save IDs while using the Android catalog for combo recipes.
+export const GODOT_TO_WEB_MUTATION: Record<string, string> = {
+  speed_boost: "haste", regeneration: "regen", ranged_absorb: "vacuum",
+  electro_discharge: "electric", mimicry: "camouflage",
+};
+
+function comboRequirements(id: string): [string, string] {
+  const canonicalId = id === "storm_emp" ? "em_storm" : id;
+  const recipe = canonicalSynergies.synergies.find((s) => s.id === canonicalId);
+  if (!recipe || recipe.required_mutations.length !== 2) {
+    throw new Error(`Missing two-mutation synergy: ${canonicalId}`);
+  }
+  return recipe.required_mutations.map((id) => GODOT_TO_WEB_MUTATION[id] ?? id) as [string, string];
+}
 
 export type Rarity = "common" | "rare" | "epic";
 
@@ -181,7 +197,7 @@ export interface ComboDef {
 export const COMBOS: ComboDef[] = [
   {
     id: "storm_emp",
-    requires: ["magnet", "electric"],
+    requires: comboRequirements("storm_emp"),
     nameRu: "Электромагнитная буря",
     nameEn: "Electromagnetic storm",
     descRu: "Магнит стягивает врагов, а разряд поражает их группой.",
@@ -190,7 +206,7 @@ export const COMBOS: ComboDef[] = [
   },
   {
     id: "toxic_clones",
-    requires: ["poison_trail", "split"],
+    requires: comboRequirements("toxic_clones"),
     nameRu: "Токсичные двойники",
     nameEn: "Toxic clones",
     descRu: "Двойники тоже оставляют ядовитый след.",
@@ -199,7 +215,7 @@ export const COMBOS: ComboDef[] = [
   },
   {
     id: "piercing_strike",
-    requires: ["dash", "spikes"],
+    requires: comboRequirements("piercing_strike"),
     nameRu: "Пробивающий удар",
     nameEn: "Piercing strike",
     descRu: "Рывок наносит урон шипами всем на пути.",
@@ -208,7 +224,7 @@ export const COMBOS: ComboDef[] = [
   },
   {
     id: "ice_armor",
-    requires: ["freeze", "shield"],
+    requires: comboRequirements("ice_armor"),
     nameRu: "Ледяная броня",
     nameEn: "Ice armor",
     descRu: "Щит замораживает атакующего при блокировании удара.",
@@ -217,7 +233,7 @@ export const COMBOS: ComboDef[] = [
   },
   {
     id: "bio_vampirism",
-    requires: ["regen", "vacuum"],
+    requires: comboRequirements("bio_vampirism"),
     nameRu: "Биологический вампиризм",
     nameEn: "Biological vampirism",
     descRu: "Поглощение на расстоянии дополнительно восстанавливает здоровье.",

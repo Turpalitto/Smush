@@ -17,6 +17,7 @@ func run() -> void:
 	_test_save_load_and_upgrades()
 	_test_corrupted_primary_recovery_from_backup()
 	_test_total_corruption_graceful_fallback()
+	_test_malformed_fields_with_valid_checksum()
 
 	_cleanup_files()
 	SaveData.set_custom_paths(SaveData.DEFAULT_SAVE_PATH, SaveData.DEFAULT_BACKUP_PATH, SaveData.DEFAULT_TMP_PATH)
@@ -88,3 +89,38 @@ func _test_total_corruption_graceful_fallback() -> void:
 	SaveData.load_from_disk()
 	assert_true(SaveData.recovered_from_corruption, "Flagged tampered save files")
 	assert_eq(SaveData.get_essence(), 0, "Fell back cleanly to safe default profile without crashing")
+
+
+func _test_malformed_fields_with_valid_checksum() -> void:
+	# A valid envelope can still contain malformed fields from an older client.
+	SaveData.data = {
+		"essence": 42, "settings": {"sfx_volume": 3.0, "locale": "xx", "auto_absorb": "false"},
+		"stats": {"victories": -4, "active_days": ["oops", 10, 10, -1]},
+		"upgrades": {"start_mass": 999, "move_speed": "broken"},
+		"unlocked_mutations": ["freeze", "unknown", 123], "unlocked_forms": "broken",
+		"bestiary": {"stone_slug": 3, "tiny_mushroom": "broken", "unknown": 10},
+		"selected_form": "not_owned", "achievements": [false]
+	}
+	assert_true(SaveData.save_to_disk(), "Malformed legacy payload written with valid checksum")
+	assert_false(FileAccess.file_exists(TEST_TMP), "Atomic save consumes temporary file")
+	SaveData.load_from_disk()
+	assert_eq(SaveData.get_essence(), 42, "Valid currency survives field repair")
+	assert_eq(SaveData.get_setting("sfx_volume"), 1.0, "Volume clamped to safe range")
+	assert_eq(SaveData.get_setting("locale"), "ru", "Unknown locale repaired")
+	assert_eq(SaveData.get_setting("auto_absorb"), true, "Wrong boolean type repaired")
+	assert_eq(SaveData.data["stats"]["victories"], 0, "Negative stats repaired")
+	assert_eq(SaveData.data["stats"]["active_days"], [10], "Malformed and duplicate days removed")
+	assert_eq(SaveData.get_upgrade_level("start_mass"), 8, "Upgrade capped at configured max")
+	assert_eq(SaveData.get_upgrade_level("move_speed"), 0, "Wrong upgrade type repaired")
+	assert_true(SaveData.is_mutation_unlocked("freeze"), "Valid unlocked mutation preserved")
+	assert_true(SaveData.is_mutation_unlocked("magnet"), "Starter mutations restored")
+	assert_false(SaveData.is_mutation_unlocked("unknown"), "Unknown mutation removed")
+	assert_eq(SaveData.get_creature_count("stone_slug"), 3, "Valid bestiary count preserved")
+	assert_eq(SaveData.get_creature_count("tiny_mushroom"), 0, "Malformed bestiary count repaired")
+	assert_eq(SaveData.data["selected_form"], "forest_drop", "Invalid equipped form repaired")
+	assert_eq(SaveData.data["achievements"], [], "Invalid achievement IDs removed")
+	var repaired := SaveData.sanitize_save({"settings": null, "stats": [], "upgrades": false})
+	assert_eq(repaired["settings"]["locale"], "ru", "Malformed nested containers repaired")
+	repaired = SaveData.sanitize_save({"essence": INF, "stats": {"peak_mass": NAN}})
+	assert_eq(repaired["essence"], 0, "Non-finite currency repaired")
+	assert_eq(repaired["stats"]["peak_mass"], 10.0, "Non-finite mass repaired")
