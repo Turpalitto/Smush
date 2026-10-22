@@ -156,6 +156,9 @@ ditto -c -k --sequesterRsrc --keepParent "$PKG_DIR" "$ARCHIVE"
 
 SHA_APP="$(shasum -a 256 "$APP_PATH/Contents/MacOS/$BIN_PATH" | cut -d' ' -f1)"
 SHA_ZIP="$(shasum -a 256 "$ARCHIVE" | cut -d' ' -f1)"
+# `file` prints one line per architecture; raw newlines inside a JSON string made
+# the metadata file unparseable, so the summary is flattened to a single line.
+ARCH_INFO_ONELINE="$(printf '%s' "$ARCH_INFO" | tr '\n\t' '  ' | sed 's/  */ /g; s/ $//')"
 
 cat > "$OUT_DIR/SlimeRushEvolution_macOS_Universal_Playtest_v$VERSION.sha256" << EOF
 $SHA_ZIP  $(basename "$ARCHIVE")
@@ -178,7 +181,7 @@ cat > "$OUT_DIR/SlimeRushEvolution_macOS_Universal_Playtest_v$VERSION.build.json
   "archive_path": "$ARCHIVE",
   "archive_sha256": "$SHA_ZIP",
   "binary_sha256": "$SHA_APP",
-  "binary_file_info": "$ARCH_INFO"
+  "binary_file_info": "$ARCH_INFO_ONELINE"
 }
 EOF
 
