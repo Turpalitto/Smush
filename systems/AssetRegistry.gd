@@ -8,11 +8,24 @@ static var _wav_cache: Dictionary = {}
 static var _ui_font: FontFile = null
 
 
+static func _can_use_imported_resource(res_path: String) -> bool:
+	var import_meta := res_path + ".import"
+	if FileAccess.file_exists(import_meta):
+		var cfg := ConfigFile.new()
+		if cfg.load(import_meta) != OK:
+			return false
+		var remap_path := str(cfg.get_value("remap", "path", ""))
+		if remap_path.is_empty():
+			return false
+		return FileAccess.file_exists(remap_path)
+	return ResourceLoader.exists(res_path)
+
+
 static func get_ui_font() -> Font:
 	if _ui_font != null:
 		return _ui_font
 	var path := "res://resources/fonts/DejaVuSans.ttf"
-	if ResourceLoader.exists(path):
+	if _can_use_imported_resource(path):
 		var loaded := ResourceLoader.load(path)
 		if loaded is FontFile:
 			_ui_font = loaded
@@ -34,7 +47,7 @@ static func get_texture(res_path: String) -> Texture2D:
 		return _tex_cache[res_path]
 
 	# 1. Try standard imported Godot resource when exported via Editor
-	if ResourceLoader.exists(res_path):
+	if _can_use_imported_resource(res_path):
 		var loaded := ResourceLoader.load(res_path)
 		if loaded is Texture2D:
 			_tex_cache[res_path] = loaded
@@ -58,7 +71,7 @@ static func get_wav_stream(res_path: String, loop_enabled: bool = false) -> Audi
 	if _wav_cache.has(cache_key):
 		return _wav_cache[cache_key]
 
-	if ResourceLoader.exists(res_path):
+	if _can_use_imported_resource(res_path):
 		var loaded := ResourceLoader.load(res_path)
 		if loaded is AudioStreamWAV:
 			var dup := loaded.duplicate() as AudioStreamWAV
