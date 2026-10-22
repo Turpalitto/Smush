@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "synergies": [
+    {
+      "id": "em_storm",
+      "name_key": "syn.em_storm.name",
+      "desc_key": "syn.em_storm.desc",
+      "icon": "res://resources/icons/synergies/em_storm.png",
+      "required_mutations": ["magnet", "electro_discharge"],
+      "min_mutation_level": 1,
+      "params": {
+        "storm_radius_bonus": 75.0,
+        "chain_extra_targets": 2,
+        "vortex_damage_mult": 1.35,
+        "enemy_pull_strength": 150.0
+      }
+    },
+    {
+      "id": "toxic_clones",
+      "name_key": "syn.toxic_clones.name",
+      "desc_key": "syn.toxic_clones.desc",
+      "icon": "res://resources/icons/synergies/toxic_clones.png",
+      "required_mutations": ["poison_trail", "split"],
+      "min_mutation_level": 1,
+      "params": {
+        "clone_count": 2,
+        "clone_trail_interval": 0.45,
+        "death_nova_damage": 38.0,
+        "death_nova_radius": 115.0
+      }
+    },
+    {
+      "id": "piercing_strike",
+      "name_key": "syn.piercing_strike.name",
+      "desc_key": "syn.piercing_strike.desc",
+      "icon": "res://resources/icons/synergies/piercing_strike.png",
+      "required_mutations": ["dash", "spikes"],
+      "min_mutation_level": 1,
+      "params": {
+        "dash_impact_damage": 48.0,
+        "shatters_armor_instantly": true,
+        "dash_distance_mult": 1.25
+      }
+    },
+    {
+      "id": "ice_armor",
+      "name_key": "syn.ice_armor.name",
+      "desc_key": "syn.ice_armor.desc",
+      "icon": "res://resources/icons/synergies/ice_armor.png",
+      "required_mutations": ["freeze", "shield"],
+      "min_mutation_level": 1,
+      "params": {
+        "shield_recharge_bonus": 2.0,
+        "nova_freeze_duration": 2.8,
+        "nova_damage": 30.0,
+        "nova_radius": 165.0
+      }
+    },
+    {
+      "id": "bio_vampirism",
+      "name_key": "syn.bio_vampirism.name",
+      "desc_key": "syn.bio_vampirism.desc",
+      "icon": "res://resources/icons/synergies/bio_vampirism.png",
+      "required_mutations": ["regeneration", "ranged_absorb"],
+      "min_mutation_level": 1,
+      "params": {
+        "drain_dps": 18.0,
+        "heal_per_absorb": 8.5,
+        "lifesteal_ratio": 0.45,
+        "can_siphon_larger": true
+      }
+    }
+  ]
+}

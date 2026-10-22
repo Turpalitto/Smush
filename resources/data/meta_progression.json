@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "upgrades": [
+    {
+      "id": "start_mass",
+      "name_key": "upg.start_mass.name",
+      "desc_key": "upg.start_mass.desc",
+      "max_level": 8,
+      "base_cost": 25,
+      "cost_growth": 1.45,
+      "bonus_per_level": 1.75
+    },
+    {
+      "id": "move_speed",
+      "name_key": "upg.move_speed.name",
+      "desc_key": "upg.move_speed.desc",
+      "max_level": 8,
+      "base_cost": 25,
+      "cost_growth": 1.45,
+      "bonus_per_level": 0.045
+    },
+    {
+      "id": "essence_chance",
+      "name_key": "upg.essence_chance.name",
+      "desc_key": "upg.essence_chance.desc",
+      "max_level": 8,
+      "base_cost": 30,
+      "cost_growth": 1.50,
+      "bonus_per_level": 0.08
+    },
+    {
+      "id": "max_vitality",
+      "name_key": "upg.max_vitality.name",
+      "desc_key": "upg.max_vitality.desc",
+      "max_level": 8,
+      "base_cost": 28,
+      "cost_growth": 1.45,
+      "bonus_per_level": 14.0
+    },
+    {
+      "id": "evolution_rate",
+      "name_key": "upg.evolution_rate.name",
+      "desc_key": "upg.evolution_rate.desc",
+      "max_level": 6,
+      "base_cost": 35,
+      "cost_growth": 1.55,
+      "bonus_per_level": 0.07
+    }
+  ],
+  "slime_forms": [
+    {
+      "id": "forest_drop",
+      "name_key": "form.forest_drop.name",
+      "desc_key": "form.forest_drop.desc",
+      "unlock_type": "default",
+      "body_color": "#22d0a8",
+      "core_color": "#fff080",
+      "rim_color": "#a5ffe8"
+    },
+    {
+      "id": "dew_lotus",
+      "name_key": "form.dew_lotus.name",
+      "desc_key": "form.dew_lotus.desc",
+      "unlock_type": "essence",
+      "essence_cost": 60,
+      "body_color": "#48b8ff",
+      "core_color": "#c8fff8",
+      "rim_color": "#d8f4ff"
+    },
+    {
+      "id": "royal_spore",
+      "name_key": "form.royal_spore.name",
+      "desc_key": "form.royal_spore.desc",
+      "unlock_type": "achievement",
+      "achievement_id": "defeat_guardian",
+      "body_color": "#9b5cff",
+      "core_color": "#ffdf78",
+      "rim_color": "#f2c8ff"
+    },
+    {
+      "id": "astral_jelly",
+      "name_key": "form.astral_jelly.name",
+      "desc_key": "form.astral_jelly.desc",
+      "unlock_type": "iap",
+      "sku_id": "com.turpalitto.slimerush.skin_astral_jelly",
+      "body_color": "#3f68ff",
+      "core_color": "#ff92f5",
+      "rim_color": "#b4e8ff"
+    },
+    {
+      "id": "amber_spirit",
+      "name_key": "form.amber_spirit.name",
+      "desc_key": "form.amber_spirit.desc",
+      "unlock_type": "iap",
+      "sku_id": "com.turpalitto.slimerush.skin_amber_spirit",
+      "body_color": "#ff9a38",
+      "core_color": "#fff8b8",
+      "rim_color": "#ffe29a"
+    }
+  ],
+  "trail_fx": [
+    {
+      "id": "default_gel",
+      "name_key": "trail.default_gel.name",
+      "unlock_type": "default",
+      "color": "#5ef5c8"
+    },
+    {
+      "id": "starlight_wake",
+      "name_key": "trail.starlight_wake.name",
+      "unlock_type": "iap",
+      "sku_id": "com.turpalitto.slimerush.fx_starlight_wake",
+      "color": "#a8dcff"
+    },
+    {
+      "id": "emerald_petals",
+      "name_key": "trail.emerald_petals.name",
+      "unlock_type": "iap",
+      "sku_id": "com.turpalitto.slimerush.fx_emerald_petals",
+      "color": "#9dff88"
+    }
+  ],
+  "achievements": [
+    {
+      "id": "first_absorb",
+      "name_key": "ach.first_absorb.name",
+      "desc_key": "ach.first_absorb.desc",
+      "metric": "total_absorbed",
+      "target": 10,
+      "reward_essence": 20
+    },
+    {
+      "id": "first_mutation",
+      "name_key": "ach.first_mutation.name",
+      "desc_key": "ach.first_mutation.desc",
+      "metric": "total_mutations_picked",
+      "target": 1,
+      "reward_essence": 20
+    },
+    {
+      "id": "synergy_alchemist",
+      "name_key": "ach.synergy_alchemist.name",
+      "desc_key": "ach.synergy_alchemist.desc",
+      "metric": "total_synergies_unlocked",
+      "target": 1,
+      "reward_essence": 35
+    },
+    {
+      "id": "shell_cracker",
+      "name_key": "ach.shell_cracker.name",
+      "desc_key": "ach.shell_cracker.desc",
+      "metric": "armored_defeated",
+      "target": 5,
+      "reward_essence": 30
+    },
+    {
+      "id": "mass_titan",
+      "name_key": "ach.mass_titan.name",
+      "desc_key": "ach.mass_titan.desc",
+      "metric": "peak_mass",
+      "target": 60,
+      "reward_essence": 40
+    },
+    {
+      "id": "defeat_guardian",
+      "name_key": "ach.defeat_guardian.name",
+      "desc_key": "ach.defeat_guardian.desc",
+      "metric": "bosses_defeated",
+      "target": 1,
+      "reward_essence": 75
+    }
+  ],
+  "store_catalog": [
+    {
+      "sku": "com.turpalitto.slimerush.no_ads",
+      "category": "utility",
+      "name_key": "shop.no_ads.name",
+      "desc_key": "shop.no_ads.desc",
+      "price_display_fallback": "299 ₽ / $2.99",
+      "non_consumable": true,
+      "grants": {
+        "no_ads": true,
+        "free_reroll_per_run": 1
+      }
+    },
+    {
+      "sku": "com.turpalitto.slimerush.skin_astral_jelly",
+      "category": "cosmetic_skin",
+      "name_key": "form.astral_jelly.name",
+      "desc_key": "form.astral_jelly.desc",
+      "price_display_fallback": "179 ₽ / $1.99",
+      "non_consumable": true,
+      "grants": {
+        "slime_form": "astral_jelly"
+      }
+    },
+    {
+      "sku": "com.turpalitto.slimerush.skin_amber_spirit",
+      "category": "cosmetic_skin",
+      "name_key": "form.amber_spirit.name",
+      "desc_key": "form.amber_spirit.desc",
+      "price_display_fallback": "179 ₽ / $1.99",
+      "non_consumable": true,
+      "grants": {
+        "slime_form": "amber_spirit"
+      }
+    },
+    {
+      "sku": "com.turpalitto.slimerush.fx_starlight_wake",
+      "category": "cosmetic_fx",
+      "name_key": "trail.starlight_wake.name",
+      "desc_key": "shop.fx_starlight.desc",
+      "price_display_fallback": "129 ₽ / $1.49",
+      "non_consumable": true,
+      "grants": {
+        "trail_fx": "starlight_wake"
+      }
+    },
+    {
+      "sku": "com.turpalitto.slimerush.fx_emerald_petals",
+      "category": "cosmetic_fx",
+      "name_key": "trail.emerald_petals.name",
+      "desc_key": "shop.fx_emerald.desc",
+      "price_display_fallback": "129 ₽ / $1.49",
+      "non_consumable": true,
+      "grants": {
+        "trail_fx": "emerald_petals"
+      }
+    }
+  ]
+}
