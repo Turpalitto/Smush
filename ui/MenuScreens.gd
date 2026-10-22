@@ -113,6 +113,15 @@ func show_page(page: Page) -> void:
 			_build_privacy_page()
 
 
+func _format_multiplier(mult: float) -> String:
+	return "×%.1f" % mult
+
+
+func _format_time(seconds: float) -> String:
+	var total := int(maxf(0.0, seconds))
+	return "%02d:%02d" % [total / 60, total % 60]
+
+
 func _make_header_with_back(title_text: String) -> HBoxContainer:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 12)
@@ -220,6 +229,46 @@ func _build_mode_select_page() -> void:
 	_page_container.add_child(vb)
 	vb.add_child(_make_header_with_back(Loc.t("mode.title")))
 
+	var cur_diff := SaveData.get_difficulty_id()
+	var diff_cfg: Dictionary = ConfigDB.get_difficulty(cur_diff)
+
+	# --- Difficulty selector ---
+	var diff_lbl := Label.new()
+	diff_lbl.text = Loc.t("difficulty.title")
+	diff_lbl.add_theme_font_size_override("font_size", 18)
+	vb.add_child(diff_lbl)
+
+	var diff_row := HFlowContainer.new()
+	diff_row.add_theme_constant_override("h_separation", 8)
+	diff_row.add_theme_constant_override("v_separation", 8)
+	vb.add_child(diff_row)
+
+	for did in ConfigDB.difficulty_order:
+		var dcfg: Dictionary = ConfigDB.difficulties[did]
+		var dname := Loc.t(str(dcfg.get("name_key", did)))
+		var db := Button.new()
+		db.text = ("✓ " + dname) if did == cur_diff else dname
+		db.custom_minimum_size = Vector2(0, 44)
+		if did == cur_diff:
+			db.add_theme_color_override("font_color", Color(str(dcfg.get("accent", "#6fe3b6"))))
+		db.pressed.connect(func() -> void:
+			Audio.play_sfx("button_click")
+			SaveData.set_difficulty(str(did))
+			show_page(Page.MODE_SELECT)
+		)
+		diff_row.add_child(db)
+
+	var diff_desc := Label.new()
+	diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	diff_desc.add_theme_font_size_override("font_size", 15)
+	var desc_text := Loc.t(str(diff_cfg.get("desc_key", "")))
+	# "Essence ×1.0" on the default difficulty is noise; only advertise a real bonus.
+	var essence_mult := float(diff_cfg.get("essence_mult", 1.0))
+	if essence_mult > 1.0:
+		desc_text += " · " + Loc.t("difficulty.essence_bonus", {"mult": _format_multiplier(essence_mult)})
+	diff_desc.text = desc_text
+	vb.add_child(diff_desc)
+
 	for mode_info in [
 		["standard", "mode.standard.name", "mode.standard.desc"],
 		["quick", "mode.quick.name", "mode.quick.desc"]
@@ -242,6 +291,20 @@ func _build_mode_select_page() -> void:
 		mdesc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		mdesc.add_theme_font_size_override("font_size", 16)
 		cv.add_child(mdesc)
+
+		# Personal best for this mode on the currently selected difficulty.
+		var rec := SaveData.get_record(mid, cur_diff)
+		var rec_lbl := Label.new()
+		rec_lbl.add_theme_font_size_override("font_size", 14)
+		rec_lbl.add_theme_color_override("font_color", Color(0.72, 0.83, 0.87))
+		if float(rec.get("best_time", 0.0)) > 0.0:
+			rec_lbl.text = Loc.t("difficulty.record_line", {
+				"time": _format_time(float(rec["best_time"])),
+				"mass": str(int(round(float(rec["best_mass"]))))
+			})
+		else:
+			rec_lbl.text = Loc.t("difficulty.no_record")
+		cv.add_child(rec_lbl)
 
 		var start_btn := Button.new()
 		start_btn.text = Loc.t("mode.start_btn")

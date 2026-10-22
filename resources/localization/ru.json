@@ -59,6 +59,10 @@
     "result.defeat": "Слизь рассеялась...",
     "result.stats": "Время: {time}  |  Пик массы: {mass}\nПоглощено: {absorbed}  |  Мутаций: {mutations}",
     "result.essence_earned": "Добыто эссенции: +{essence}",
+    "result.difficulty": "Сложность: {name}",
+    "result.record_line": "Лучшее время: {time}",
+    "result.new_record": "★ НОВЫЙ РЕКОРД ★",
+    "result.new_best_mass": "★ Рекорд массы: {mass} ★",
     "result.revive_ad": "Возродиться (1 раз за забег — Реклама)",
     "result.double_ad": "Удвоить награду x2 (Реклама)",
     "result.double_claimed": "Награда удвоена!",
@@ -205,6 +209,21 @@
     "ach.mass_titan.name": "Лесной исполин",
     "ach.mass_titan.desc": "Достигните массы 60 в одном забеге.",
     "ach.defeat_guardian.name": "Владыка чащи",
-    "ach.defeat_guardian.desc": "Одолейте Древнего стража леса."
+    "ach.defeat_guardian.desc": "Одолейте Древнего стража леса.",
+    "ach.hunter_clear.name": "Охотник на стража",
+    "ach.hunter_clear.desc": "Победите Древнего стража на сложности «Охотник».",
+    "ach.nightmare_clear.name": "Кошмар леса",
+    "ach.nightmare_clear.desc": "Победите Древнего стража на сложности «Кошмар».",
+
+    "difficulty.title": "Сложность",
+    "difficulty.normal.name": "Обычная",
+    "difficulty.normal.desc": "Базовый баланс леса, как он задуман.",
+    "difficulty.hunter.name": "Охотник",
+    "difficulty.hunter.desc": "Враги крепче и бьют больнее, лес гуще.",
+    "difficulty.nightmare.name": "Кошмар",
+    "difficulty.nightmare.desc": "Максимальное давление. Для тех, кто уже видел Стража.",
+    "difficulty.essence_bonus": "Эссенция {mult}",
+    "difficulty.record_line": "Рекорд: {time} · масса {mass}",
+    "difficulty.no_record": "Рекорда пока нет"
   }
 }

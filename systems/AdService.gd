@@ -105,6 +105,24 @@ func notify_offered(placement: String) -> void:
 		Analytics.track("rewarded_ad_offered", {"placement": placement})
 
 
+func any_placement_available() -> bool:
+	## True when the SDK could serve at least one rewarded ad right now, ignoring
+	## per-run caps. Used by the UI to avoid showing an "ad unavailable" placeholder
+	## when the placements are simply used up for this run.
+	if _adapter == null:
+		return false
+	for placement in RUN_CAPS.keys():
+		if bool(_adapter.call("is_available", placement)):
+			return true
+	return false
+
+
+func platform_supports_ads() -> bool:
+	## Desktop and web exports ship without a rewarded-ad backend, so an "ads are
+	## offline" line there would be a permanent dead placeholder on the result screen.
+	return OS.get_name() in ["Android", "iOS"]
+
+
 func request_rewarded_ad(placement: String, on_done: Callable) -> void:
 	if not _pending_token.is_empty():
 		on_done.call(false, "ad_already_pending")

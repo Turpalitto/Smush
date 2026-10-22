@@ -59,6 +59,10 @@
     "result.defeat": "Slime Dispersed...",
     "result.stats": "Time: {time}  |  Peak Mass: {mass}\nAbsorbed: {absorbed}  |  Mutations: {mutations}",
     "result.essence_earned": "Essence Earned: +{essence}",
+    "result.difficulty": "Difficulty: {name}",
+    "result.record_line": "Best time: {time}",
+    "result.new_record": "★ NEW RECORD ★",
+    "result.new_best_mass": "★ Mass record: {mass} ★",
     "result.revive_ad": "Revive Once (Rewarded Ad)",
     "result.double_ad": "Double Reward x2 (Rewarded Ad)",
     "result.double_claimed": "Reward Doubled!",
@@ -205,6 +209,21 @@
     "ach.mass_titan.name": "Forest Behemoth",
     "ach.mass_titan.desc": "Reach 60 mass in a single run.",
     "ach.defeat_guardian.name": "Lord of the Grove",
-    "ach.defeat_guardian.desc": "Defeat the Ancient Forest Guardian."
+    "ach.defeat_guardian.desc": "Defeat the Ancient Forest Guardian.",
+    "ach.hunter_clear.name": "Guardian Hunter",
+    "ach.hunter_clear.desc": "Defeat the Ancient Guardian on Hunter difficulty.",
+    "ach.nightmare_clear.name": "Forest Nightmare",
+    "ach.nightmare_clear.desc": "Defeat the Ancient Guardian on Nightmare difficulty.",
+
+    "difficulty.title": "Difficulty",
+    "difficulty.normal.name": "Normal",
+    "difficulty.normal.desc": "The forest's baseline balance, as designed.",
+    "difficulty.hunter.name": "Hunter",
+    "difficulty.hunter.desc": "Tougher, harder-hitting enemies and a denser forest.",
+    "difficulty.nightmare.name": "Nightmare",
+    "difficulty.nightmare.desc": "Maximum pressure. For those who have already met the Guardian.",
+    "difficulty.essence_bonus": "Essence {mult}",
+    "difficulty.record_line": "Best: {time} · mass {mass}",
+    "difficulty.no_record": "No record yet"
   }
 }
