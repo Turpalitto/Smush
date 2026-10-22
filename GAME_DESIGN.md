@@ -1,167 +1,90 @@
-# GAME_DESIGN.md — Slime Rush: Evolution
+# GAME DESIGN DOCUMENT — SLIME RUSH: EVOLUTION
 
-## Pitch
+## 1. Концепция и столпы игрового процесса
 
-A small slime crawls through the Enchanted Forest, absorbs creatures and
-nutrients to grow, chooses mutations at evolution thresholds, and finally
-faces the Ancient Forest Guardian. 5–8 minute sessions, one-thumb control,
-honest monetization.
+**SLIME RUSH: EVOLUTION** — динамичный top-down экшен-рогалайт с управлением одним пальцем, где крошечная лесная слизь поглощает фауну Зачарованного леса, мутирует прямо по ходу 5–8-минутного забега и бросает вызов Древнему стражу леса.
 
-## Controls
+### Ключевые дизайн-столпы
+1. **Тактильная физика «живого желе»**: мягкое ускорение, инерция, пружинистый squash-and-stretch, втягивание добычи и выразительный взгляд слизи.
+2. **Умное поглощение вместо примитивного «кто больше»**: броня, состояния цели (заморозка, оглушение, кислотное ослабление, открытое ядро после засады) и выбранные мутации позволяют одолевать даже более массивных врагов.
+3. **Масса как тактический ресурс, а не бесконечный счётчик**: рост усиливает урон и охват, но снижает поворотливость, повышает заметность для хищников, увеличивает площадь поражения лужами/молниями и мешает протиснуться в узкие корневые проходы без «Рывка» или «Разделения».
+4. **Эволюция, меняющая поведение**: комбинации мутаций превращают слизь то в скрытного засадного охотника, то в призывателя токсичных двойников, то в живой бронебойный таран.
 
-- One-thumb virtual joystick, **fixed** or **floating** (Settings).
-- Double-tap the joystick area to **Dash** (requires the Dash mutation).
-- Auto-absorb toggle (default on): slightly enlarges the contact radius so
-  nearby eligible targets are consumed without pixel-perfect contact —
-  this is the "optional automatic absorption in contact radius" from the
-  brief, not a magic vacuum (that's the Magnet/Vacuum mutations).
+---
 
-## Growth model
+## 2. Формулы роста и поглощения
 
-- `radius = BASE_RADIUS * (mass / BASE_MASS) ^ 0.33`, capped at `MAX_RADIUS`.
-  Non-linear and diminishing — doubling mass does **not** double size.
-- `speedMultiplier` decays smoothly toward a floor (`0.42x`) as mass grows
-  (`src/lib/game/growth.ts`). Bigger = slower & more visible, not strictly
-  better.
-- HP scales with mass (`maxHp = 100 + mass * 0.07`), so bigger slimes survive
-  longer but are easier for enemies/bosses to hit (bigger hitbox).
+### 2.1 Нелинейный рост (`MassSystem.gd`)
+- Диапазон массы: `MIN_MASS = 8.0`, старт `10.0` (увеличивается мета-прогрессией), мягкий порог убывающей отдачи `SOFT_CAP_MASS = 115.0`, жёсткий потолок `MAX_MASS = 220.0`.
+- Радиус тела:
+  $$R(m) = \text{clamp}\left(15.0 + \frac{5.2 \cdot (m - 5.0)^{0.46}}{1.0 + \frac{\max(m - 10.0, 0)}{260.0}},\; 18.0,\; 58.0\right)$$
+- **Компромиссы высокой массы**:
+  - *Манёвренность*: множитель плавно снижается с `1.02` до `0.74`.
+  - *Заметность*: радиус обнаружения врагами растёт с `0.90x` до `1.48x`.
+  - *Уязвимость к площадным атакам*: урон от ядовитых луж и электрических колец масштабируется с `0.95x` до `1.45x`.
+  - *Узкие корневые врата* (`half_gap = 30 px`): свободно проходимы при малой массе (`R <= 30 px`) либо при сжатии мембраны во время `Рывка` (`0.78 * R <= 30 px`); гигантская слизь вынуждена огибать преграду.
 
-## Absorption rules (not "bigger always wins")
+### 2.2 Правила поглощения (`AbsorptionRules.gd`)
+Требуемое отношение масс `required_ratio` вычисляется из базового коэффициента категории (`flora: 0.82`, `insect: 0.94`, `toxic: 1.05`, `armored: 1.08`, `predator: 1.12`, `electric: 1.14`, `ambusher: 1.16`, `miniboss: 1.35`):
+- Активный каменный панцирь (`shell_active`) добавляет `+1.15` к порогу, **если** не расколот шипами (`Ур. 2+`), синергией `Пробивающий удар`, заморозкой или оглушением.
+- Ослабленные состояния цели снижают порог: `Заморозка (-0.24)`, `Оглушение (-0.22)`, `Яд (-0.16)`, `Открытое ядро после атаки (-0.26)`, а также низкий запас здоровья (`<= 15% HP` гарантирует добивающее поглощение).
+- Босс защищён от мгновенного проглатывания до порога казни `<= 6% HP`.
 
-`canAbsorb(playerMass, target, activeMutations)`:
+---
 
-- Normal target: absorbable if `targetMass <= playerMass * 0.85`.
-- **Armored** target (e.g. Stone Slug): ratio tightened to `* 0.47`
-  (`0.85 * 0.55`) — you need a much bigger mass margin...
-  - ...**unless** you have the **Spikes** mutation, which raises the
-    effective ratio by `35%`, letting you crack armor earlier.
-- Targets with `requiresAnyMutation` (reserved for future "protected"
-  object types) are only absorbable if the player owns one of the listed
-  mutations, regardless of mass, up to a mass-margin override.
+## 3. Мутации (12 базовых) и Синергии (5 особых комбинаций)
 
-## Evolution & mutation thresholds
+### 3.1 Базовые мутации (`resources/data/mutations.json`, макс. уровень 5)
+| № | ID | Название | Редкость | Тип влияния и визуал на теле слизи |
+|---|---|---|---|---|
+| 1 | `magnet` | Магнит | Обычная | Притягивает эссенцию и споры (+немного заметности). *Визуал*: орбитальные голубые кольца поля. |
+| 2 | `speed_boost` | Ускорение | Обычная | Повышает скорость и разгон (+10% отбрасывания). *Визуал*: обтекаемые боковые плавники. |
+| 3 | `spikes` | Шипы | Обычная | Контактный урон и раскол брони (-3% скорости). *Визуал*: кристаллические шипы по контуру. |
+| 4 | `poison_trail` | Ядовитый след | Редкая | Кислотные лужи за спиной ослабляют погоню. *Визуал*: бурлящие токсичные капли в цитоплазме. |
+| 5 | `split` | Разделение | Эпическая | Отделяет автономного двойника (временно заимствует 10% массы). *Визуал*: парное мини-ядро. |
+| 6 | `shield` | Щит | Редкая | Блокирует 1 удар с отталкивающей волной и перезарядкой. *Визуал*: энергетический купол. |
+| 7 | `regeneration` | Регенерация | Обычная | Ускоренное восстановление здоровья (сильнее вне боя). *Визуал*: изумрудные органеллы внутри. |
+| 8 | `dash` | Рывок | Редкая | Реактивный бросок с кадрами неуязвимости и сжатием для узких лазов. *Визуал*: реактивный факел. |
+| 9 | `ranged_absorb` | Поглощение вдали | Эпическая | Выпускает до 2 щупалец, подтягивающих слабые цели издали. *Визуал*: эластичные щупальца. |
+| 10 | `electro_discharge` | Электроразряд | Эпическая | Цепная молния с оглушением и расколом защиты. *Визуал*: плазменные искры по оболочке. |
+| 11 | `freeze` | Заморозка | Редкая | Кольцо холода замедляет врагов и снижает порог поглощения. *Визуал*: кристаллы льда вокруг тела. |
+| 12 | `mimicry` | Мимикрия | Редкая | Снижает радиус агрессии врагов и заряжает удар из засады. *Визуал*: маскировочный лесной лист. |
 
-`EVOLUTION_THRESHOLDS = [35, 80, 150, 260, 420, 640, 920, 1300]` mass.
-Crossing a threshold pauses the run and offers **3 random mutation
-choices** (weighted by rarity: common 60 / rare 30 / epic 10), excluding
-mutations already at max level and mutations not yet unlocked. A rewarded
-ad can add a 4th option once per evolution ("extra mutation" slot).
+### 3.2 Синергии (`resources/data/synergies.json`)
+1. **Электромагнитная буря (`em_storm`)** = `Магнит` + `Электроразряд`: вихрь стягивает самих врагов в радиус усиленных цепных молний.
+2. **Токсичные двойники (`toxic_clones`)** = `Ядовитый след` + `Разделение`: призывает сразу 2 ядовитых двойников, взрывающихся облаком кислоты по окончании жизни.
+3. **Пробивающий удар (`piercing_strike`)** = `Рывок` + `Шипы`: превращает рывок в бронебойный таран с мгновенным разрушением панцирей.
+4. **Ледяная броня (`ice_armor`)** = `Заморозка` + `Щит`: ускоряет перезарядку щита, а при блокировании удара замораживает и ранит всех атакующих вокруг.
+5. **Биовампиризм (`bio_vampirism`)** = `Регенерация` + `Поглощение вдали`: щупальца вытягивают здоровье даже из более крупных противников и босса, исцеляя слизь.
 
-## The 12 mutations
+---
 
-| id | Name (RU) | Rarity | What it actually changes |
-|---|---|---|---|
-| `magnet` | Магнит | common | Pulls pellets/essence into a growing radius — stat-ish but changes positioning strategy. |
-| `haste` | Ускорение | common | +speed multiplier, stacks 3x. |
-| `spikes` | Шипы | common | Contact damage to enemies, cracks armored enemies, enables piercing-dash combo. **Behavioral**: turns contact from "bounce away" into "fight". |
-| `poison_trail` | Ядовитый след | rare | Drops damaging puddles while moving — **behavioral**: rewards kiting pursuers through your own trail. |
-| `split` | Разделение | epic | Spawns a temporary AI clone that independently absorbs nearby pellets. **Behavioral**: adds a pet/ally to manage. |
-| `shield` | Щит | rare | Blocks the next hit entirely, then goes on cooldown. **Behavioral**: changes risk calculus around hazards. |
-| `regen` | Регенерация | common | Passive HP/sec regen. |
-| `dash` | Рывок | common | Double-tap burst movement with cooldown. **Behavioral**: enables dodging telegraphed boss attacks and crossing hazards. |
-| `vacuum` | Поглощение на расстоянии | epic (locked) | Long-range pull of weak/small targets. |
-| `electric` | Электроразряд | rare (locked) | Periodic AoE damage pulse around the player — **behavioral**: turns the player into a mobile damage source, key boss-DPS mutation. |
-| `freeze` | Заморозка | rare (locked) | Aura that slows nearby enemies — **behavioral**: crowd control, enables outrunning packs. |
-| `camouflage` | Мимикрия | epic (locked) | Shrinks enemy detection radius — **behavioral**: a stealth playstyle, avoids fights instead of winning them. |
+## 4. Существа Зачарованного леса и Босс
 
-6 of 12 are clearly behavior-changing (spikes, poison_trail, split, shield,
-dash, electric, freeze, camouflage — actually 8), satisfying "at least half
-must meaningfully change behavior, not just be numeric".
+### 4.1 Обычные существа (8 типов) и Мини-босс
+1. **Маленький гриб** (`flora`) — мирно прыгает по полянам, идеальная стартовая добыча.
+2. **Лесной жук** (`insect`) — пугливый собиратель, стремительно убегает от превосходящей слизи.
+3. **Светлячок** (`insect`) — быстро движется зигзагами, даёт повышенный опыт эволюции и эссенцию.
+4. **Каменный слизень** (`armored`) — медленный танк; сворачивается в каменный панцирь при угрозе.
+5. **Ядовитая жаба** (`toxic`) — прыгает и оставляет опасные кислотные зоны на земле.
+6. **Хищный цветок** (`ambusher`) — прячется в листве (`AMBUSH_HIDE`), телеграфирует атаку и совершает резкий выпад, после чего открывает уязвимое ядро (`RECOVER`).
+7. **Электрический жук** (`electric`) — преследует игрока, телеграфирует электрическое кольцо и разряжается по площади.
+8. **Теневая слизь** (`predator`) — агрессивный соперник, выслеживающий игрока и совершающий рывки.
+- **Мини-босс (2:45)**: *Вожак теневой рощи* (`umbral_alpha`) — кульминация середины забега с крупной наградой эссенции.
 
-`vacuum`, `electric`, `freeze`, `camouflage` start **locked** and are
-unlocked with meta-currency in Upgrades → Mutations, giving a clear early
-progression goal within the first few runs.
+### 4.2 Босс: Древний страж леса (`AncientGuardianBoss.gd`)
+Пробуждается на 4:30 стандартного забега (или 2:25 в блиц-режиме):
+- **Фаза I (100%–66% HP)**: преследование и телеграфируемые круговые удары корнями по площади (`TELEGRAPH_SLAM`), после которых ядро Стража кратковременно открывается для контратаки (`VULNERABLE_RECOVER`, +45% урона).
+- **Фаза II (66%–33% HP)**: призыв лесных прислужников (которых игрок может поглощать для лечения и роста прямо в бою) и крестообразные корневые разломы (`TELEGRAPH_CROSS`).
+- **Фаза III (33%–0% HP)**: перегрузка древнего ядра — стремительный таран по заранее обозначенному багровому коридору (`TELEGRAPH_CHARGE` -> `CHARGING`) в сочетании с кольцом взрывных спор.
 
-## The 5 combos (data-driven, see `src/lib/game/mutations.ts#COMBOS`)
+---
 
-1. **Electromagnetic storm** (`magnet` + `electric`) — magnet now also serves
-   the electric discharge by clustering enemies first.
-2. **Toxic clones** (`poison_trail` + `split`) — clones also drop poison
-   puddles.
-3. **Piercing strike** (`dash` + `spikes`) — dashing deals spike damage to
-   everything in the dash path (also chips boss HP).
-4. **Ice armor** (`freeze` + `shield`) — blocking a hit with the shield also
-   freezes the attacker.
-5. **Biological vampirism** (`regen` + `vacuum`) — long-range absorbs grant
-   bonus healing.
+## 5. Ритм сессии и постоянная прогрессия
 
-Combos are detected purely from the *set* of owned mutation ids
-(`detectActiveCombos`), so adding a 13th mutation or a 6th combo later is a
-data change, not an engine rewrite.
-
-## Enemies (8 types, FSM-driven, no LLM involved)
-
-| id | Behavior | Notes |
-|---|---|---|
-| `small_mushroom` | passive | Easiest food, no danger. |
-| `forest_beetle` | flee | Runs once the player out-masses it. |
-| `firefly` | erratic | Fast random-direction movement, high essence chance. |
-| `stone_slug` | armored | Needs mass margin or Spikes. |
-| `poison_toad` | hazard | Randomly drops damaging puddles. |
-| `predator_flower` | ambush | Stationary, lunges when player is close. |
-| `electric_beetle` | ranged | Periodic short-range shock zone. |
-| `shadow_slime` | hunter | Actively chases the player; also the Guardian's summoned add. |
-
-Each has mass/speed/detectRadius/damage/reward/essence-drop parameters in
-`src/lib/game/enemies.ts` and a minimum evolution stage at which it can spawn,
-so difficulty ramps with the player's own growth.
-
-## Boss: Ancient Forest Guardian
-
-3 phases driven by HP fraction (`src/lib/game/boss.ts`):
-
-1. **Pursuit** (100–66% HP): chases, periodic telegraphed ground-slam AoE.
-2. **Summoning** (66–33% HP): same slam, plus periodically spawns 2 Shadow
-   Slime adds.
-3. **Guardian's rage** (33–0% HP): faster, shorter telegraph window, more
-   frequent slams and adds.
-
-Every slam is **telegraphed**: a red circle appears at the target point for
-`telegraphSec` before it deals damage, so losses come from player mistakes,
-not surprise damage. The player cannot "absorb" the boss outright — damaging
-it requires owning an offensive mutation (Spikes, Electric, or Dash);
-without one, contact just bounces/damages the player. This forces a build
-decision before the boss fight, as required by the brief.
-
-## Run structure & rewards
-
-- **Classic**: 6 minutes. Boss spawns once the player reaches evolution
-  stage 4+ **and** 55% of the timer has elapsed. Defeating the boss before
-  the timer ends → Victory. Timer elapsing without defeating an active boss
-  → Defeat. No boss ever spawning (e.g. slow run) and surviving to the
-  timer → Victory (a full survival run still counts).
-- **Practice**: 3 minutes, no boss, no currency reward — a safe sandbox to
-  learn controls/mutations.
-- **Reward formula** (`calcRunReward`): `massReached*0.35 + durationSec*0.12
-  + (bossDefeated ? 120 : 0)`, multiplied by `0.6` on defeat, `0` if
-  abandoned. Deterministic and unit-tested.
-
-## Meta-progression
-
-- **Permanent upgrades** (Upgrades → Characteristics): starting mass,
-  movement speed, essence drop chance — each with increasing currency cost.
-- **Mutation unlocks** (Upgrades → Mutations): 4 locked mutations purchased
-  with currency.
-- **Collection**: 8 creatures + the boss (silhouette until first
-  encountered), 8 slime evolution "forms" (unlocked by reaching mass
-  thresholds), achievements (first victory, guardian slayer, colossal
-  slime, persistent slime).
-- First meaningful unlocks happen inside the **first run** already
-  (creatures get discovered on sight, forms on first threshold crossed).
-
-## Visual style
-
-Soft gradients, glowing mushrooms/crystals, semi-transparent gradient-filled
-slime body with squash/stretch on movement/dash, a bright pulsing "core",
-expressive eyes that track movement direction, and mutation-specific visual
-overlays (spikes ring, shield ring, magnet ring, frost aura). All rendered
-procedurally via Canvas2D — no external art assets, so there is no licensing
-risk, and it maps cleanly to a future Godot `AnimatedSprite2D` +
-`GPUParticles2D` + shader implementation (see `ARCHITECTURE.md`).
-
-## Audio
-
-Every effect (move/absorb/evolve/mutation/attack/damage/victory/defeat/click
-/boss) is synthesized at runtime with the Web Audio API — original, zero
-licensing risk. Music is off by default and no track is bundled, matching
-the brief's requirement that the game be complete without music.
+- **Структура сессии (5–8 минут)**:
+  - *0:00–1:30*: спокойный старт в центральной роще, быстрое получение первых 2–3 мутаций.
+  - *1:30–3:30*: выход бронированных, засадных и электрических существ, сбор первой синергии, бой с мини-боссом на 2:45.
+  - *3:30–4:30*: финальная закалка билда перед пробуждением Стража.
+  - *4:30–6:30*: трёхфазная схватка с Древним стражем леса, победа или поражение, экран итогов и наград.
+- **Первые открытия в первые 5–10 минут**: один забег приносит ~35–90 единиц *Лесной эссенции* даже при поражении, а первые улучшения и мутации стоят `25–45` эссенции — игрок открывает новые возможности уже после первого же забега без утомительного гринда.

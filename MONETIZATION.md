@@ -1,99 +1,83 @@
-# MONETIZATION.md
+# MONETIZATION & ANALYTICS — SLIME RUSH: EVOLUTION
 
-## Status: TEST adapters, not production ad/billing SDKs
+## 1. Философия честной монетизации
 
-There is no Android/Google Mobile Ads SDK, no AdMob account, and no Google
-Play Console/Billing account configured in this sandbox. Every ad and
-purchase flow described below is implemented with a **test adapter**
-(`src/lib/game/client.ts`) that:
+Монетизация **SLIME RUSH: EVOLUTION** спроектирована так, чтобы сохранять уважение к игроку и полностью соответствовать требованиям Google Play Developer Program Policies:
 
-- Mimics the real callback shape of a rewarded-ad SDK
-  (`completed: true/false`, with `reason` like `no_fill` / `closed_early`),
-  including an occasional simulated no-fill so the "ad unavailable → game
-  continues normally" path is exercised.
-- Always confirms the reward **server-side** (`/api/ads/reward`,
-  `/api/iap/purchase`) — the client never grants currency/entitlements by
-  itself, matching "reward only after SDK-confirmed success".
-- Is idempotent: a unique `(runId, slot)` database constraint
-  (`ad_reward_grants`) guarantees a reward slot can only be granted once,
-  even under client retries or multiple taps — verified by
-  `tests/ads.test.ts` and a live duplicate-request check (`TEST_REPORT.md`).
+- **Полное отсутствие Pay-to-Win**: ни один платный товар не увеличивает урон, здоровье, стартовую массу, скорость роста или шанс редких мутаций.
+- **Полная работоспособность офлайн**: основная игра, постоянные улучшения, открытие мутаций, коллекция, босс и сохранения работают без подключения к интернету.
+- **Отсутствие тёмных паттернов**: нет фальшивых таймеров скидок, нет скрытых или труднодоступных кнопок закрытия, нет принудительной рекламы посреди боя или во время обучения.
+- **Строгая изоляция тестовых и коммерческих сборок (`BuildConfig.gd`)**:
+  - В коммерческой сборке (`feature "commercial"` в пресете `Android Release AAB` или `BuildConfig.force_commercial_mode = true`) любые симуляционные/моковые адаптеры рекламы и покупок полностью отключены.
+  - Если нативный SDK недоступен или нет сети, игра честно сообщает об этом и корректно продолжает работу без выдачи фальшивых наград и без имитации оплаты.
 
-**No fake/fraudulent ad impressions are shown as if they were real** — the
-UI explicitly labels the shop as a sandbox ("⚠️ Тестовый режим покупок...")
-and rewarded-ad buttons show a "🎬" film icon with a visible 1.4s simulated
-playback delay rather than pretending to be a real ad network.
+---
 
-## Rewarded ads (voluntary, never forced)
+## 2. Добровольная реклама за награду (Rewarded Ads)
 
-Three reward slots, each grantable **at most once per run** (slot name is
-part of the DB uniqueness key):
+Используется архитектура адаптеров (`systems/AdService.gd`) с поддержкой нативного плагина `poingstudios/godot-admob-plugin` (`v5.1.0`, MIT):
 
-1. `revive` — offered once, immediately when HP reaches 0, before the run
-   is finalized as a defeat. Declining proceeds straight to the Defeat
-   screen with no penalty beyond the already-incurred loss.
-2. `double` — offered on the Victory/Defeat results screen; doubles the
-   already-computed, server-calculated currency reward for that run.
-3. `extra_mutation` — offered inside the mutation-choice screen at every
-   evolution threshold; adds a 4th rolled option on top of the normal 3.
+### Точки размещения (исключительно по инициативе игрока)
+1. **Второй шанс (`revive`)**: не более **1 раза за забег** на экране поражения — восстанавливает 55% здоровья слизи и даёт краткую неуязвимость.
+2. **Удвоение награды (`double_reward`)**: на экране итогов забега (победа или поражение) удваивает заработанную за сессию *Лесную эссенцию* (не более 1 раза за итог забега).
+3. **Смена набора мутаций (`mutation_reroll`)**: при повышении уровня эволюции позволяет 1 раз обновить 3 предложенные карточки мутаций.
 
-If the simulated ad reports "no fill" or the player closes early, no reward
-is granted and the run continues exactly as if the player had declined —
-the game never blocks progress waiting on an ad.
+### Безопасность выдачи награды
+- Награда начисляется **только** после получения сигнала успешного завершения просмотра от SDK (`on_user_earned_reward` -> `_on_adapter_reward_earned`).
+- Одноразовый криптостойкий токен сессии (`_claimed_grant_tokens`) гарантирует защиту от повторного или двойного начисления при дублирующихся колбэках SDK.
 
-## In-app purchases (sandbox)
+---
 
-| Product id | Type | Effect |
-|---|---|---|
-| `no_ads` | non-consumable | Sets `players.no_ads = true`. |
-| `cosmetic_crystal` / `cosmetic_shadow` / `cosmetic_golden` | non-consumable | Adds a cosmetic skin id to `players.owned_cosmetics`. Purely visual — different slime body palette, no gameplay effect. |
+## 3. Внутриигровые покупки (IAP) и точное поведение `No Ads`
 
-Purchases are recorded in a `purchases` ledger table and are **not**
-re-inserted on repeat purchase attempts of an already-owned non-consumable,
-and `/api/iap/restore` returns the full list of owned product ids for a
-device, standing in for the platform's "restore purchases" mechanism.
+Интеграция выполнена через официальный плагин **`addons/GodotGooglePlayBilling`** (`v3.3.0`, MIT, обёртка над `com.android.billingclient:billing-ktx:9.1.0`).
 
-### What exactly does "No Ads" disable?
+### Каталог товаров (`resources/data/meta_progression.json -> iap_products`)
 
-This game only ever shows **voluntary, player-initiated rewarded ads** —
-there are no interstitials and no forced video ads blocking gameplay. To
-give the purchase concrete, honest value, the UI additionally includes a
-small non-intrusive **banner placeholder** on the Shop screen that is only
-shown to players who have **not** purchased "No Ads". Buying "No Ads":
+| SKU (`product_id`) | Тип | Цена (ориентир) | Описание и назначение |
+|---|---|---|---|
+| `com.turpalitto.slimerush.no_ads` | Non-consumable | `$2.99` | **Отключение принудительной рекламы (`No Ads`)** + эксклюзивный косметический облик *Кристальная призма*. |
+| `com.turpalitto.slimerush.skin_pack_aurora` | Non-consumable | `$1.99` | **Набор обликов «Северное сияние»**: открывает косметические формы *Кристальная призма* и *Золотистый янтарь*. |
+| `com.turpalitto.slimerush.fx_pack_starlight` | Non-consumable | `$1.49` | **Набор эффектов «Звёздный след»**: открывает декоративные шлейфы *Звёздная пыль* и *Споры папоротника*. |
 
-- **Removes**: the banner placeholder on the Shop/main screens.
-- **Does NOT remove**: the voluntary rewarded-ad options (revive / double /
-  extra mutation). Those stay available because they are strictly optional
-  player benefits, not something a paying player should lose access to;
-  removing them would be a worse outcome for the player. This exact
-  behavior must be restated in the real Play Store listing per Google
-  Play's transparency requirements for subscriptions/IAP.
+### Прозрачное правило работы `No Ads`
+- В текущей версии игры межстраничная (interstitial) и баннерная реклама отключены изначально ради чистого игрового опыта, а покупка `No Ads` (`SaveData.has_no_ads() == true`):
+  1. Навсегда гарантирует полное отсутствие любых межстраничных и баннерных рекламных вставок (`AdService.are_forced_ads_disabled() == true`), включая будущие контентные обновления;
+  2. Сразу разблокирует редкую форму слизи **«Кристальная призма»**;
+  3. **Оставляет доступными добровольные кнопки за награду** (*Второй шанс*, *x2 эссенция*, *Смена мутаций*) только в том случае, если игрок сам решает нажать их ради бонуса — это прямо и честно указано в описании товара в магазине (`shop.noads_note`) и в настоящем документе.
 
-No pay-to-win: no purchase affects starting mass, enemy difficulty, mutation
-odds, or boss stats. Only cosmetics and the ad-banner removal are sold.
+### Подтверждение и восстановление покупок
+- После получения состояния `PurchaseState.PURCHASED` вызывается обязательный `acknowledge_purchase(purchase_token)` (требование Google Play Billing, чтобы покупка не была автоматически возвращена через 3 дня).
+- Кнопка **«Восстановить покупки»** в магазине вызывает `BillingClient.query_purchases("inapp")` и синхронизирует все ранее приобретённые `non-consumable` товары с локальным профилем `SaveData`.
 
-## Anti-pattern checklist (explicitly avoided)
+---
 
-- ❌ No countdown timers pressuring purchases.
-- ❌ No fake "your reward is waiting!" dialogs without a real action.
-- ❌ No disguised purchase buttons or pre-checked upsells.
-- ❌ No simulated transactions pretending to be real money charges outside
-  of the clearly labeled sandbox banner.
-- ❌ No ads during active gameplay (mid-run) — only at natural breakpoints
-  (evolution choice, defeat, results).
+## 4. Продуктовая аналитика и KPI (`AnalyticsService.gd`)
 
-## Production integration plan (for a real Android build)
+### Поддерживаемые события
+1. `first_launch`
+2. `tutorial_started`
+3. `tutorial_completed`
+4. `run_started`
+5. `run_finished`
+6. `run_duration`
+7. `mutation_selected`
+8. `boss_encountered`
+9. `boss_defeated`
+10. `rewarded_ad_offered`
+11. `rewarded_ad_completed`
+12. `purchase_started`
+13. `purchase_completed`
+14. `session_end`
 
-1. Replace `playTestRewardedAd()` with a real Google Mobile Ads (AdMob)
-   rewarded-ad load/show flow (Godot Android plugin or, if staying on web,
-   an AdMob Web/AdSense-for-games equivalent is **not** viable for a Play
-   Store listing — this must happen after the Godot/Android port described
-   in `ARCHITECTURE.md`).
-2. Replace `purchaseTestProduct()`/`restorePurchases()` with the Google Play
-   Billing Library (v6+) purchase flow, including purchase acknowledgment
-   and server-side receipt verification against the Play Developer API.
-3. Keep the exact same reward-slot idempotency contract
-   (`canGrantReward`/unique `(runId, slot)`) so existing anti-fraud logic
-   carries over unchanged.
-4. Add a Data Safety / ads disclosure entry in the Play Console matching
-   this document (see `RELEASE_CHECKLIST.md`).
+### Поддержка ключевых продуктовых метрик (`Analytics.compute_kpi_snapshot()`)
+- **D1 / D7 Retention**: отслеживание когортного дня установки и активных календарных дней.
+- **Средняя длительность сессии и забега**: агрегация `run_duration` и `session_end`.
+- **Доля завершивших обучение**: отношение `tutorial_completed / tutorial_started`.
+- **Rewarded Ads Opt-in Rate**: отношение `rewarded_ad_completed / rewarded_ad_offered`.
+- **ARPDAU и конверсия в покупку**: учёт подтверждённых покупок к числу уникальных активных дней.
+
+### Конфиденциальность
+- Переключатель согласия на аналитику доступен прямо в **Настройках** игры.
+- При отключённом согласии `AnalyticsService` не сохраняет и не ставит в очередь телеметрию (`queued_for_dispatch = 0`).
+- Перед записью полезной нагрузки фильтр `_sanitize_payload` принудительно удаляет потенциальные поля ПДн (`email`, `phone`, `ip`, `gps`, `device_id`, `advertising_id`, `full_name`).

@@ -1,98 +1,85 @@
-# SLIME RUSH: EVOLUTION
+# SLIME RUSH: EVOLUTION (Слайм Раш: Эволюция)
 
-A top-down 2D "grow by absorbing" game about a small slime that eats
-creatures and objects, mutates, and eventually fights the **Ancient Forest
-Guardian**. Designed as a short (5–8 minute) mobile session game with a
-mutation-driven evolution system, honest rewarded-ad monetization, and a
-local/offline-first meta-progression loop.
+Оригинальная коммерческая мобильная 2D-игра с видом сверху на **Godot 4.5 (GDScript)**, разработанная для **Android** (с архитектурной готовностью к выпуску на **iOS**).
 
-## ⚠️ Important: platform adaptation notice
+Игрок управляет мягкой биолюминесцентной слизью в стартовом биоме **Зачарованный лес**, поглощает существ и споры, нелинейно увеличивает массу, собирает мутации и синергии, адаптируется к ограничениям большой массы и сражается с трёхфазным боссом **Древний страж леса**.
 
-The master brief asked for a **Godot 4 / Android** game. This sandbox is a
-**Next.js + PostgreSQL (Drizzle ORM) web application template** — there is no
-Godot engine, no Android SDK/NDK, no emulator, and no app-store tooling
-available in this environment, and the platform's own build/validation
-pipeline (`next typegen`, `tsc`, `next build`, `build_and_start` →
-`/api/health`) is specific to Next.js.
+---
 
-Rather than deliver only design documents or non-functional placeholders, we
-made a deliberate, documented engineering decision:
+## Ключевые особенности
 
-> **Re-implement the full game design as a real, playable browser game**
-> (Canvas2D + TypeScript game engine) inside this Next.js app, with the
-> PostgreSQL database powering meta-progression, analytics, and
-> monetization bookkeeping — while keeping every subsystem architected so it
-> maps 1:1 onto the original Godot/Android plan (same mutation data, same
-> enemy/boss state machines, same monetization rules, same analytics
-> events). See `ARCHITECTURE.md` for the mapping table and the concrete
-> steps required to port this to Godot/Android for a real Play Store release.
+- **Управление одним пальцем**: адаптивный виртуальный джойстик с переключением между **плавающим** и **фиксированным** режимами, плавным ускорением, инерцией, squash-and-stretch деформацией и опциональным автопоглощением в радиусе контакта.
+- **Тактическое поглощение и рост**: многофакторная модель поглощения (`AbsorptionRules`) учитывает массу, тип существа, каменные панцири, способности слизи, эффекты заморозки/оглушения/яда и уязвимость цели. Нелинейный рост (`MassSystem`) исключает бесконтрольное разрастание и вводит тактические компромиссы большой массы (манёвренность, заметность, уязвимость к AoE, узкие корневые проходы).
+- **12 мутаций и 5 синергий**: конфигурируемая через JSON система эволюции (`mutations.json`, `synergies.json`) с визуальным отображением каждой мутации на теле слизи и активными поведенческими механиками (временные двойники, реактивный рывок, втягивающие щупальца, маскировка-мимикрия, мембранный щит, шипы, ядовитый след и др.).
+- **Живой биом «Зачарованный лес»**: процедурная генерация с валидацией проходимости, безопасной стартовой поляной, узкими корневыми вратами, светящимися грибами, кристаллами маны и шейдером лесного полога.
+- **8 типов существ + мини-босс + 3-фазный Босс**: конечный автомат состояний (`EnemyFSM`), визуальные телеграфы опасных атак и полноценная битва с **Древним стражем леса**.
+- **Постоянная прогрессия и коллекция**: валюта *Лесная эссенция*, 5 постоянных улучшений, открытие продвинутых мутаций, энциклопедия существ, коллекция форм слизи и шлейфов, достижения и защита сохранений с авто-восстановлением из `.bak`.
+- **Честная монетизация и приватность**: полностью работоспособный офлайн-режим, официальный плагин `GodotGooglePlayBilling` (MIT, Billing 9.1.0), добровольная реклама за награду с защитой от повторной выдачи, полное отсутствие pay-to-win и согласие-ориентированная аналитика без сбора ПДн.
+- **Локализация**: русский (основной) и английский языки (`resources/localization/ru.json`, `en.json`).
 
-This is a fully working, commercially-structured product within the
-constraints of the sandbox — not a prototype or a stub. Every mechanic listed
-in the brief (growth, absorption rules, 12 mutations, 5 combos, 8 enemy
-types, a 3-phase boss, runs, meta-progression, rewarded ads, IAP, analytics,
-settings, collection, etc.) is implemented and testable today by opening the
-app.
+---
 
-## What's implemented
+## Структура репозитория
 
-- **Core loop**: one-thumb virtual joystick (fixed/floating), inertia-based
-  movement, non-linear mass→size curve, speed penalty at high mass,
-  absorption rules that are *not* pure "bigger wins" (armor, mutation gates).
-- **Evolution**: 8 mass thresholds, 3-choice mutation picks, 12 mutations (6
-  are behavior-changing, not just stat buffs), 5 data-driven combos.
-- **World**: procedurally scattered "Enchanted Forest" biome (mushrooms,
-  crystals, rocks, flowers), bounded arena, pellet respawn, object pooling
-  for particles.
-- **Enemies**: 8 creature types, each with a distinct finite-state behavior
-  (passive / flee / erratic / armored / hazard-dropping / ambush / ranged /
-  hunter).
-- **Boss**: "Ancient Forest Guardian" with 3 phases (pursuit → summons →
-  enrage), telegraphed AoE slam attacks, offense gated by mutation choice.
-- **Runs**: Classic (6 min, boss) and Practice (3 min, no rewards) modes,
-  win/lose/pause/restart, results screen, one voluntary rewarded revive per
-  run, rewarded "double reward", rewarded "extra mutation option".
-- **Meta-progression**: currency, 3 permanent upgrade tracks, 4 mutations
-  unlockable with currency, creature/forms collection, achievements — all
-  persisted server-side (PostgreSQL) keyed by an anonymous device id.
-- **Sound**: every SFX is synthesized at runtime via the Web Audio API (no
-  third-party audio assets, zero licensing risk). Music is off by default,
-  as required by the brief.
-- **Monetization**: rewarded-ad **test adapter** and Google-Play-Billing
-  **test adapter**, both server-confirmed and idempotent (anti-double-grant
-  via a unique DB constraint). Clearly labeled as sandbox/test in the UI —
-  see `MONETIZATION.md`.
-- **Analytics**: all 14 events from the brief, logged to Postgres.
-- **Automated tests**: 40 Vitest unit tests covering mass/growth math,
-  absorption thresholds, mutation rolls & combos, level caps, run rewards,
-  save/load + corrupted-save recovery, and rewarded-ad idempotency.
-
-## Running locally
-
-```bash
-npm install
-npx drizzle-kit push   # applies schema to DATABASE_URL
-npm run dev
+```text
+res://
+├── addons/GodotGooglePlayBilling/  # Официальный MIT-плагин Google Play Billing v3.3.0
+├── audio/
+│   ├── music/                      # Ненавязчивый эмбиент (по умолчанию выключен)
+│   └── sfx/                        # 11 синтезированных оригинальных WAV-эффектов
+├── bosses/                         # 3-фазный босс Древний страж леса
+├── enemies/                        # Конечный автомат EnemyFSM и сущности 8 типов врагов
+├── entities/                       # Игрок PlayerSlime, SlimeVisual, двойники, лужи, орбы, частицы
+├── localization/                   # Менеджер локализации RU / EN
+├── mutations/                      # Менеджер мутаций, уровней и синергий
+├── resources/
+│   ├── branding/                   # Иконка 512x512, адаптивные слои Android, splash 720x1280
+│   ├── data/                       # JSON-конфиги мутаций, синергий, врагов, прогрессии и магазина
+│   ├── icons/                      # Оригинальные PNG-иконки мутаций, синергий и существ
+│   ├── localization/               # Словари ru.json и en.json
+│   └── sprites/                    # Вспомогательные спрайты свечения и кристаллов
+├── scenes/                         # Main.tscn и контроллер забега ArenaController.gd
+├── scripts/                        # Корневой контроллер MainRoot.gd и build_android.sh
+├── shaders/                        # Шейдеры тела слизи, лесного полога и телеграфов атак
+├── systems/                        # Масса, поглощение, пулы, SpatialHashGrid, сохранения, звук, реклама, IAP, аналитика
+├── tests/                          # Автоматические юнит- и интеграционные тесты (222 проверки)
+└── tools/                          # Генерация ассетов, синхронизация кэша классов, упаковщик .pck
 ```
 
-Open the printed URL on a phone or in a narrow desktop window (the UI is
-designed mobile-first, portrait).
+---
 
-## Testing
+## Быстрый старт и проверка
+
+### 1. Запуск в Godot 4.5+
+Откройте каталог репозитория в **Godot Engine 4.5-stable** (или новее из ветки 4.x) и нажмите **F5** (`scenes/Main.tscn`), либо запустите из терминала:
 
 ```bash
-npx vitest run           # 40 unit tests, see TEST_REPORT.md
-npx next typegen
-npm exec tsc -- --noEmit
-npm run build
+python3 tools/sync_godot_cache.py
+godot4 --path .
 ```
 
-## Documentation map
+### 2. Запуск автоматических тестов (CLI / Headless)
+```bash
+python3 tools/sync_godot_cache.py
+godot4 --headless --quit-after 600 --path . res://tests/TestRunner.tscn
+```
 
-- `GAME_DESIGN.md` — full design: mutations, combos, enemies, boss, economy.
-- `ARCHITECTURE.md` — code layout + the Godot/Android porting plan.
-- `MONETIZATION.md` — ad/IAP rules, what "No Ads" disables, test vs. prod.
-- `TEST_REPORT.md` — what was actually executed and the results.
-- `RELEASE_CHECKLIST.md` — Android release checklist + manual/blocked items.
-- `DEVELOPMENT_PLAN.md` — staged plan (as requested in the brief) + status.
-- `PROGRESS.md` — current state, open issues, next steps for a future agent.
+### 3. Сборка Android Debug APK и Release AAB
+Требуются установленные **JDK 17**, **Android SDK (API 35)** и шаблоны экспорта Godot 4.5 (`export_templates.tpz`). Подробная инструкция и чеклист релиза приведены в [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
+```bash
+export ANDROID_HOME=/path/to/Android/Sdk
+./scripts/build_android.sh
+```
+
+---
+
+## Документация проекта
+
+- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — План разработки и результаты аудита окружения.
+- [GAME_DESIGN.md](GAME_DESIGN.md) — Геймдизайн, формулы баланса, мутации, синергии, враги и босс.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Архитектура систем, событийная шина и оптимизации производительности.
+- [MONETIZATION.md](MONETIZATION.md) — Экономика, добровольная реклама, поведение `No Ads` и внутриигровые покупки.
+- [TEST_REPORT.md](TEST_REPORT.md) — Отчёт о реальном запуске автоматических и интеграционных тестов.
+- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — Подготовка к Google Play, подпись, тексты магазина, черновик политики конфиденциальности, Data Safety и Content Rating.
+- [PROGRESS.md](PROGRESS.md) — Журнал прогресса, статус этапов и перечень оставшихся ручных шагов владельца.

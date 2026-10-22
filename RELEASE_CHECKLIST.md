@@ -1,125 +1,184 @@
-# RELEASE_CHECKLIST.md
+# ANDROID RELEASE CHECKLIST & GOOGLE PLAY PACKAGE — SLIME RUSH: EVOLUTION
 
-This checklist mirrors the brief's Android release section. Items are
-marked **Done**, **Simulated/Test**, or **Blocked** (needs a resource not
-available in this sandbox — real device, real account, real secret, or
-human/legal sign-off).
+## 1. Паспорт релиза
 
-## Build artifacts
+| Параметр | Значение |
+|---|---|
+| **Название игры (RU)** | Слайм Раш: Эволюция |
+| **Название игры (EN)** | Slime Rush: Evolution |
+| **Application ID** | `com.turpalitto.slimerush` |
+| **Версия (`versionName` / `versionCode`)** | `1.0.0` / `1` |
+| **Движок** | Godot 4.5-stable (`mobile` renderer, портрет `720x1280`) |
+| **Min SDK / Target SDK** | API 24 (Android 7.0) / API 35 (Android 15) |
+| **Архитектуры Release AAB** | `arm64-v8a`, `armeabi-v7a` |
+| **Иконка и адаптивные слои** | `res://resources/branding/icon.png` (512×512), `icon_foreground.png`, `icon_background.png` (432×432) |
+| **Splash-экран** | `res://resources/branding/splash.png` (720×1280) |
+| **Разрешения Android** | `INTERNET` (только для рекламы/IAP), `VIBRATE`, `com.android.vending.BILLING` |
 
-- [x] Working web build (`npm run build`) — **Done**.
-- [ ] Android `application id` — **Blocked**: needs the owner to choose and
-  register a reverse-DNS id (e.g. `com.yourstudio.slimerush`); not a
-  technical blocker, a decision requiring the owner.
-- [ ] App icon / splash screen (Android) — not produced; this build is a
-  responsive web UI, icon/splash assets would be authored during the Godot
-  port (`ARCHITECTURE.md`). **Blocked** (depends on the port).
-- [ ] Debug APK — **Blocked**: requires Android SDK/Gradle/Godot export
-  templates, unavailable in this sandbox.
-- [ ] Release AAB — **Blocked**: same as above, plus a signing keystore.
-- [ ] Signing configuration & keystore — **Blocked**: must be generated and
-  stored by the owner outside of version control (see "Secrets" below);
-  never committed to Git in any case.
+---
 
-## Store listing materials
+## 2. Сборка Debug APK и Release AAB
 
-- [x] Short/long description drafts — see below.
-- [ ] Screenshots — **Blocked**: requires a rendered Android build or
-  device/emulator capture; this web build's screens are feature-complete
-  and screenshot-ready once a capture environment exists.
-- [x] Privacy policy draft — in-app (`Privacy` screen) and reproduced below;
-  **requires legal review before publishing**, as required by the brief.
-- [x] Data Safety checklist draft — below.
-- [x] Content rating checklist draft — below.
-- [ ] Final Play Console content rating questionnaire submission —
-  **Blocked**: requires a real Play Console account.
+> **Примечание о среде разработки**: В облачной среде агента отсутствуют `JDK 17`, `Android SDK / NDK` и сетевой доступ к `dl.google.com`, поэтому бинарные файлы `.apk` и `.aab` собираются локально на рабочей станции владельца или через готовый workflow `.github/workflows/android-build.yml`. Вся GDScript-кодовая база, `export_presets.cfg`, упаковка `.pck` и 222 автотеста полностью верифицированы на реальном `Godot 4.5`.
 
-### Short description (RU, draft)
+### 2.1 Подготовка окружения сборки
+1. Установите **JDK 17** (Temurin 17), **Android SDK** (`platforms;android-35`, `build-tools;35.0.0`, `ndk;27.2.12479018`) и **Godot 4.5-stable + Export Templates**.
+2. В редакторе Godot выполните `Project -> Install Android Build Template...` и поместите `.aar` релизы официальных MIT-плагинов:
+   - `GodotGooglePlayBilling` `v3.3.0` -> `addons/GodotGooglePlayBilling/`
+   - `poingstudios-admob-android` `v5.1.0` -> `addons/admob/` (при подключении боевого AdMob App ID).
+3. Выполните проверочную и сборочную команду:
+   ```bash
+   export ANDROID_HOME="$HOME/Android/Sdk"
+   ./scripts/build_android.sh
+   ```
 
-> Поглощай, расти, эволюционируй! SLIME RUSH — динамичная 2D-аркада про
-> слизь, которая поглощает лес и превращается в могущественное существо.
+---
 
-### Short description (EN, draft)
+## 3. Безопасная генерация и хранение ключей подписи (Keystore)
 
-> Absorb, grow, evolve! A fast 2D slime-growth arcade game with mutations,
-> an evolving forest biome, and a 3-phase boss fight.
+**Строгое правило безопасности**: никогда не добавляйте `.keystore`, `.jks`, `keystore.properties` или пароли в Git (они уже заблокированы в `.gitignore`).
 
-### Privacy policy (draft — see also the in-app Privacy screen)
+### 3.1 Создание Upload Keystore (выполняется владельцем локально)
+```bash
+keytool -genkeypair -v \
+  -keystore ~/secure-keys/slime-rush-upload.jks \
+  -keyalg RSA -keysize 4096 -validity 10000 \
+  -alias slime_rush_upload
+```
 
-> SLIME RUSH: EVOLUTION works offline. The game stores an anonymous,
-> randomly generated device identifier to persist progress (currency,
-> upgrades, collection). We do not collect name, email, phone number, or
-> precise location. With user consent, the game may send anonymized
-> analytics events (e.g. "run started", "mutation selected", "rewarded ad
-> viewed") to improve balance and retention; these events contain no
-> personal data. Voluntary rewarded ads and in-app purchases are currently
-> processed through sandbox/test adapters in this build (see
-> `MONETIZATION.md`); a production release will use Google Mobile Ads SDK
-> and Google Play Billing under their respective policies. **This is a
-> draft and requires legal review before publication.**
+### 3.2 Правила безопасного хранения ключей
+1. Включите **Play App Signing** в Google Play Console: ваш локальный ключ выступает как *Upload Key*, а основной ключ подписи приложения хранится на аппаратных модулях безопасности Google (при утере upload-ключа его можно сбросить через поддержку Play Console).
+2. Храните резервную копию `slime-rush-upload.jks` и пароль в зашифрованном менеджере паролей (1Password / Bitwarden / KeePassXC) + на офлайн-носителе.
+3. При сборке передавайте реквизиты только через переменные окружения (см. шаблон `keystore.properties.example`):
+   ```bash
+   export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$HOME/secure-keys/slime-rush-upload.jks"
+   export GODOT_ANDROID_KEYSTORE_RELEASE_USER="slime_rush_upload"
+   export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="<из_менеджера_паролей>"
+   ./scripts/build_android.sh
+   ```
 
-### Data Safety checklist (draft, Play Console mapping)
+---
 
-| Data type | Collected? | Shared? | Purpose |
+## 4. Материалы для страницы Google Play
+
+### 4.1 Короткое описание (RU — 77 символов, лимит 80)
+> Поглощай существ леса, открывай мутации и синергии, победи Древнего стража!
+
+### 4.2 Короткое описание (EN — 76 chars, limit 80)
+> Absorb forest creatures, evolve wild mutations & defeat the Forest Guardian!
+
+### 4.3 Полное описание для Google Play (RU)
+> **Слайм Раш: Эволюция** — динамичное приключение с видом сверху и управлением одним пальцем! Начни путь крошечной светящейся каплей в таинственном Зачарованном лесу, поглощай сказочных существ, комбинируй необычные мутации и брось вызов могучему Древнему стражу леса.
+>
+> **УМНОЕ ПОГЛОЩЕНИЕ И ЖИВАЯ ФИЗИКА**
+> Здесь решает не только размер! Заманивай хищные цветы в промах, раскалывай каменные панцири кристаллическими шипами, замораживай быстрых врагов или подкрадывайся под прикрытием лесной мимикрии. С ростом массы твоя мощь увеличивается, но приходится учитывать инерцию и узкие лесные тропы.
+>
+> **12 МУТАЦИЙ И 5 МОЩНЫХ СИНЕРГИЙ**
+> Каждое повышение уровня открывает выбор из трёх мутаций, которые сразу меняют внешний вид и способности слизи:
+> • Отделяй автономных двойников и превращай их в Токсичных клонов;
+> • Выпускай дальнобойные щупальца с эффектом Биовампиризма;
+> • Соединяй Магнит и Электроразряд в сокрушительную Электромагнитную бурю;
+> • Пробивай броню реактивным Рывком с Шипами или укрывайся Ледяной бронёй.
+>
+> **ЗАЧАРОВАННЫЙ ЛЕС И БИТВА С БОССОМ**
+> Исследуй светящиеся грибные поляны и кристальные рощи в насыщенных забегах по 5–8 минут, изучай повадки 8 видов лесных обитателей и сразись с трёхфазным боссом — Древним стражем леса.
+>
+> **ИГРАЙ ОФЛАЙН И БЕЗ PAY-TO-WIN**
+> • Удобное управление одной рукой (плавающий или фиксированный джойстик);
+> • Полная поддержка игры без интернета;
+> • Честная прогрессия: улучшения и новые мутации открываются только за игровые достижения, а внутриигровые покупки ограничены косметикой и опцией No Ads.
+
+### 4.4 Рекомендуемый перечень скриншотов (8 кадров, 1080×1920 портрет)
+1. **Кадр 1 — Яркий старт в Зачарованном лесу**: изумрудная слизь с выразительными глазами втягивает светлячков и споры на фоне светящихся грибов.
+2. **Кадр 2 — Выбор мутации**: оверлей эволюции с 3 карточками (`Разделение`, `Электроразряд`, `Рывок`) и иконками редкости.
+3. **Кадр 3 — Синергия в действии**: крупная слизь с шипами и плазменными искрами активирует *Электромагнитную бурю* против стаи лесных жуков.
+4. **Кадр 4 — Тактическая охота**: пробитие панциря Каменного слизня с помощью синергии *Пробивающий удар*.
+5. **Кадр 5 — Токсичные двойники и щупальца**: два зелёных клона и втягивающее щупальце против Хищного цветка.
+6. **Кадр 6 — Битва с Древним стражем леса**: 3-я фаза босса с багровыми телеграфами атак на земле и шкалой фаз сверху.
+7. **Кадр 7 — Эволюция и коллекция**: экран постоянных улучшений и энциклопедии открытых существ Зачарованного леса.
+8. **Кадр 8 — Кастомизация форм**: коллекция косметических обликов слизи (*Кристальная призма*, *Золотистый янтарь*, *Фиалка сумрака*).
+
+---
+
+## 5. Черновик Политики конфиденциальности (ТРЕБУЕТ ПРОВЕРКИ ЮРИСТОМ ПЕРЕД ПУБЛИКАЦИЕЙ)
+
+> **ВАЖНО**: Приведённый ниже текст является техническим черновиком, отражающим фактическую работу кода приложения, и подлежит обязательной проверке квалифицированным юристом и размещению на публичном HTTPS-адресе владельца перед отправкой игры в Google Play.
+
+```text
+ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ «SLIME RUSH: EVOLUTION» (ЧЕРНОВИК)
+Дата вступления в силу: [Указать дату публикации]
+Правообладатель / Разработчик: [Указать наименование / ФИО владельца и контактный e-mail]
+
+1. Общие положения
+Игра «Slime Rush: Evolution» работает преимущественно офлайн и хранит игровой прогресс, настройки и коллекцию локально на вашем устройстве. Мы не требуем регистрации учётной записи и не запрашиваем имя, номер телефона, точное местоположение, контакты, фото или доступ к микрофону/камере.
+
+2. Какие данные могут обрабатываться
+• Локальные сохранения: игровой прогресс, выбранный язык, настройки звука и отметки приобретённых товаров сохраняются в локальной памяти приложения на устройстве.
+• Обезличенная продуктовая аналитика (только при включённом согласии в Настройках): события игрового процесса (длительность забега, выбранные мутации, прохождение обучения) без передачи имени, e-mail или точной геолокации. Вы можете отключить аналитику в любой момент в меню «Настройки».
+• Внутриигровые покупки: платежи обрабатываются непосредственно сервисом Google Play Billing. Разработчик не получает и не хранит реквизиты банковских карт и платёжных счетов; приложение получает только статус подтверждения покупки и её токен для предоставления приобретённого контента.
+• Добровольная реклама за награду: при просмотре видеорекламы за бонус рекламный SDK (Google AdMob) может обрабатывать рекламный идентификатор устройства, IP-адрес и диагностические данные показа в соответствии с настройками конфиденциальности вашего устройства и политикой конфиденциальности Google (https://policies.google.com/privacy).
+
+3. Управление данными и удаление
+Вы можете в любой момент отключить сбор аналитики в меню «Настройки», сбросить рекламный идентификатор в системных настройках Android или полностью удалить локальные данные путём очистки хранилища / удаления приложения.
+
+4. Контакты
+По всем вопросам конфиденциальности обращайтесь: [support@example.com — заменить на реальный адрес владельца].
+```
+
+---
+
+## 6. Чеклист Google Play Data Safety
+
+| Категория данных в Play Console | Собирается самим приложением? | Передаётся партнёрским SDK (AdMob / Play Billing)? | Комментарий для заполнения анкеты |
 |---|---|---|---|
-| Device/anonymous identifiers | Yes (random UUID) | No | App functionality (save progress) |
-| App interactions (analytics events) | Yes, if consented | No (processed internally) | Analytics |
-| Personal info (name/email/phone) | No | No | — |
-| Location | No | No | — |
-| Financial info | No (handled entirely by Google Play Billing, not stored by the app) | — | — |
+| Личные данные (Имя, E-mail, Телефон, Адрес) | **Нет** | **Нет** | Регистрация аккаунта отсутствует |
+| Финансовая информация (История покупок в приложении) | **Нет** (локальный учёт SKU) | **Да** (Google Play Billing) | Стандартная обработка транзакций Google Play |
+| Местоположение (Точное GPS) | **Нет** | **Нет** | Разрешения геолокации не запрашиваются; грубый регион по IP может использоваться AdMob при показе рекламы |
+| Идентификаторы устройства (`Advertising ID`) | **Нет** | **Да** (при подключении боевого AdMob SDK) | Указать цель: *Advertising or marketing, Fraud prevention* |
+| Действия в приложении (Игровые события) | Опционально (только с согласия) | При подключении внешнего бэкенда аналитики | Шифрование при передаче TLS (`HTTPS`), возможность отказа в Настройках |
+| Диагностика / сбои | **Нет** | Стандартно через Google Play Vitals / AdMob | Указать цель: *Analytics, App functionality* |
 
-### Content rating checklist (draft)
+---
 
-- Violence: mild, cartoon/fantasy creature absorption, no blood/gore.
-- No real-world weapons, no gambling mechanics, no user-generated content,
-  no chat/social features.
-- Expected rating bracket: Everyone / PEGI 3 — **must be confirmed via the
-  actual Play Console questionnaire**, not asserted here.
+## 7. Чеклист возрастного рейтинга (IARC Content Rating)
 
-## Testing & QA
+- **Насилие**: Фэнтезийное мультяшное микро-взаимодействие (сказочная капля слизи поглощает светящиеся грибы и жучков без крови, расчленёнки или реалистичного насилия) -> **Mild Fantasy Violence (PEGI 7 / ESRB E / 6+)**.
+- **Страх / Ненормативная лексика / Взрослый контент / Вещества**: **Нет** по всем пунктам.
+- **Азартные игры / Лубоксы за реальные деньги**: **Нет** (все платные товары — фиксированные `non-consumable` косметические наборы и `No Ads` с известным содержимым).
+- **Обмен данными между игроками / Чат / Геолокация**: **Нет**.
+- **Внутриигровые покупки**: **Да** (отмечается чекбокс *In-App Purchases*).
 
-- [x] Automated unit tests executed (`TEST_REPORT.md`) — 40/40 passing.
-- [x] Type-check, lint-equivalent, and production build executed — passing.
-- [x] Live API/integration smoke test against the running server — passing.
-- [ ] Manual playtest on a real Android device — **Blocked**, no device
-  available in this sandbox.
-- [ ] 60/90/120Hz behavior verification — **Blocked**, requires physical
-  hardware; the web engine uses delta-time scaling (`dt` clamped to 50ms)
-  which is hardware-refresh-rate-agnostic by design, but this has not been
-  measured on real high-refresh hardware.
-- [ ] Rewarded ad / IAP sandbox testing with real Google accounts —
-  **Blocked**, no AdMob/Play Console account configured.
+---
 
-## Secrets & signing (process, not yet executed — no secrets exist yet)
+## 8. Инструкция по тестированию покупок и рекламы перед публикацией
 
-1. Generate a keystore (`keytool -genkeypair -v -keystore release.keystore
-   -alias slimerush -keyalg RSA -keysize 2048 -validity 10000`) **once a
-   Godot/Android export pipeline exists**.
-2. Store `release.keystore`, the key alias, and both passwords in a secret
-   manager or CI secret store — **never commit them to Git**. Add
-   `*.keystore`, `*.jks`, and any `key.properties` file to `.gitignore`
-   immediately when they are introduced.
-3. Keep a secure, access-controlled backup; Google Play cannot recover a
-   lost signing key for apps enrolled before Play App Signing, so register
-   for Play App Signing when creating the app listing.
+### 8.1 Тестирование Google Play Billing (License Testing)
+1. Загрузите подписанный `slime-rush-release.aab` в дорожку **Internal Testing** в Google Play Console.
+2. Создайте в разделе **Monetize -> Products -> In-app products** три активных товара с точными ID:
+   - `com.turpalitto.slimerush.no_ads`
+   - `com.turpalitto.slimerush.skin_pack_aurora`
+   - `com.turpalitto.slimerush.fx_pack_starlight`
+3. Добавьте Google-аккаунт тестировщика в **Setup -> License testing** (карта `Test card, always approves`).
+4. Установите сборку из ссылки Internal Testing на смартфон:
+   - Совершите тестовую покупку каждого SKU -> убедитесь, что покупка переходит в статус `Владеете`, не возвращается через 5 минут (проверка `acknowledge_purchase`), а косметика сразу доступна в Коллекции.
+   - Переустановите игру и нажмите **«Восстановить покупки»** -> убедитесь, что все приобретённые товары восстанавливаются.
+   - Проверьте поведение тестовой карты `Test card, always declines` -> игра должна корректно показать уведомление об отмене без зависания интерфейса.
 
-## Explicit list of owner/manual actions required before this can ship
+### 8.2 Тестирование Rewarded Ads (AdMob)
+1. В `systems/BuildConfig.gd` при первичной проверке на устройстве оставьте официальный тестовый Ad Unit Google (`ca-app-pub-3940256099942544/5224354917`) или зарегистрируйте тестовое устройство в кабинете AdMob (**никогда не нажимайте на боевую рекламу без режима Test Device**).
+2. Проверьте 3 сценария:
+   - Просмотр до конца -> выдача возрождения / `x2 эссенции` / смены мутаций ровно 1 раз.
+   - Закрытие рекламного ролика до завершения -> награда **не** начисляется, игра остаётся отзывчивой.
+   - Включение авиарежима -> кнопка корректно сообщает о недоступности рекламы и позволяет спокойно продолжить игру офлайн.
+3. Перед переводом в Production замените тестовый ID в `BuildConfig.gd` на ваш боевой `Ad Unit ID` из кабинета AdMob.
 
-1. Decide the Android `applicationId` and app display name for the store
-   listing.
-2. Provide (or approve generation of) a Google Play Console developer
-   account and an AdMob account.
-3. Perform the Godot/Android port described in `ARCHITECTURE.md` (requires
-   a Godot-capable environment, which this sandbox does not have).
-4. Replace the test ad/IAP adapters with real SDK integrations
-   (`MONETIZATION.md`).
-5. Run the full manual QA matrix from the original brief (first launch,
-   full run, boss victory, defeat, restart, offline behavior, app
-   backgrounding, resolution/aspect-ratio changes) on real Android hardware.
-6. Have the privacy policy and store listing reviewed by legal counsel
-   before publishing.
-7. Generate and securely store the release keystore; never check it into
-   version control.
-8. Only publish after the owner's explicit sign-off — this session does not
-   publish anything, per the brief's own restriction on taking
-   publishing/payment/account actions without explicit permission.
+---
+
+## 9. Финальный чеклист владельца перед нажатием «Выпустить в рабочую версию»
+
+- [ ] Заменён черновик Политики конфиденциальности на проверенную юристом версию и указан публичный HTTPS URL в Play Console и `MenuScreens.gd` (при необходимости).
+- [ ] Создан и надёжно сохранён `slime-rush-upload.jks`, включён Play App Signing.
+- [ ] Заведены 3 товара в Play Console и проверены через Internal Testing.
+- [ ] В `systems/BuildConfig.gd` прописан боевой `ADMOB_ANDROID_REWARDED_UNIT_ID` (и `app-ads.txt` размещён на домене разработчика).
+- [ ] Проверены стабильные 60 FPS, нагрев, звук и читаемость шрифтов на реальном бюджетном Android-смартфоне.
+- [ ] Сняты и загружены 8 реальных скриншотов и Feature Graphic `1024×500`.

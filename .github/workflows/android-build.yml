@@ -1,0 +1,27 @@
+name: Godot 4.5 QA & Android Package CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  godot-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.5-stable
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5-stable/Godot_v4.5-stable_linux.x86_64.zip
+          unzip -q Godot_v4.5-stable_linux.x86_64.zip
+          sudo mv Godot_v4.5-stable_linux.x86_64 /usr/local/bin/godot4
+
+      - name: Run Automated GDScript Test Suite & Verify .pck Build
+        run: |
+          python3 tools/sync_godot_cache.py
+          godot4 --headless --quit-after 600 --path . res://tests/TestRunner.tscn
+          python3 tools/build_pck.py /tmp/slime_rush.pck
+          cd /tmp && godot4 --headless --quit-after 600 --main-pack /tmp/slime_rush.pck res://tests/TestRunner.tscn

@@ -1,70 +1,59 @@
-# DEVELOPMENT_PLAN.md
+# DEVELOPMENT PLAN — SLIME RUSH: EVOLUTION
 
-Staged plan as requested by the brief (Stage 0 → 6), with actual status in
-this web-adapted implementation (see `README.md` for why it's web, not
-Godot).
+## 1. Результаты аудита окружения (Этап 0)
 
-## Stage 0 — Environment audit ✅ Done
+- **ОС и оборудование песочницы**: Debian GNU/Linux 12 (bookworm) `x86_64`, 2 vCPU, 3.8 GiB RAM, 20 GiB свободного места на диске.
+- **Игровой движок**: **Godot Engine v4.5.stable.official (`876b29033`)** — официальный Linux `x86_64` рантайм, проверенный по коммит-хэшу официального тега `4.5-stable` (`876b290332ec6f2e6d173d08162a02aa7e6ca46d`).
+- **Шрифты и локализация**: Проверена полная поддержка кириллицы и латиницы во встроенном шрифте Godot 4.5 и системном `DejaVuSans`.
+- **Генерация оригинальных ресурсов**: Python 3.11 (`tools/generate_assets.py`) создаёт все лицензионно чистые `.png` иконки, адаптивные иконки Android, splash-экран и синтезирует 16-бит PCM `.wav` звуковые эффекты.
+- **Официальные SDK монетизации (проверены лицензии и API)**:
+  - **Google Play Billing**: `godot-sdk-integrations/godot-google-play-billing` `v3.3.0` (MIT, Google Play Billing `9.1.0`, поддержка Godot 4.2+). Официальный `BillingClient.gd` и `export_plugin.gd` подключены в `addons/GodotGooglePlayBilling/`.
+  - **Rewarded Ads (AdMob)**: `poingstudios/godot-admob-plugin` `v5.1.0` (MIT, поддержка Godot 4.5+). Архитектура `AdService` разделяет `ProductionAdMobAdapter` и изолированный тестовый `TestMockAdAdapter` (заблокированный в коммерческих сборках).
+- **Сетевые ограничения среды и инженерный обходной путь**:
+  - В песочнице разрешены только `github.com`, `codeload.github.com`, `api.github.com`, `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`; домены `dl.google.com` и S3-редиректы `objects.githubusercontent.com` недоступны.
+  - Вся игровая логика, сцены, шейдеры, упаковка `.pck` и 222 автотеста проверены реальным запуском `godot4 --headless`; подготовлены `export_presets.cfg`, `scripts/build_android.sh` и `.github/workflows/android-build.yml` для финальной сборки APK/AAB.
 
-- Repository found to be a clean Next.js 16 + PostgreSQL/Drizzle template,
-  no Godot/Android tooling present or installable in this sandbox.
-- Decision recorded: implement the full game design as a browser game
-  inside the given stack, architected for a later Godot/Android port.
-- Constraints documented in `README.md`/`ARCHITECTURE.md`.
+---
 
-## Stage 1 — Core loop ✅ Done
+## 2. Поэтапный план разработки
 
-- One-thumb joystick (fixed/floating), inertia-based movement, camera
-  follow, bounded arena, non-linear mass→size growth, non-"bigger always
-  wins" absorption rules, basic collisions. Fully playable prototype.
+### Этап 0 — Проверка окружения и базовая инфраструктура
+- [x] Аудит репозитория, ОС, доступных инструментов, сетевых политик и лицензий SDK.
+- [x] Настройка `.gitignore` (защита ключей, keystore, бинарных сборок).
+- [x] Создание `DEVELOPMENT_PLAN.md`, `PROGRESS.md` и утилиты синхронизации кэша классов `tools/sync_godot_cache.py`.
 
-## Stage 2 — Evolution ✅ Done
+### Этап 1 — Игровое ядро (Core Gameplay Prototype)
+- [x] Конфигурация `project.godot` (портретный мобильный режим `720x1280`, адаптивное масштабирование `canvas_items` + `expand`, физика 60 тиков/с + `physics_interpolation` для экранов 60/90/120 Гц, Autoload-синглтоны).
+- [x] Пространственная хэш-сетка (`SpatialHashGrid`) и пул объектов (`ObjectPool`) для высокой производительности.
+- [x] Нелинейная математика массы и роста (`MassSystem`) с тактическими ограничениями большой массы (снижение манёвренности, рост заметности, уязвимость к AoE, узкие проходы).
+- [x] Многофакторная система поглощения (`AbsorptionRules`): учёт массы, типа цели, брони, способностей, состояний (`FROZEN`, `STUNNED`, `VULNERABLE`) и временных усилений.
+- [x] Управление слизью одним пальцем (`VirtualJoystick` — фиксированный и плавающий режимы + опциональное автопоглощение), инерция, деформация тела, реакция на столкновения, плавная камера.
+- [x] Проверка ядра через `godot4 --headless`.
 
-- 12 mutations (8 locked/unlocked split), weighted random 3-choice picks at
-  8 mass thresholds, 5 data-driven combos, mutation-specific visuals on the
-  slime body, balance constants centralized and unit-tested.
+### Этап 2 — Система эволюции и мутаций
+- [x] Конфигурация данных `resources/data/mutations.json` (12 уникальных мутаций с уровнями 1–5, редкостью, ограничениями и визуальными признаками на теле слизи) и `resources/data/synergies.json` (5 особых комбинаций).
+- [x] `MutationManager`: расчёт порогов эволюции, взвешенная выдача 3 случайных мутаций, активные и поведенческие механики (`Split`, `Dash`, `Ranged Absorb`, `Mimicry`, `Poison Trail`, `Spikes`, `Shield`, `Electro Discharge`, `Freeze`, `Magnet`, `Speed Boost`, `Regeneration`).
+- [x] Автоматическая активация и эффекты всех 5 синергий (`Электромагнитная буря`, `Токсичные двойники`, `Пробивающий удар`, `Ледяная броня`, `Биовампиризм`).
+- [x] Проверка мутаций и синергий автотестами.
 
-## Stage 3 — Content ✅ Done
+### Этап 3 — Игровой мир, противники, босс и прогрессия
+- [x] Стартовый биом **Зачарованный лес** (`WorldGenerator`): процедурное размещение светящихся грибов, кристаллов, рунных камней, узких корневых проходов с проверкой проходимости и безопасной зоны старта.
+- [x] 8 типов противников (`resources/data/enemies.json` + конечный автомат `EnemyFSM`): Маленький гриб, Лесной жук, Светлячок, Каменный слизень, Ядовитая жаба, Хищный цветок, Электрический жук, Теневая слизь + мини-босс Вожак теневой рощи.
+- [x] Полноценный 3-фазный босс **Древний страж леса** (`AncientGuardianBoss`) с визуальными телеграфами атак, призывом миньонов и окнами уязвимости.
+- [x] Система забегов (`ArenaController`, стандартный забег 5–8 минут и блиц-режим), постоянная прогрессия (`SaveManager` с защитой от повреждения сохранений, 5 улучшений, открытие мутаций, коллекция существ, формы слизи, достижения).
 
-- Enchanted Forest biome (procedurally scattered decorations), 8 enemy
-  types with distinct FSM behaviors, 3-phase boss with telegraphed attacks,
-  Classic/Practice run modes, win/lose/pause/restart, meta-progression
-  (currency, upgrades, mutation unlocks, collection, achievements).
+### Этап 4 — Визуальная полировка, шейдеры, звук, интерфейс и обучение
+- [x] Процедурная генерация оригинальных `.png` ассетов и синтез `.wav` звуков (`tools/generate_assets.py`).
+- [x] Кастомные шейдеры (`slime_body.gdshader`, `forest_canopy.gdshader`, `telegraph_zone.gdshader`) и выразительная анимация слизи (`SlimeVisual`: глаза, ядро, squash & stretch, поглощение, мутации, урон, гибель, эволюция).
+- [x] Локализация RU (основной) + EN (`LocalizationManager`).
+- [x] Все 12 экранов интерфейса, адаптированных под экраны телефонов и разные соотношения сторон + интерактивное обучение (`TutorialManager`).
 
-## Stage 4 — Polish ✅ Done (web-appropriate scope)
+### Этап 5 — Коммерческие функции (Монетизация, Аналитика, Конфиденциальность)
+- [x] Подключение `addons/GodotGooglePlayBilling` (MIT) + безопасная архитектура `BillingService` и `AdService` (разделение Production и Test/Mock адаптеров, строгая защита от повторной выдачи наград, отсутствие фиктивной рекламы в коммерческой сборке, корректный офлайн-режим).
+- [x] Прозрачная реализация `No Ads`, косметических обликов и эффектов следа без pay-to-win.
+- [x] Privacy-friendly `AnalyticsService` (14 событий, расчёт D1/D7 retention и продуктовых метрик, учёт согласия пользователя).
 
-- Canvas-rendered slime with squash/stretch, glowing core, eyes, mutation
-  overlays, particle bursts, telegraphed boss attacks, HUD (mass/HP/time/
-  evolution bar/boss bar), synthesized SFX (no licensed/third-party audio),
-  Russian-first UI with an English-ready i18n layer, mobile-first responsive
-  layout with `touch-action:none`/no-zoom viewport.
-- Not done: a dedicated interactive tutorial flow (the brief's
-  `tutorial_started`/`tutorial_completed` analytics events exist and are
-  wired for future use, but there is no forced first-run tutorial sequence
-  yet — Practice mode currently serves as the de facto tutorial). Flagged in
-  `PROGRESS.md` as the top "nice to have" follow-up.
-
-## Stage 5 — Commercial features ✅ Done (as test adapters)
-
-- Shop (No Ads + 3 cosmetics), rewarded-ad flows (revive/double/extra
-  mutation) with server-confirmed, idempotent grants, all 14 analytics
-  events, privacy screen + draft policy. Clearly labeled as sandbox/test —
-  see `MONETIZATION.md` for the real-SDK integration plan.
-
-## Stage 6 — QA & release ⚠️ Partially done / blocked
-
-- Done: 40 automated unit tests, type-check, production build,
-  `build_and_start` + `/api/health`, and a live API integration smoke test
-  (see `TEST_REPORT.md`).
-- Blocked (needs resources unavailable here): Godot/Android export, real
-  device QA, real ad/billing sandbox testing, Play Console submission
-  materials finalization. Full list in `RELEASE_CHECKLIST.md`.
-
-## Summary
-
-Every mechanic from the brief is implemented and verified to the extent
-possible without Godot/Android tooling or a real device. The remaining work
-is almost entirely **porting + platform/account work**, not game design or
-core engineering — tracked explicitly in `ARCHITECTURE.md` and
-`RELEASE_CHECKLIST.md` so a future session (ideally with Godot/Android
-access) can continue directly from here.
+### Этап 6 — QA, тестирование и подготовка к Android-релизу
+- [x] Полный прогон автоматических и интеграционных тестов в `godot4 --headless` (222 утверждения пройдены без ошибок, проверена работа из упакованного `.pck`).
+- [x] Подготовка `export_presets.cfg`, `scripts/build_android.sh`, `.github/workflows/android-build.yml`, конфигурации подписи, материалов Google Play, черновика политики конфиденциальности, чеклистов Data Safety и Content Rating.
+- [x] Финализация всех 8 отчётных документов.

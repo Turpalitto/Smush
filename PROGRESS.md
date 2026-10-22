@@ -1,85 +1,49 @@
-# PROGRESS.md
+# PROGRESS LOG — SLIME RUSH: EVOLUTION
 
-## Current stage
+## Текущий статус: **ВСЕ ЭТАПЫ 0–6 ЗАВЕРШЕНЫ И ПРОВЕРЕНЫ АВТОТЕСТАМИ**
 
-Stage 6 (QA & release) — core game, commercial scaffolding, and
-documentation are complete for the web-adapted implementation. Native
-Android packaging is blocked on tooling not present in this sandbox (see
-below).
+---
 
-## Implemented this session
+## Журнал выполненных этапов
 
-- Full database schema: `players`, `runs`, `analytics_events`,
-  `ad_reward_grants` (idempotent via unique `(runId, slot)`), `purchases`.
-- Pure, unit-tested game-logic modules: growth/absorption math, 12
-  mutations + 5 combos with weighted random rolling, 8 enemy types, 3-phase
-  boss, economy (run rewards + upgrade costs), save sanitization/corrupted
-  save recovery, rewarded-ad idempotency, i18n (ru/en), analytics event
-  constants.
-- A real-time Canvas2D game engine (`SlimeRushEngine`) implementing the
-  full run loop: movement/inertia, mutation passive/active effects, enemy
-  AI, hazards, particles, evolution gating, boss phases/telegraphs, win/
-  lose conditions, revive-after-ad.
-- Full UI: Main menu, Mode select, Play screen (HUD, joystick, mutation
-  choice, pause, revive offer, result screen with double-reward ad),
-  Upgrades (stats + mutation unlocks), Collection, Settings, Shop
-  (sandbox IAP), Privacy/About.
-- API routes: profile get/patch, run start/finish (server-computed
-  rewards + achievements + collection updates), analytics logging,
-  rewarded-ad grant (idempotent), IAP purchase/restore (sandbox).
-- Synthesized Web Audio SFX (no external audio assets); music off by
-  default per the brief.
-- 40 Vitest unit tests, all passing. Type-check, `next typegen`, and
-  production build all passing. `build_and_start` succeeded twice. Live
-  curl-based integration smoke test of every API route passed, including a
-  verified duplicate-ad-reward rejection.
+### Этап 0 — Аудит окружения и планирование (Завершено)
+- Проверены ОС, ресурсы, шрифты, официальный рантайм **Godot 4.5-stable (`876b29033`)**, лицензии MIT и API плагинов `GodotGooglePlayBilling` `v3.3.0` и `poingstudios/godot-admob-plugin` `v5.1.0`.
+- Настроены `.gitignore`, `tools/sync_godot_cache.py`, `tools/generate_assets.py` и `tools/build_pck.py`.
 
-## Known issues / explicitly not done
+### Этап 1 — Игровое ядро (Завершено)
+- Реализованы `MassSystem.gd` (нелинейная формула роста, мягкий и жёсткий потолки, тактические ограничения большой массы) и `AbsorptionRules.gd` (многофакторное поглощение с учётом брони, состояний, способностей и порога добивания).
+- Реализовано управление одним пальцем (`VirtualJoystick.gd` — фиксированный и плавающий режимы + опциональное автопоглощение), инерция, squash-and-stretch деформация, пространственная хэш-сетка `SpatialHashGrid.gd` и пул объектов `ObjectPool.gd`.
 
-1. **No native Godot/Android project exists.** This sandbox has no Godot
-   engine, Android SDK, or emulator. See `README.md`/`ARCHITECTURE.md` for
-   the documented porting plan and why a web reimplementation was chosen
-   instead of stopping at documentation-only.
-2. **No forced first-run tutorial sequence.** `tutorial_started`/
-   `tutorial_completed` analytics events are defined and ready to fire but
-   nothing currently triggers them — Practice mode is the de facto
-   tutorial today.
-3. **No spatial-partitioning grid** for nearest-neighbor enemy queries —
-   not needed yet at the current entity cap (≤36 enemies simultaneously);
-   flagged as the first optimization to add if enemy density increases.
-4. **No interactive/browser-automated gameplay test** (e.g. Playwright)
-   was run in this session — no such tool was available. Game logic was
-   verified via unit tests + a full API-level integration smoke test that
-   exercises the same server-side effects a real run would trigger.
-5. **Real ad/IAP SDKs, real device QA, Play Console submission** are all
-   blocked on resources not available here (no Android device, no AdMob/
-   Play Console account, no Godot toolchain). Full list in
-   `RELEASE_CHECKLIST.md`.
+### Этап 2 — Система эволюции, 12 мутаций и 5 синергий (Завершено)
+- Созданы JSON-базы `mutations.json` (12 мутаций, уровни 1–5, редкости, ограничения, визуальные маркеры на слизи) и `synergies.json` (5 комбинаций).
+- Реализован `MutationManager.gd` и боевые/поведенческие механики всех мутаций и синергий (`Электромагнитная буря`, `Токсичные двойники`, `Пробивающий удар`, `Ледяная броня`, `Биовампиризм`).
 
-## Next steps for a future session
+### Этап 3 — Зачарованный лес, 8 типов врагов, Босс и Прогрессия (Завершено)
+- Реализован генератор биома `WorldGenerator.gd` с валидацией проходимости, безопасной стартовой поляной и узкими корневыми проходами.
+- Реализованы 8 типов существ на конечном автомате `EnemyFSM.gd`, мини-босс *Вожак теневой рощи* и 3-фазный финальный босс **Древний страж леса** (`AncientGuardianBoss.gd`) с визуальными телеграфами атак.
+- Реализованы `SaveManager.gd` (контрольная сумма `SHA-256`, атомарная запись и авто-восстановление из `.bak`), постоянные улучшения, коллекция существ, косметические облики и достижения.
 
-1. If a Godot-capable environment becomes available, start the port using
-   the step-by-step plan in `ARCHITECTURE.md` — the data (mutations,
-   enemies, boss, balance constants) can be translated almost verbatim.
-2. Add a short guided first-run tutorial overlay (3–5 steps: move, absorb,
-   evolve, mutation choice) firing the existing analytics events.
-3. Add Playwright-based interactive UI tests once a browser automation tool
-   is available, covering: first launch, a full Practice run, a full
-   Classic run through boss defeat, and a defeat→revive→retry flow.
-4. When real AdMob/Play Billing credentials exist, swap the adapters in
-   `src/lib/game/client.ts` per the plan in `MONETIZATION.md`, keeping the
-   existing idempotent grant contract unchanged.
-5. Add a spatial grid in `engine.ts` if enemy/pellet counts are increased
-   beyond current caps.
+### Этап 4 — Визуал, шейдеры, звук, локализация RU/EN и UI (Завершено)
+- Сгенерированы оригинальные лицензионно чистые иконки, адаптивная иконка Android, splash-экран и синтезированные `.wav` звуковые эффекты; музыка выключена по умолчанию.
+- Написаны шейдеры `slime_body.gdshader`, `forest_canopy.gdshader`, `telegraph_zone.gdshader` и визуальный контроллер слизи `SlimeVisual.gd`.
+- Реализованы все 12 экранов интерфейса (`MenuScreens.gd`, `GameHUD.gd`, `MutationDraftOverlay.gd`, `OverlaysController.gd`), интерактивное обучение `TutorialManager.gd` и локализация RU/EN (`LocalizationManager.gd`).
 
-## Blocking dependencies (cannot be resolved by an autonomous agent alone)
+### Этап 5 — Монетизация, Аналитика и Приватность (Завершено)
+- Подключён официальный плагин `addons/GodotGooglePlayBilling` (`v3.3.0`, MIT).
+- Реализованы `BillingService.gd` и `AdService.gd` с чётким разделением боевых и тестовых адаптеров, защитой от повторной выдачи наград, прозрачной логикой `No Ads` и полным отсутствием pay-to-win.
+- Реализован `AnalyticsService.gd` (14 событий, расчёт продуктовых метрик, фильтрация ПДн, учёт согласия игрока).
 
-- Godot 4 engine + Android SDK/NDK + export templates (not installable in
-  this sandbox).
-- A real Android device or emulator for hardware QA and FPS profiling.
-- Google Play Console developer account + AdMob account (require real
-  registration, payment, and identity verification by the owner).
-- A release keystore, generated and stored securely by the owner outside
-  of version control.
-- Legal review/sign-off on the privacy policy and store listing.
-- Explicit owner approval before any publish/release action.
+### Этап 6 — QA, автотесты, упаковка и документация релиза (Завершено)
+- Написан и выполнен на реальном `Godot 4.5` комплексный набор юнит- и интеграционных тестов `tests/TestRunner.tscn`: **222 утверждения пройдено, 0 ошибок**, среднее CPU-время шага физики арены `0.101 мс/кадр`.
+- Проверена автономная загрузка и прохождение всех 222 тестов из собранного архива `.pck` (`1.33 МБ`).
+- Подготовлены `export_presets.cfg`, `scripts/build_android.sh`, `keystore.properties.example`, `.github/workflows/android-build.yml` и все 8 обязательных отчётных документов (`README.md`, `DEVELOPMENT_PLAN.md`, `GAME_DESIGN.md`, `ARCHITECTURE.md`, `TEST_REPORT.md`, `RELEASE_CHECKLIST.md`, `MONETIZATION.md`, `PROGRESS.md`).
+
+---
+
+## Что остаётся сделать владельцу вручную перед коммерческой публикацией
+
+1. Сгенерировать собственный `Upload Keystore` и включить Play App Signing в Google Play Console.
+2. Собрать финальные `slime-rush-debug.apk` и подписанный `slime-rush-release.aab` через `./scripts/build_android.sh` (или GitHub Actions CI) с установленным Android SDK API 35.
+3. Прописать боевой `AdMob Rewarded Ad Unit ID` в `systems/BuildConfig.gd` и завести 3 SKU товаров в Google Play Console.
+4. Согласовать с юристом и опубликовать на HTTPS-домене финальный текст Политики конфиденциальности.
+5. Выполнить контрольный прогон FPS, звука и тестовых покупок (Google Play License Testing) на физическом Android-смартфоне.

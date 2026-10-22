@@ -1,0 +1,62 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Slime Rush: Evolution"
+config/description="Original 2D top-down evolution action game in the Enchanted Forest."
+config/version="1.0.0"
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.5", "Mobile")
+boot_splash/bg_color=Color(0.0431373, 0.0862745, 0.117647, 1)
+boot_splash/image="res://resources/branding/splash.png"
+boot_splash/fullsize=true
+config/icon="res://resources/branding/icon.png"
+
+[autoload]
+
+Events="*res://systems/GameEvents.gd"
+Loc="*res://localization/LocalizationManager.gd"
+ConfigDB="*res://systems/ConfigDatabase.gd"
+SaveData="*res://systems/SaveManager.gd"
+Audio="*res://systems/AudioManager.gd"
+Analytics="*res://systems/AnalyticsService.gd"
+Ads="*res://systems/AdService.gd"
+Billing="*res://systems/BillingService.gd"
+App="*res://systems/GameManager.gd"
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/GodotGooglePlayBilling/plugin.cfg")
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[physics]
+
+common/physics_ticks_per_second=60
+common/physics_interpolation=true
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+renderer/rendering_method.web="gl_compatibility"
+textures/canvas_textures/default_texture_filter=2

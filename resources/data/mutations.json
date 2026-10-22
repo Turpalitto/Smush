@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "mutations": [
+    {
+      "id": "magnet",
+      "name_key": "mut.magnet.name",
+      "desc_key": "mut.magnet.desc",
+      "icon": "res://resources/icons/mutations/magnet.png",
+      "rarity": "common",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": false,
+      "visual_tag": "orbit_rings",
+      "constraints": {
+        "visibility_add": 0.06
+      },
+      "params": {
+        "pull_radius_base": 145.0,
+        "pull_radius_per_level": 38.0,
+        "pull_force_base": 260.0,
+        "pull_force_per_level": 65.0
+      }
+    },
+    {
+      "id": "speed_boost",
+      "name_key": "mut.speed_boost.name",
+      "desc_key": "mut.speed_boost.desc",
+      "icon": "res://resources/icons/mutations/speed_boost.png",
+      "rarity": "common",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": false,
+      "visual_tag": "fins",
+      "constraints": {
+        "knockback_taken_mult": 1.10
+      },
+      "params": {
+        "speed_mult_per_level": 0.09,
+        "accel_mult_per_level": 0.12
+      }
+    },
+    {
+      "id": "spikes",
+      "name_key": "mut.spikes.name",
+      "desc_key": "mut.spikes.desc",
+      "icon": "res://resources/icons/mutations/spikes.png",
+      "rarity": "common",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": true,
+      "visual_tag": "thorns",
+      "constraints": {
+        "speed_penalty": 0.03
+      },
+      "params": {
+        "contact_dps_base": 18.0,
+        "contact_dps_per_level": 9.0,
+        "armor_pierce_per_level": 0.22
+      }
+    },
+    {
+      "id": "poison_trail",
+      "name_key": "mut.poison_trail.name",
+      "desc_key": "mut.poison_trail.desc",
+      "icon": "res://resources/icons/mutations/poison_trail.png",
+      "rarity": "rare",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": true,
+      "visual_tag": "toxic_bubbles",
+      "constraints": {
+        "spawn_interval_min": 0.24
+      },
+      "params": {
+        "drop_interval": 0.38,
+        "pool_duration": 3.4,
+        "dps_base": 14.0,
+        "dps_per_level": 7.5,
+        "weaken_absorb_bonus": 0.18
+      }
+    },
+    {
+      "id": "split",
+      "name_key": "mut.split.name",
+      "desc_key": "mut.split.desc",
+      "icon": "res://resources/icons/mutations/split.png",
+      "rarity": "epic",
+      "max_level": 5,
+      "unlocked_by_default": false,
+      "unlock_cost": 35,
+      "behavioral": true,
+      "visual_tag": "twin_core",
+      "constraints": {
+        "min_mass_required": 13.0,
+        "temp_mass_loan_ratio": 0.10
+      },
+      "params": {
+        "cooldown_base": 10.5,
+        "cooldown_per_level": -0.9,
+        "clone_duration": 6.5,
+        "clone_damage_base": 15.0,
+        "clone_damage_per_level": 6.0
+      }
+    },
+    {
+      "id": "shield",
+      "name_key": "mut.shield.name",
+      "desc_key": "mut.shield.desc",
+      "icon": "res://resources/icons/mutations/shield.png",
+      "rarity": "rare",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": true,
+      "visual_tag": "hex_bubble",
+      "constraints": {
+        "blocks_single_hit": true
+      },
+      "params": {
+        "recharge_base": 11.0,
+        "recharge_per_level": -1.3,
+        "knockback_wave": 240.0
+      }
+    },
+    {
+      "id": "regeneration",
+      "name_key": "mut.regeneration.name",
+      "desc_key": "mut.regeneration.desc",
+      "icon": "res://resources/icons/mutations/regeneration.png",
+      "rarity": "common",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": false,
+      "visual_tag": "emerald_organelles",
+      "constraints": {
+        "reduced_during_combat_sec": 1.5
+      },
+      "params": {
+        "hp_per_sec_base": 2.6,
+        "hp_per_sec_per_level": 1.6
+      }
+    },
+    {
+      "id": "dash",
+      "name_key": "mut.dash.name",
+      "desc_key": "mut.dash.desc",
+      "icon": "res://resources/icons/mutations/dash.png",
+      "rarity": "rare",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": true,
+      "visual_tag": "jet_nozzle",
+      "constraints": {
+        "mass_cost_ratio": 0.015
+      },
+      "params": {
+        "cooldown_base": 4.2,
+        "cooldown_per_level": -0.42,
+        "dash_speed_mult": 2.65,
+        "dash_duration": 0.26,
+        "iframes_sec": 0.24
+      }
+    },
+    {
+      "id": "ranged_absorb",
+      "name_key": "mut.ranged_absorb.name",
+      "desc_key": "mut.ranged_absorb.desc",
+      "icon": "res://resources/icons/mutations/ranged_absorb.png",
+      "rarity": "epic",
+      "max_level": 5,
+      "unlocked_by_default": false,
+      "unlock_cost": 40,
+      "behavioral": true,
+      "visual_tag": "tendrils",
+      "constraints": {
+        "max_simultaneous_targets": 2
+      },
+      "params": {
+        "range_base": 155.0,
+        "range_per_level": 28.0,
+        "reel_speed_base": 310.0,
+        "reel_speed_per_level": 55.0,
+        "mass_ratio_bonus": 0.14
+      }
+    },
+    {
+      "id": "electro_discharge",
+      "name_key": "mut.electro_discharge.name",
+      "desc_key": "mut.electro_discharge.desc",
+      "icon": "res://resources/icons/mutations/electro_discharge.png",
+      "rarity": "epic",
+      "max_level": 5,
+      "unlocked_by_default": false,
+      "unlock_cost": 45,
+      "behavioral": true,
+      "visual_tag": "plasma_sparks",
+      "constraints": {
+        "visibility_add": 0.10
+      },
+      "params": {
+        "interval_base": 3.4,
+        "interval_per_level": -0.32,
+        "radius_base": 150.0,
+        "radius_per_level": 20.0,
+        "damage_base": 22.0,
+        "damage_per_level": 10.0,
+        "stun_sec": 0.75,
+        "targets_base": 2
+      }
+    },
+    {
+      "id": "freeze",
+      "name_key": "mut.freeze.name",
+      "desc_key": "mut.freeze.desc",
+      "icon": "res://resources/icons/mutations/freeze.png",
+      "rarity": "rare",
+      "max_level": 5,
+      "unlocked_by_default": true,
+      "unlock_cost": 0,
+      "behavioral": true,
+      "visual_tag": "frost_crystals",
+      "constraints": {
+        "boss_slow_cap": 0.35
+      },
+      "params": {
+        "pulse_interval": 3.8,
+        "radius_base": 140.0,
+        "radius_per_level": 22.0,
+        "slow_factor_base": 0.42,
+        "slow_per_level": 0.07,
+        "chill_duration": 2.6
+      }
+    },
+    {
+      "id": "mimicry",
+      "name_key": "mut.mimicry.name",
+      "desc_key": "mut.mimicry.desc",
+      "icon": "res://resources/icons/mutations/mimicry.png",
+      "rarity": "rare",
+      "max_level": 5,
+      "unlocked_by_default": false,
+      "unlock_cost": 30,
+      "behavioral": true,
+      "visual_tag": "leaf_cloak",
+      "constraints": {
+        "breaks_briefly_on_attack": 1.2
+      },
+      "params": {
+        "detect_reduction_base": 0.28,
+        "detect_reduction_per_level": 0.09,
+        "ambush_absorb_bonus": 0.25,
+        "ambush_damage_mult": 1.45
+      }
+    }
+  ]
+}

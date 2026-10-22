@@ -1,151 +1,58 @@
-# ARCHITECTURE.md
+# ARCHITECTURE — SLIME RUSH: EVOLUTION
 
-## Why Next.js instead of Godot
+## 1. Архитектурные принципы
 
-This sandbox provides a Next.js (App Router) + PostgreSQL/Drizzle template
-and a validation pipeline built around it (`next typegen`, `tsc`, `next
-build`, `build_and_start` → `/api/health`). There is no Godot binary,
-Android SDK/NDK, emulator, or packaging toolchain available here, and no way
-to produce an installable APK/AAB in this sandbox. See `README.md` for the
-adaptation rationale.
+Проект построен на **Godot 4.5** с использованием строго типизированного **GDScript** и чётким разделением ответственности между слоями:
 
-The implementation below is organized so that **porting to Godot 4 is a
-translation exercise, not a redesign**: game data, balance numbers, and
-state-machine logic are isolated from rendering/input, mirroring Godot's own
-separation of `Resource` data, `Node` scenes, and `Autoload` singletons.
+1. **Данные и конфигурация (`resources/data/*.json`, `ConfigDatabase.gd`)** — все параметры мутаций, синергий, противников, улучшений, форм, достижений и каталога магазина вынесены в чистые JSON-файлы и индексируются при старте.
+2. **Доменная математика и правила (`MassSystem.gd`, `AbsorptionRules.gd`, `MutationManager.gd`, `EnemyFSM.gd`)** — детерминированные `RefCounted`-модули без привязки к узлам сцены и UI, что делает их быстрыми и 100% тестируемыми изолированно.
+3. **Игровые сущности и представление (`entities/`, `enemies/`, `bosses/`, `shaders/`)** — визуальная часть слизи (`SlimeVisual.gd` + `slime_body.gdshader`) отделена от физики и боевой логики (`PlayerSlime.gd`).
+4. **Событийная шина (`systems/GameEvents.gd` — Autoload `Events`)** — связывает игровой мир с HUD, звуком, обучением и достижениями без жёстких перекрёстных ссылок.
+5. **Платформенные и коммерческие сервисы (`SaveManager.gd`, `AdService.gd`, `BillingService.gd`, `AnalyticsService.gd`)** — спроектированы через адаптеры с полной поддержкой офлайн-работы и готовностью к портированию на iOS.
 
-## Current (web) project layout
+---
 
-```
-src/
-  db/
-    schema.ts         Drizzle tables: players, runs, analytics_events,
-                       ad_reward_grants (unique runId+slot), purchases
-    index.ts           Postgres pool + drizzle client
-  lib/game/
-    constants.ts        BALANCE table, upgrade defs, mutation unlock costs
-    rng.ts               seeded PRNG (mulberry32) for reproducible rolls
-    growth.ts            mass<->radius, speed penalty, canAbsorb, HP
-    mutations.ts         12 mutation defs + 5 combo defs + weighted rolling
-    enemies.ts           8 enemy type defs (FSM behavior tags + stats)
-    boss.ts              3-phase boss definition
-    economy.ts           run reward + upgrade cost/afford helpers
-    save.ts              PlayerProfile type, defaults, sanitize/repair
-    ads.ts               reward-slot idempotency + ad-result eligibility
-    i18n.ts              ru/en dictionary
-    analyticsEvents.ts   the 14 required event names
-    engine.ts            the actual real-time game engine (Canvas2D),
-                         "use client" — pure game loop + renderer, no React
-    sound.ts             Web Audio synthesized SFX manager
-    client.ts            device id, analytics POSTs, test ad/IAP adapters
-    db.ts                server-only DB access functions ("server-only")
-  hooks/useProfile.ts     client hook: fetch/patch the player's profile
-  components/game/
-    GameApp.tsx           top-level screen state machine
-    PlayScreen.tsx         hosts <canvas>, HUD, joystick, all run overlays
-    Joystick.tsx            fixed/floating one-thumb virtual joystick
-    MenuScreens.tsx         MainMenu, ModeSelect, Upgrades, Collection,
-                            Settings, Shop, Privacy
-  app/
-    page.tsx               renders <GameApp/>
-    layout.tsx              metadata/viewport (mobile-first, no zoom)
-    api/
-      profile/route.ts      GET/POST anonymous device profile
-      run/route.ts           POST start/finish a run, computes rewards
-      analytics/route.ts      POST one of the 14 analytics events
-      ads/reward/route.ts      POST confirm a rewarded-ad grant (idempotent)
-      iap/purchase/route.ts    POST sandbox purchase (no_ads, cosmetics)
-      iap/restore/route.ts     GET restore purchases
-      health/route.ts         unchanged platform health check
-tests/                     Vitest unit tests (40 tests, see TEST_REPORT.md)
-```
+## 2. Карта Autoload-синглтонов (`project.godot`)
 
-### Separation of concerns (mirrors the brief's requested Godot layout)
+Порядок инициализации гарантирует отсутствие неразрешённых зависимостей:
 
-| Brief's Godot folder | Web equivalent |
-|---|---|
-| `resources/` (mutation/enemy/boss data) | `src/lib/game/{mutations,enemies,boss,constants}.ts` |
-| `systems/` (economy, save, analytics, ads) | `src/lib/game/{economy,save,ads,analyticsEvents,client,db}.ts` |
-| `entities/`, `enemies/`, `bosses/` (behavior) | state handled inside `engine.ts` update loop, keyed by the same data ids |
-| `ui/` | `src/components/game/*` |
-| `scenes/` (composition) | `GameApp.tsx` screen router + `PlayScreen.tsx` |
-| `addons/` (ad/billing plugins) | `src/lib/game/client.ts` test adapters + API routes |
-| `tests/` (GUT) | `tests/*.test.ts` (Vitest) |
+1. `Events` (`res://systems/GameEvents.gd`) — типизированные сигналы состояния игры, боя, эволюции, босса и прогрессии.
+2. `Loc` (`res://localization/LocalizationManager.gd`) — словари `ru` (по умолчанию) и `en` с динамическим переключением без перезагрузки сцены.
+3. `ConfigDB` (`res://systems/ConfigDatabase.gd`) — загрузка и кэширование JSON-конфигураций.
+4. `SaveData` (`res://systems/SaveManager.gd`) — атомарная запись `save.tmp -> save.json`, резервная копия `.bak`, контрольная сумма `SHA-256` и автоматическое восстановление после повреждённых сохранений.
+5. `Audio` (`res://systems/AudioManager.gd`) — пул из 8 `AudioStreamPlayer` для SFX + отдельный канал музыки (выключен по умолчанию).
+6. `Analytics` (`res://systems/AnalyticsService.gd`) — учёт согласия пользователя, очистка от ПДн, 14 продуктовых событий и расчёт D1/D7 retention, opt-in rate и ARPDAU.
+7. `Ads` (`res://systems/AdService.gd`) — управление добровольной рекламой с защитой от дублирования наград (`_claimed_grant_tokens`) и строгой блокировкой тестовых адаптеров в коммерческих сборках (`BuildConfig.is_commercial_build()`).
+8. `Billing` (`res://systems/BillingService.gd`) — интеграция с официальным `BillingClient` (`addons/GodotGooglePlayBilling`), подтверждение (`acknowledge_purchase`) и восстановление покупок (`query_purchases`).
+9. `App` (`res://systems/GameManager.gd`) — глобальный конечный автомат состояний приложения, обработка сворачивания (`NOTIFICATION_APPLICATION_PAUSED` / `FOCUS_OUT`), системной кнопки «Назад» Android и бюджетов качества эффектов.
 
-### Engine internals
+---
 
-`SlimeRushEngine` (`src/lib/game/engine.ts`) owns all simulation state
-(player, enemies, pellets, hazards, particles, boss, decorations) and runs
-its own `requestAnimationFrame` loop independent of React — React only
-polls a cheap `getSnapshot()` every 120ms for the HUD, and renders overlays
-(mutation choice / pause / revive / result) driven by callbacks
-(`onMutationChoice`, `onGameOver`, etc.). This keeps the hot path
-(60 FPS target) free of React re-renders, which is the same reasoning that
-would apply to keeping Godot's `_physics_process` free of UI work.
+## 3. Оптимизации производительности для бюджетных Android-устройств
 
-Performance techniques actually implemented (not just claimed):
-- **Object pooling-style reuse**: particles are capped (`MAX_PARTICLES`) and
-  the oldest is evicted (`shift()`) instead of growing unbounded.
-- **Entity caps**: `MAX_ENEMIES`, `MAX_PELLETS` bound simulation cost.
-- **Off-screen culling**: rendering skips decorations/pellets/enemies whose
-  screen-space position falls outside the viewport + margin.
-- **Minimal per-frame allocation**: hot loops mutate existing objects
-  in-place rather than creating new ones where practical.
-- A true spatial grid (as requested for "nearest target" queries) is not
-  needed at the current entity caps (≤36 enemies) and was intentionally not
-  added to avoid "architectural complexity for its own sake" (brief rule
-  #14); it is called out in `PROGRESS.md` as the first optimization to add
-  if enemy counts increase.
+1. **Пространственное разбиение (`systems/SpatialHashGrid.gd`)**:
+   - Двумерная клеточная хэш-сетка (`cell_size = 160..180 px`) обслуживает поиск ближайших целей для автопоглощения, магнита, щупалец, цепной молнии, ледяного импульса и двойников за $O(1)$ по локальным ячейкам вместо полного перебора $O(N^2)$.
+2. **Пул объектов (`systems/ObjectPool.gd`)**:
+   - Враги (`MAX_ACTIVE_ENEMIES = 44`), питательные споры/кристаллы (`MAX_ACTIVE_ORBS = 85`), опасные лужи/телеграфы (`MAX_ACTIVE_HAZARDS = 48`) и вспышки частиц (`BurstFX`) предсоздаются при старте и переиспользуются без `instantiate()` / `queue_free()` спайков в игровом цикле.
+3. **Экономичный 2D-рендеринг без тяжёлой жидкостной симуляции**:
+   - Эффект мягкой полупрозрачной слизи достигается лёгким фрагментным шейдером `slime_body.gdshader` + аналитическим squash-and-stretch и батч-отрисовкой примитивов CanvasItem.
+4. **Независимость от герцовки экрана (60 / 90 / 120 Гц)**:
+   - Физика тикает на фиксированных 60 Гц с включённой `physics/common/physics_interpolation = true`, а визуальное сглаживание использует экспоненциальное затухание `1.0 - exp(-rate * delta)`.
+5. **Уровни качества эффектов (`Низкое / Среднее / Высокое`)**:
+   - Ограничивают бюджет одновременных частиц (`20 / 45 / 80`) и отключают фоновые воздушные споры на профиле `Низкое`.
 
-### Data flow for meta-progression
+---
 
-1. Client generates a random UUID on first load, stored in
-   `localStorage['slime_rush_device_id']` — this is the only "account" the
-   anonymous game needs.
-2. `useProfile()` fetches/creates a `players` row via `/api/profile`.
-3. `PlayScreen` posts `/api/run` with `action:"start"` when a run begins and
-   `action:"finish"` when it ends; the server computes the currency reward
-   (`calcRunReward`) and the achievement/collection updates, so the client
-   cannot forge rewards.
-4. Rewarded-ad grants and purchases are **always confirmed server-side**
-   (`/api/ads/reward`, `/api/iap/purchase`) and are idempotent via a unique
-   `(runId, slot)` database index — verified in `tests/ads.test.ts` and via
-   a live duplicate-request smoke test (see `TEST_REPORT.md`).
+## 4. Двойной контур загрузки ассетов (`AssetRegistry.gd`)
 
-## Path to a real Godot 4 / Android build
+Для того чтобы игра одинаково надёжно работала как в экспортированных из Godot Editor Android/iOS пакетах, так и при прямом CLI-запуске рантайма или из сырых `.pck`-архивов:
+- Сначала проверяется `ResourceLoader.exists(path)` (использующий `.ctex` / `.sample` импорты редактора);
+- При отсутствии импорт-кэша выполняется буферное чтение `FileAccess.get_file_as_bytes(path)` (совместимое с `PackSource` внутри `.pck` и APK) с декодированием PNG (`Image.load_png_from_buffer`) и RIFF PCM WAV (`AudioStreamWAV`) и последующим кэшированием в памяти.
 
-If/when a Godot-capable environment is available, port in this order
-(all game data above is already in a Godot-portable shape — JSON/typed
-tables that map directly onto `Resource` classes):
+---
 
-1. **Project skeleton**: `project.godot`, `res://scenes`, `res://scripts`,
-   `res://systems`, `res://entities`, `res://mutations`, `res://enemies`,
-   `res://bosses`, `res://ui`, `res://resources`, `res://shaders`,
-   `res://audio`, `res://localization`, `res://tests` (GUT), `res://addons`.
-2. Re-express `constants.ts`, `mutations.ts`, `enemies.ts`, `boss.ts` as
-   Godot `Resource` (`.tres`)/`class_name` data files — the field names and
-   values carry over directly.
-3. Re-implement `engine.ts`'s update loop as a `CharacterBody2D` player +
-   `Area2D`-based absorption checks + a `Node2D` per enemy type driven by a
-   `StateMachine` autoload (matches the behavior tags already defined per
-   enemy).
-4. Re-implement `canvas` rendering as `Sprite2D`/`AnimatedSprite2D` +
-   `GPUParticles2D` + a `CanvasItem` shader for the slime body
-   (squash/stretch + Fresnel glow instead of manual `ctx.scale`).
-5. Replace the synthesized Web Audio SFX with short original recordings or
-   procedurally-generated `AudioStreamWAV` assets using the same event list.
-6. Replace `src/lib/game/client.ts` test ad/IAP adapters with a maintained
-   Godot Android plugin for Google Mobile Ads (rewarded) and the Google
-   Play Billing plugin, keeping the same interface
-   (`playTestRewardedAd`/`purchaseTestProduct` signatures) so the rest of
-   the game logic is untouched.
-7. Local save becomes a Godot `ConfigFile`/JSON in `user://`, reusing the
-   exact `sanitizeProfile` repair logic ported to GDScript.
-8. Android export: application id, icon, splash, keystore, target SDK per
-   current Play requirements — tracked as open items in
-   `RELEASE_CHECKLIST.md`.
+## 5. Готовность к выпуску на iOS
 
-This is explicitly flagged as **not completed** in this session — it
-requires a Godot-enabled environment, Android SDK, and (for store
-submission) a real Google Play developer account, none of which are
-available here.
+- Все пути сохранений используют исключительно `user://`.
+- UI построен на резиновых контейнерах Godot (`Anchor` + `MarginContainer` + `ScrollContainer`) с режимом масштабирования `canvas_items` + `expand`, корректно адаптируясь к соотношениям сторон от `16:9` и `4:3`/`16:10` планшетов до вытянутых `19.5:9` и `20:9` экранов.
+- Платформенно-зависимые вызовы рекламы и покупок изолированы внутри адаптеров `AdService` и `BillingService` (в `BuildConfig.gd` уже предусмотрены слоты iOS Ad Unit ID, а плагин `poingstudios/godot-admob-plugin` поддерживает как Android, так и iOS).

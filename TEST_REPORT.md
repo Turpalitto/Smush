@@ -1,97 +1,88 @@
-# TEST_REPORT.md
+# TEST REPORT — SLIME RUSH: EVOLUTION
 
-Honest record of what was actually executed in this session, and what was
-not (and why). No claim here is made without having run the corresponding
-command.
+## 1. Среда тестирования
 
-## Automated unit tests (executed)
+- **Движок**: `Godot Engine v4.5.stable.official.876b29033` (Linux `x86_64`, режим `--headless`).
+- **Команда запуска тестов из исходного дерева**:
+  ```bash
+  python3 tools/sync_godot_cache.py
+  godot4 --headless --quit-after 600 --path /home/user/Smush res://tests/TestRunner.tscn
+  ```
+- **Команда проверки автономного упакованного архива `.pck`** (эквивалент загрузки ресурсов из `assets/main.pck` на Android):
+  ```bash
+  python3 tools/build_pck.py /tmp/slime_rush.pck
+  cd /tmp && godot4 --headless --quit-after 600 --main-pack /tmp/slime_rush.pck res://tests/TestRunner.tscn
+  ```
 
+---
+
+## 2. Фактические результаты выполнения автотестов
+
+Все 5 тестовых наборов выполнены на реальном движке Godot 4.5 с кодом возврата `0` и пустым потоком ошибок `stderr`:
+
+```text
+============================================================
+ SLIME RUSH: EVOLUTION — AUTOMATED QA & INTEGRATION SUITE
+============================================================
+  [Perf] 30 simulated arena frames avg physics CPU time: 0.101 ms/frame (pool reuse hits=39)
+  [PASS] MassAndAbsorptionSuite -> 20 passed, 0 failed
+  [PASS] MutationsAndSynergiesSuite -> 64 passed, 0 failed
+  [PASS] SaveAndProgressionSuite -> 18 passed, 0 failed
+  [PASS] MonetizationAndAnalyticsSuite -> 18 passed, 0 failed
+  [PASS] FullGameIntegrationSuite -> 102 passed, 0 failed
+------------------------------------------------------------
+ TOTAL ASSERTIONS: 222 PASSED, 0 FAILED
+============================================================
 ```
-npx vitest run
-```
 
-Result: **5 test files, 40 tests, all passing.**
+При запуске полностью из упакованного файла `/tmp/slime_rush.pck` (`1333.9 КБ`, `103 файла`) результат идентичен: **222 PASSED, 0 FAILED**, время шага физики `0.131 ms/frame`.
 
-| File | Tests | Covers |
-|---|---|---|
-| `tests/growth.test.ts` | 13 | mass→radius monotonicity & cap, speed penalty floor, **absorption thresholds** (normal/armored/mutation-gated), evolution stage calculation |
-| `tests/mutations.test.ts` | 8 | **mutation rolling** (count, pool restriction, max-level exclusion, determinism with a seeded RNG), **level restrictions**, **5+ combos exist and are only active when both required mutations are owned** |
-| `tests/economy.test.ts` | 7 | **run reward calculation** (abandoned=0, defeat<victory, boss bonus, non-negative), upgrade cost growth and affordability |
-| `tests/save.test.ts` | 7 | default profile shape, round-trip save/load, **corrupted-save recovery** (null/undefined/garbage/negative numbers/wrong-typed arrays all repaired without throwing) |
-| `tests/ads.test.ts` | 5 | **rewarded-ad reward idempotency** (first grant allowed, duplicate blocked, different slot/run allowed), ad completion eligibility gating |
+---
 
-Re-run after every source change in this session; last run was clean.
+## 3. Детализация тестового покрытия
 
-## Type-checking & build (executed)
+### 3.1 `MassAndAbsorptionSuite` (20 утверждений — PASS)
+- Монотонный нелинейный рост радиуса с соблюдением жёсткого потолка `MAX_RADIUS = 58 px` даже при экстремальных значениях массы.
+- Убывающая отдача прироста массы выше `SOFT_CAP_MASS = 115`.
+- Тактические компромиссы большой массы: снижение манёвренности, рост заметности, рост уязвимости к AoE, блокировка узких корневых проходов для гигантской слизи и прохождение при сжатии в `Рывке`.
+- Многофакторная формула поглощения: блокировка проглатывания каменного панциря без бронебойных эффектов, пробитие панциря шипами/заморозкой/таранным ударом, добивание при низком HP и защита Босса от раннего поглощения.
 
-```
-npx next typegen        # ✓ passed
-npm exec tsc -- --noEmit --pretty false   # ✓ passed, 0 errors
-npm run build            # ✓ passed, all routes compiled
-```
+### 3.2 `MutationsAndSynergiesSuite` (64 утверждения — PASS)
+- Валидация всех 12 мутаций в `mutations.json`: уникальные ID, редкость, уровни `1..5`, иконки, локализованные названия и описания (RU/EN), не менее половины мутаций активно меняют поведение слизи.
+- Соблюдение потолка уровня (`MAX_LEVEL = 5`) и отсутствие дубликатов в выдаче 3 карточек эволюции.
+- Активация всех 5 синергий (`em_storm`, `toxic_clones`, `piercing_strike`, `ice_armor`, `bio_vampirism`) строго по данным `synergies.json`.
 
-`build_and_start` (platform tool) was run **twice** in this session and
-succeeded both times, including the `/api/health` check against the running
-production server.
+### 3.3 `SaveAndProgressionSuite` (18 утверждений — PASS)
+- Сохранение и повторная загрузка прогресса с проверкой контрольной суммы `SHA-256`.
+- **Восстановление после повреждения сохранения**: при записи битого JSON в основной файл `SaveManager` бесшумно восстанавливает валидный профиль из резервной копии `.bak`.
+- **Защита от двойного повреждения**: при одновременном повреждении основного файла и `.bak` система безопасно создаёт новый профиль без падения игры.
+- Расчёт наград забега, покупка постоянных улучшений, разблокировка мутаций и запись открытых существ в коллекцию.
 
-## Live integration smoke test (executed against the running server)
+### 3.4 `MonetizationAndAnalyticsSuite` (18 утверждений — PASS)
+- Начисление награды за рекламу только после колбэка завершения и защита от повторного начисления по одному токену.
+- Ограничение возрождения до 1 раза за забег и сброс лимита при старте нового забега.
+- Честный отказ (`ad_unavailable` / `billing_unavailable`) в коммерческом режиме без нативного SDK — **отсутствие симуляции рекламы и оплаты в релизе**.
+- Покупка и восстановление `No Ads` и косметических наборов в изолированном тестовом профиле.
+- Регистрация всех 14 аналитических событий, очистка ПДн и блокировка записи событий при отзыве согласия игрока.
 
-Using `curl` against the started app, the following were verified to
-actually work end-to-end (not just unit-tested in isolation):
+### 3.5 `FullGameIntegrationSuite` (102 утверждения — PASS)
+- Полная загрузка корневой сцены `scenes/Main.tscn`, HUD, оверлеев и всех 12 экранов меню.
+- Проверка вёрстки на 4 мобильных разрешениях и соотношениях сторон: `360x640 (16:9)`, `720x1280 (16:9 HD)`, `1080x2400 (20:9)`, `1200x1920 (16:10)`.
+- Переключение локализации `RU <-> EN` в реальном времени и проверка выключенной по умолчанию музыки (`music_enabled == false`).
+- Генерация мира «Зачарованный лес»: подтверждение свободной стартовой поляны без блокирующих препятствий.
+- Пошаговая симуляция ИИ всех 8 типов противников (включая сворачивание Каменного слизня в панцирь, засаду и окно уязвимости Хищного цветка, телеграф Электрического жука и бегство Лесного жука).
+- Полный цикл забега: поглощение существ -> повышение уровня -> выбор мутаций -> сбор синергий -> призыв двойников и рывок -> пробуждение **Древнего стража леса** -> прохождение Фаз 1, 2 и 3 -> победа и начисление эссенции.
+- Сценарий поражения -> добровольное возрождение -> повторное поражение -> удвоение награды -> пауза при сворачивании приложения (`NOTIFICATION_APPLICATION_PAUSED`).
 
-- `GET /api/health` → `{"ok":true}`
-- `GET /` → HTTP 200
-- `GET /api/profile?playerId=...` → creates and returns a fresh profile
-- `POST /api/run {action:"start"}` → `{"ok":true}`
-- `POST /api/run {action:"finish", result:"victory", bossDefeated:true,...}`
-  → returns an updated profile with `currency` increased by the expected
-  server-computed amount, `totalWins`/`totalBossKills` incremented,
-  `discoveredCreatures`/`discoveredForms`/`achievements` updated
-- `POST /api/ads/reward {slot:"double"}` (first call) → `{"granted":true,...}`
-- `POST /api/ads/reward` with the **same** `runId`+`slot` again → `{"granted":false,"reason":"already_granted"}` — confirms the anti-double-grant DB constraint works live, not just in the unit test
-- `POST /api/iap/purchase {productId:"no_ads"}` → profile now has `noAds:true`
-- `GET /api/iap/restore?playerId=...` → returns `["no_ads"]`
-- `POST /api/analytics` → `{"ok":true}`
+---
 
-## Manual gameplay verification
+## 4. Производительность и честное разграничение проверок
 
-The game engine and UI were built and statically verified (types, build),
-and the API-level game-loop effects (mass growth, boss defeat, mutation
-selection, reward calculation) were exercised through the integration smoke
-test above by simulating a full run's server calls. However, **this session
-did not perform interactive manual playtesting with a pointer/touch device
-inside a real browser** (no browser automation tool was available in this
-toolset). This is explicitly called out as not yet verified:
+### Проверено фактически в текущей среде
+- Среднее процессорное время шага арены в `godot4 --headless` (при активных врагах, спорах, двойниках, мутациях и `SpatialHashGrid`): **`0.101 – 0.131 мс/кадр`** (при бюджете кадра 60 FPS `16.67 мс`), повторное использование объектов из `ObjectPool` — `39` хитов за короткий прогон без спайков аллокаций.
+- Чистый старт и корректное завершение основной сцены `scenes/Main.tscn` и из исходников, и из упакованного `.pck` (`1.33 МБ`).
 
-- Visual correctness of the canvas renderer (slime squash/stretch, particle
-  bursts, boss telegraph circles) — code-reviewed but not visually captured.
-- Joystick drag ergonomics on an actual touchscreen.
-- Full 6-minute classic run played interactively start-to-finish by a human
-  or automated UI test.
-
-**Recommended next step for a future session**: add a Playwright (or
-similar) browser test that opens `/`, starts a Practice run, drives the
-joystick via synthetic pointer events, and asserts the HUD mass value
-increases and a mutation-choice overlay appears — this was not done here
-because no browser automation tool was available in this toolset.
-
-## Explicitly NOT executed (requires resources unavailable in this sandbox)
-
-Per the brief's own instruction ("do not claim tests passed without running
-them", "flag what needs a real device/account"), the following from the
-original QA checklist require infrastructure not present here and are
-**not** claimed as done:
-
-- GUT (Godot) test suite — N/A, there is no Godot project in this
-  implementation (see `README.md`/`ARCHITECTURE.md` for why).
-- Real Android device testing (60/90/120Hz behavior, real FPS profiling on
-  a budget device). No FPS numbers are claimed for any physical Android
-  hardware.
-- Real Google Mobile Ads / AdMob rewarded-ad integration test.
-- Real Google Play Billing purchase/restore test with a sandbox tester
-  account.
-- App backgrounding/resume, OS-level interruption (phone call), and
-  screen-rotation testing in a native Android shell.
-- Cross-device aspect-ratio verification beyond responsive CSS review.
-
-These are tracked as open items in `RELEASE_CHECKLIST.md` and `PROGRESS.md`.
+### Требует проверки на физическом Android-устройстве перед публикацией
+В текущей облачной Linux-песочнице отсутствуют физический GPU смартфона, Android SDK/NDK и реальное устройство Google Play. Поэтому перед коммерческой выкладкой владелец должен выполнить на реальном смартфоне:
+1. Профилирование реального GPU/FPS на бюджетном Android-смартфоне (проверка стабильных 60 FPS в 3-й фазе боя с Боссом).
+2. Проверку тестовых покупок через Google Play License Testing и тестового блока AdMob на реальном Android-устройстве.
