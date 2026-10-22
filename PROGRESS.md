@@ -103,18 +103,47 @@
   метаданные), `scripts/run_qa.sh` больше не требует `ripgrep` (fallback на `grep`), а
   `tools/automated_playthrough_driver.gd` умеет снимать кадры и переживать автопаузу по потере фокуса.
 
+### 4. Сложности и личные рекорды — причина играть 4-й и 10-й забег
+Раньше все забеги шли по одному балансу и никак не сравнивались между собой: посмотрев все
+8 врагов, 12 мутаций и единственного босса, игрок не получал новой цели.
+
+- `resources/data/difficulties.json` — три сложности (`normal` / `hunter` / `nightmare`) с множителями
+  HP врагов, урона, HP босса, плотности спавна и эссенции. У `normal` все множители `1.0`,
+  поэтому базовый баланс не изменился.
+- Сложность фиксируется в `start_new_run` (снимок забега), поэтому смена настройки в меню
+  не влияет на уже идущий забег. Применяется в единственной точке спавна (`spawn_enemy_by_id`)
+  и в `setup_boss`, поверх существующего масштабирования по времени.
+- `SaveManager` хранит выбор в `settings.difficulty` (с валидацией: подделанное значение
+  откатывается к `normal`) и таблицу `records` с ключом `режим → сложность`: лучшее время
+  (только победы), лучшая масса, лучшая эссенция, число забегов и побед. Рекорды валидируются
+  отдельно — их ключи динамические, общий `_repair_value` их не знает.
+- Экран выбора режима: ряд сложностей с галочкой и своим акцентом, описание выбранной,
+  бонус эссенции (показывается только когда он реально есть) и личный рекорд для этого
+  режима на этой сложности.
+- Экран результата: сложность (если не обычная), прошлое лучшее время и золотые строки
+  `★ НОВЫЙ РЕКОРД ★` / `★ Рекорд массы ★`. Рекорд пишется вместе с наградой, поэтому на
+  экране поражения с ещё доступным возрождением панель показывает сохранённый рекорд,
+  а не объявляет новый.
+- Достижения `hunter_clear` и `nightmare_clear` дают сложностям цель помимо множителя.
+- Заглушка «Реклама сейчас недоступна» больше не висит на экране результата в десктопной
+  сборке: она показывается только на платформах, где рекламный бэкенд вообще существует.
+- Старые сохранения не требуют миграции: отсутствующая сложность читается как `normal`,
+  отсутствующая таблица рекордов — как пустая.
+
 ## Последние зафиксированные проверки и артефакты
 
-- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **324 assertions, 0 failures**, `0` ошибок `ERROR:`/`SCRIPT ERROR` (`reports/gameplay-source-qa-2026-10-22.log`).
+- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **464 assertions, 0 failures**, `exit 0`
+  (`reports/macos-source-qa-difficulty-2026-10-22.log`; 324 — прошлая итерация, +128 `DifficultyAndRecordsSuite`
+  и +12 живых проверок множителей в арене).
 - Автономный запуск `PCK` из изолированного `/tmp`: **324 assertions, 0 failures** (`reports/gameplay-packed-qa-2026-10-22.log`).
 - Автоматизированное прохождение на чистом профиле + одновременный замер шины `Master` до/после лимитера:
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
-  - `./scripts/run_qa.sh` → **324 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-2026-10-22.log`);
+  - `./scripts/run_qa.sh` → **464 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-difficulty-2026-10-22.log`);
   - автоматизированное прохождение `VICTORY` + запись шины `Master` (`reports/macos-automated-playthrough-2026-10-22.json`,
     `reports/macos-audio-limiter-2026-10-22.json`, консоль `reports/macos-playthrough-console-2026-10-22.log`);
-  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (62 MB) + `.sha256` + `.build.json`;
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (61 MiB / 63.8 МБ, коммит `78d6bf0`) + `.sha256` + `.build.json`;
   - скриншоты `deliverables/macos_screenshots/` — 14 реальных кадров GPU (`720x1280`, `540x1200`, `1080x1682`, `1280x720`).
 - Готовые скачиваемые пакеты в рабочей области (каталог `deliverables/`, исключён из Git, но доступен для скачивания в файловом менеджере платформы):
   - `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` — **основной результат для macOS**;

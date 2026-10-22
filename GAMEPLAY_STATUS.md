@@ -18,6 +18,7 @@
 | Мини-босс и честный 3-фазный босс | [ArenaController](scenes/ArenaController.gd), [AncientGuardianBoss](bosses/AncientGuardianBoss.gd), [GameHUD](ui/GameHUD.gd) | На рендере и в чистом забеге проверены все 3 фазы Стража (кора, рога, ядро, широкая полоса тарана 3-й фазы, верхние телеграфы ниже компактного HUD) и защита от мульти-удара мини-босса на перекрытии (`_contact_hit_cd` + pushback) |
 | Пауза, поражение, возрождение, рестарт | [GameManager](systems/GameManager.gd), [OverlaysController](ui/OverlaysController.gd), [ArenaController](scenes/ArenaController.gd) | Проверены автопауза, однократное добровольное возрождение, отсутствие зависших тостов поверх экранов победы/поражения и чистый рестарт |
 | Мета-прогрессия и сохранения | [SaveManager](systems/SaveManager.gd), [meta_progression.json](resources/data/meta_progression.json) | Чистый забег приносит `~134–281` эссенции к победе (или `~60–110` при первом поражении у мини-босса/босса) — достаточно для первых улучшений (`25–35`) уже после 1-го забега |
+| Сложности и личные рекорды | [difficulties.json](resources/data/difficulties.json), [ConfigDatabase](systems/ConfigDatabase.gd), [SaveManager](systems/SaveManager.gd), [MenuScreens](ui/MenuScreens.gd), [OverlaysController](ui/OverlaysController.gd) | Три сложности (`normal`/`hunter`/`nightmare`) с множителями HP врагов, урона, HP босса, плотности спавна и эссенции; у `normal` всё `1.0`, базовый баланс не изменён. Подтверждено на живой арене: множители применяются при спавне врага и босса, снимок сложности не меняется в середине забега, старые сохранения читаются как `normal` с пустой таблицей рекордов. Рекорды (лучшее время только за победы, масса, эссенция) раздельны по режиму и сложности и переживают перезапуск. **Подбор множителей для `hunter`/`nightmare` — аналитический, проходимость живым игроком требует плейтеста** |
 | UI на разных экранах, RU/EN | [MenuScreens](ui/MenuScreens.gd), [MutationDraftOverlay](ui/MutationDraftOverlay.gd), [OverlaysController](ui/OverlaysController.gd), [GameHUD](ui/GameHUD.gd) | Проверены реальным рендером на `720x1280` (`9:16`) и узком `540x1200` (`9:20`), а также автотестами на `360x640`, `720x1280`, `1080x2400`, `1200x1920` (RU/EN) |
 | Звук и выключенная по умолчанию музыка | [AudioManager](systems/AudioManager.gd), [PlayerSlime](entities/PlayerSlime.gd), [SaveManager](systems/SaveManager.gd) | Музыка по умолчанию выключена; пост-лимитерная запись шины `Master` (`Audio.create_post_limiter_recorder()`) в бою с боссом подтвердила `0` клиппированных сэмплов и строгий потолок **`-1.200 dBFS`** (при пике `-0.22 dBFS` до лимитера), защиту важных событий в 10-голосном пуле и устранение гула `move`; требуется живое прослушивание ушами |
 | Производительность под нагрузкой | [ObjectPool](systems/ObjectPool.gd), [SpatialHashGrid](systems/SpatialHashGrid.gd) | Шаг физики в стресс-тесте с боссом, 32 врагами и 45 сферами занимает `< 1 ms` CPU; реальные 60 FPS и нагрев на мобильном GPU требуют замера на смартфоне |
@@ -30,8 +31,9 @@
 | Мутации и синергии (`MutationsAndSynergiesSuite`) | 64 |
 | Сохранения и прогрессия (`SaveAndProgressionSuite`) | 38 |
 | Коммерческие/аналитические regression tests (`MonetizationAndAnalyticsSuite`) | 41 |
-| Полная игровая интеграция, управление, UI, честный бой с боссом и звук (`FullGameIntegrationSuite`) | 159 |
-| **Всего** | **324** |
+| Сложности, миграция сохранений и рекорды (`DifficultyAndRecordsSuite`) | 128 |
+| Полная игровая интеграция, управление, UI, честный бой с боссом и звук (`FullGameIntegrationSuite`) | 171 |
+| **Всего** | **464** |
 
 Оба прогона — из исходного дерева (`./scripts/run_qa.sh`) и из автономного `.pck` вне
 репозитория — завершились с `0 FAILED` и без `ERROR:` в логе. Подробности: [TEST_REPORT.md](TEST_REPORT.md).
