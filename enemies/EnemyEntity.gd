@@ -20,6 +20,9 @@ var is_miniboss: bool = false
 
 var color_primary: Color = Color(0.94, 0.53, 0.65)
 var color_secondary: Color = Color(1.0, 0.92, 0.82)
+## Painted body art from resources/data/enemies.json ("sprite"). Null keeps the
+## procedural silhouette, so a creature without art still renders.
+var sprite_tex: Texture2D = null
 
 var fsm: EnemyFSM = EnemyFSM.new()
 var shell_active: bool = false
@@ -72,6 +75,17 @@ func setup_from_config(cfg: Dictionary, spawn_pos: Vector2, p_arena: Node, diffi
 
 	color_primary = Color(str(cfg.get("color_primary", "#9b5cff")))
 	color_secondary = Color(str(cfg.get("color_secondary", "#ffebd2")))
+
+	# Pooled entities are reused for different creature ids, so the art is re-resolved
+	# on every spawn rather than cached on the instance.
+	var sprite_name := str(cfg.get("sprite", ""))
+	sprite_tex = null
+	if not sprite_name.is_empty():
+		sprite_tex = AssetRegistry.get_texture("res://resources/art/creatures/" + sprite_name)
+	if sprite_tex != null:
+		# The art is downscaled hard at runtime (256 px -> ~40 px), so mipmaps are
+		# required or the creature shimmers while it moves.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 	shell_active = false
 	shell_broken_permanently = false
@@ -407,6 +421,32 @@ func mark_contact_hit_dealt() -> void:
 	_contact_hit_cd = 1.08 if is_miniboss else 0.92
 
 
+const SPRITE_SIDE_MULT: float = 2.2
+
+
+func _draw_sprite_body(center: Vector2, r: float, bounce: float, face: Vector2) -> void:
+	if sprite_tex == null:
+		return
+	var side := r * SPRITE_SIDE_MULT
+	var half := side * 0.5
+	# Squash & stretch keeps the single painted frame alive while hopping.
+	var sy := bounce
+	var sx := 1.0 / sqrt(maxf(0.85, bounce))
+	if face.x < -0.15:
+		sx = -sx # Mirror instead of shipping a second facing.
+	var tint := Color.WHITE
+	if freeze_timer > 0.0:
+		tint = Color(0.62, 0.88, 1.0)
+	elif poison_timer > 0.0:
+		tint = Color(0.74, 1.0, 0.58)
+	draw_set_transform(center, 0.0, Vector2(sx, sy))
+	draw_texture_rect(sprite_tex, Rect2(-half, -half, side, side), false, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# Multiply-tinting cannot exceed white, so a hit is a soft flash laid on top.
+	if hurt_flash > 0.01:
+		draw_circle(center, r * 1.02, Color(1.0, 0.94, 0.94, 0.45 * clampf(hurt_flash, 0.0, 1.0)))
+
+
 func _draw() -> void:
 	if fsm.state == EnemyFSM.State.DEAD:
 		return
@@ -462,108 +502,114 @@ func _draw() -> void:
 	var face := velocity.normalized() if velocity.length() > 8.0 else wander_dir
 	var perp := face.orthogonal()
 
-	# Distinct creature silhouettes across ALL 8 creatures + Umbral Alpha Miniboss
-	match enemy_id:
-		"tiny_mushroom":
-			var stem_w := r * 0.68
-			var stem_h := r * 0.72
-			draw_rect(Rect2(center + Vector2(-stem_w * 0.5, -r * 0.05), Vector2(stem_w, stem_h)), color_secondary)
-			draw_circle(center + Vector2(0.0, stem_h * 0.58), stem_w * 0.5, color_secondary)
-			var cap_y := -r * 0.18 * bounce
-			var cap_pts := PackedVector2Array([
-				center + Vector2(-r * 0.98, cap_y + r * 0.26),
-				center + Vector2(-r * 0.82, cap_y - r * 0.42),
-				center + Vector2(0.0, cap_y - r * 0.78),
-				center + Vector2(r * 0.82, cap_y - r * 0.42),
-				center + Vector2(r * 0.98, cap_y + r * 0.26)
-			])
-			draw_colored_polygon(cap_pts, col)
-			draw_circle(center + Vector2(-r * 0.36, cap_y - r * 0.16), r * 0.18, color_secondary)
-			draw_circle(center + Vector2(r * 0.32, cap_y - r * 0.10), r * 0.15, color_secondary)
-			draw_circle(center + Vector2(0.0, cap_y - r * 0.42), r * 0.13, color_secondary)
-		"forest_beetle":
-			for side: float in [-1.0, 1.0]:
-				for leg_i: float in [-0.42, 0.0, 0.42]:
-					var swing := sin(_anim_phase * 2.6 + leg_i * 4.0) * 2.4
-					var p0: Vector2 = center + face * (r * leg_i) + perp * (side * r * 0.65)
-					var p1: Vector2 = p0 + perp * (side * r * 0.42) + face * swing
-					draw_line(p0, p1, Color(0.16, 0.11, 0.07), 2.0)
-			draw_circle(center, r * 0.90, col)
-			draw_line(center - face * (r * 0.80), center + face * (r * 0.45), color_secondary.darkened(0.35), 2.0)
-			draw_circle(center + face * (r * 0.66), r * 0.40, col.darkened(0.22))
-			draw_line(center + face * (r * 0.84), center + (face + perp * 0.42) * (r * 1.32), color_secondary, 1.8)
-			draw_line(center + face * (r * 0.84), center + (face - perp * 0.42) * (r * 1.32), color_secondary, 1.8)
-		"firefly":
-			var wing_off := sin(_anim_phase * 3.5) * 4.0
-			draw_circle(center + Vector2(-r * 0.65, wing_off), r * 0.48, Color(0.85, 1.0, 0.98, 0.55))
-			draw_circle(center + Vector2(r * 0.65, wing_off), r * 0.48, Color(0.85, 1.0, 0.98, 0.55))
-			draw_circle(center + Vector2(0, r * 0.20), r * 1.05, Color(1.0, 0.95, 0.45, 0.28))
-			draw_circle(center, r * 0.76, col)
-		"stone_slug":
-			draw_circle(center, r * bounce, col)
-			if not shell_broken_permanently:
-				var plate_a := 0.96 if shell_active else 0.72
-				draw_circle(center + Vector2(0, -1.5), r * 0.82, Color(0.42, 0.48, 0.56, plate_a))
-				draw_arc(center, r * 1.08, 0.0, TAU, 20, Color(0.86, 0.92, 0.98, plate_a), 3.8 if shell_active else 2.4)
-			else:
-				draw_line(center + Vector2(-r * 0.45, -r * 0.35), center + Vector2(r * 0.4, r * 0.3), Color(1.0, 0.86, 0.52), 2.5)
-		"poison_toad":
-			var puff := 1.0 + 0.10 * sin(_anim_phase * 1.5)
-			draw_circle(center + Vector2(-r * 0.62, r * 0.34), r * 0.38, col.darkened(0.22))
-			draw_circle(center + Vector2(r * 0.62, r * 0.34), r * 0.38, col.darkened(0.22))
-			draw_circle(center, r * 0.96 * puff, col)
-			draw_circle(center + Vector2(0, r * 0.25), r * 0.48 * puff, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.78))
-			for wart: Vector2 in [Vector2(-r * 0.36, -r * 0.24), Vector2(r * 0.36, -r * 0.20), Vector2(0, -r * 0.46)]:
-				draw_circle(center + wart, r * 0.19, color_secondary.darkened(0.15))
-		"predator_flower":
-			var open_f := 0.58 if fsm.state == EnemyFSM.State.AMBUSH_HIDE else (1.32 if is_vulnerable else 1.12)
-			for i in range(6):
-				var pa := (TAU / 6.0) * float(i) + _anim_phase * 0.15
-				var pdir := Vector2.from_angle(pa)
-				var ptang := pdir.orthogonal() * (r * 0.34)
-				var ptip := center + pdir * (r * 1.12 * open_f)
-				var pbase := center + pdir * (r * 0.28)
-				draw_colored_polygon(PackedVector2Array([pbase - ptang, ptip, pbase + ptang]), col)
-			draw_circle(center, r * 0.54, Color(0.18, 0.05, 0.10))
-			draw_circle(center, r * 0.40, Color(0.42, 1.0, 0.72) if is_vulnerable else color_secondary)
-			if not is_vulnerable:
-				for t_i in range(5):
-					var ta := (TAU / 5.0) * float(t_i) - _anim_phase * 0.2
-					draw_line(center + Vector2.from_angle(ta) * (r * 0.52), center + Vector2.from_angle(ta) * (r * 0.28), Color(1.0, 0.95, 0.88), 2.0)
-		"electric_beetle":
-			draw_circle(center, r * 0.94, col)
-			draw_arc(center, r * 0.60, 0.0, TAU, 16, color_secondary, 2.2)
-			var h1 := center + (face * 1.28 + perp * 0.38) * r
-			var h2 := center + (face * 1.28 - perp * 0.38) * r
-			draw_line(center + perp * (r * 0.32), h1, color_secondary, 3.0)
-			draw_line(center - perp * (r * 0.32), h2, color_secondary, 3.0)
-			if fsm.state == EnemyFSM.State.TELEGRAPH or _action_cooldown < 0.9:
-				draw_line(h1, h2, Color(1.0, 0.84, 0.26, 0.98), 2.8)
-		"shadow_slime":
-			for w in range(4):
-				var wa := _anim_phase * 0.8 + float(w) * (TAU / 4.0)
-				draw_circle(center + Vector2.from_angle(wa) * (r * 0.70), r * 0.40, Color(col.r, col.g, col.b, 0.52))
-			draw_circle(center, r * 0.94 * bounce, col)
-			draw_circle(center, r * 0.45, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.68))
-		"umbral_alpha":
-			draw_arc(center, r * 1.24, 0.0, TAU, 32, Color(0.76, 0.32, 1.0, 0.44), 3.4)
-			for horn: float in [-0.62, 0.0, 0.62]:
-				var ha: float = -PI * 0.5 + horn
-				var tip := center + Vector2.from_angle(ha) * (r * 1.48)
-				var b1 := center + Vector2.from_angle(ha - 0.22) * (r * 0.85)
-				var b2 := center + Vector2.from_angle(ha + 0.22) * (r * 0.85)
-				draw_colored_polygon(PackedVector2Array([b1, tip, b2]), color_secondary)
-			draw_circle(center, r * bounce, col)
-			var core_c := Color(0.42, 1.0, 0.74) if is_vulnerable else color_secondary
-			draw_circle(center, r * 0.44, core_c)
-		_:
-			draw_circle(center, r * bounce, col)
-			draw_circle(center, r * 0.50, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.55))
+	# Generated creature art replaces the procedural silhouette. Every readability
+	# overlay below (rings, telegraph, HP bar) still draws on top, and the silhouette
+	# code stays as the fallback for any creature without art.
+	if sprite_tex != null:
+		_draw_sprite_body(center, r, bounce, face)
+	else:
+		match enemy_id:
+			"tiny_mushroom":
+				var stem_w := r * 0.68
+				var stem_h := r * 0.72
+				draw_rect(Rect2(center + Vector2(-stem_w * 0.5, -r * 0.05), Vector2(stem_w, stem_h)), color_secondary)
+				draw_circle(center + Vector2(0.0, stem_h * 0.58), stem_w * 0.5, color_secondary)
+				var cap_y := -r * 0.18 * bounce
+				var cap_pts := PackedVector2Array([
+					center + Vector2(-r * 0.98, cap_y + r * 0.26),
+					center + Vector2(-r * 0.82, cap_y - r * 0.42),
+					center + Vector2(0.0, cap_y - r * 0.78),
+					center + Vector2(r * 0.82, cap_y - r * 0.42),
+					center + Vector2(r * 0.98, cap_y + r * 0.26)
+				])
+				draw_colored_polygon(cap_pts, col)
+				draw_circle(center + Vector2(-r * 0.36, cap_y - r * 0.16), r * 0.18, color_secondary)
+				draw_circle(center + Vector2(r * 0.32, cap_y - r * 0.10), r * 0.15, color_secondary)
+				draw_circle(center + Vector2(0.0, cap_y - r * 0.42), r * 0.13, color_secondary)
+			"forest_beetle":
+				for side: float in [-1.0, 1.0]:
+					for leg_i: float in [-0.42, 0.0, 0.42]:
+						var swing := sin(_anim_phase * 2.6 + leg_i * 4.0) * 2.4
+						var p0: Vector2 = center + face * (r * leg_i) + perp * (side * r * 0.65)
+						var p1: Vector2 = p0 + perp * (side * r * 0.42) + face * swing
+						draw_line(p0, p1, Color(0.16, 0.11, 0.07), 2.0)
+				draw_circle(center, r * 0.90, col)
+				draw_line(center - face * (r * 0.80), center + face * (r * 0.45), color_secondary.darkened(0.35), 2.0)
+				draw_circle(center + face * (r * 0.66), r * 0.40, col.darkened(0.22))
+				draw_line(center + face * (r * 0.84), center + (face + perp * 0.42) * (r * 1.32), color_secondary, 1.8)
+				draw_line(center + face * (r * 0.84), center + (face - perp * 0.42) * (r * 1.32), color_secondary, 1.8)
+			"firefly":
+				var wing_off := sin(_anim_phase * 3.5) * 4.0
+				draw_circle(center + Vector2(-r * 0.65, wing_off), r * 0.48, Color(0.85, 1.0, 0.98, 0.55))
+				draw_circle(center + Vector2(r * 0.65, wing_off), r * 0.48, Color(0.85, 1.0, 0.98, 0.55))
+				draw_circle(center + Vector2(0, r * 0.20), r * 1.05, Color(1.0, 0.95, 0.45, 0.28))
+				draw_circle(center, r * 0.76, col)
+			"stone_slug":
+				draw_circle(center, r * bounce, col)
+				if not shell_broken_permanently:
+					var plate_a := 0.96 if shell_active else 0.72
+					draw_circle(center + Vector2(0, -1.5), r * 0.82, Color(0.42, 0.48, 0.56, plate_a))
+					draw_arc(center, r * 1.08, 0.0, TAU, 20, Color(0.86, 0.92, 0.98, plate_a), 3.8 if shell_active else 2.4)
+				else:
+					draw_line(center + Vector2(-r * 0.45, -r * 0.35), center + Vector2(r * 0.4, r * 0.3), Color(1.0, 0.86, 0.52), 2.5)
+			"poison_toad":
+				var puff := 1.0 + 0.10 * sin(_anim_phase * 1.5)
+				draw_circle(center + Vector2(-r * 0.62, r * 0.34), r * 0.38, col.darkened(0.22))
+				draw_circle(center + Vector2(r * 0.62, r * 0.34), r * 0.38, col.darkened(0.22))
+				draw_circle(center, r * 0.96 * puff, col)
+				draw_circle(center + Vector2(0, r * 0.25), r * 0.48 * puff, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.78))
+				for wart: Vector2 in [Vector2(-r * 0.36, -r * 0.24), Vector2(r * 0.36, -r * 0.20), Vector2(0, -r * 0.46)]:
+					draw_circle(center + wart, r * 0.19, color_secondary.darkened(0.15))
+			"predator_flower":
+				var open_f := 0.58 if fsm.state == EnemyFSM.State.AMBUSH_HIDE else (1.32 if is_vulnerable else 1.12)
+				for i in range(6):
+					var pa := (TAU / 6.0) * float(i) + _anim_phase * 0.15
+					var pdir := Vector2.from_angle(pa)
+					var ptang := pdir.orthogonal() * (r * 0.34)
+					var ptip := center + pdir * (r * 1.12 * open_f)
+					var pbase := center + pdir * (r * 0.28)
+					draw_colored_polygon(PackedVector2Array([pbase - ptang, ptip, pbase + ptang]), col)
+				draw_circle(center, r * 0.54, Color(0.18, 0.05, 0.10))
+				draw_circle(center, r * 0.40, Color(0.42, 1.0, 0.72) if is_vulnerable else color_secondary)
+				if not is_vulnerable:
+					for t_i in range(5):
+						var ta := (TAU / 5.0) * float(t_i) - _anim_phase * 0.2
+						draw_line(center + Vector2.from_angle(ta) * (r * 0.52), center + Vector2.from_angle(ta) * (r * 0.28), Color(1.0, 0.95, 0.88), 2.0)
+			"electric_beetle":
+				draw_circle(center, r * 0.94, col)
+				draw_arc(center, r * 0.60, 0.0, TAU, 16, color_secondary, 2.2)
+				var h1 := center + (face * 1.28 + perp * 0.38) * r
+				var h2 := center + (face * 1.28 - perp * 0.38) * r
+				draw_line(center + perp * (r * 0.32), h1, color_secondary, 3.0)
+				draw_line(center - perp * (r * 0.32), h2, color_secondary, 3.0)
+				if fsm.state == EnemyFSM.State.TELEGRAPH or _action_cooldown < 0.9:
+					draw_line(h1, h2, Color(1.0, 0.84, 0.26, 0.98), 2.8)
+			"shadow_slime":
+				for w in range(4):
+					var wa := _anim_phase * 0.8 + float(w) * (TAU / 4.0)
+					draw_circle(center + Vector2.from_angle(wa) * (r * 0.70), r * 0.40, Color(col.r, col.g, col.b, 0.52))
+				draw_circle(center, r * 0.94 * bounce, col)
+				draw_circle(center, r * 0.45, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.68))
+			"umbral_alpha":
+				draw_arc(center, r * 1.24, 0.0, TAU, 32, Color(0.76, 0.32, 1.0, 0.44), 3.4)
+				for horn: float in [-0.62, 0.0, 0.62]:
+					var ha: float = -PI * 0.5 + horn
+					var tip := center + Vector2.from_angle(ha) * (r * 1.48)
+					var b1 := center + Vector2.from_angle(ha - 0.22) * (r * 0.85)
+					var b2 := center + Vector2.from_angle(ha + 0.22) * (r * 0.85)
+					draw_colored_polygon(PackedVector2Array([b1, tip, b2]), color_secondary)
+				draw_circle(center, r * bounce, col)
+				var core_c := Color(0.42, 1.0, 0.74) if is_vulnerable else color_secondary
+				draw_circle(center, r * 0.44, core_c)
+			_:
+				draw_circle(center, r * bounce, col)
+				draw_circle(center, r * 0.50, Color(color_secondary.r, color_secondary.g, color_secondary.b, 0.55))
 
 	# Eyes
-	var eye_c := Color(1.0, 0.32, 0.48) if (category in ["predator", "miniboss"]) else Color(0.08, 0.10, 0.14)
-	draw_circle(center + Vector2(-r * 0.28, -r * 0.10), 2.9, eye_c)
-	draw_circle(center + Vector2(r * 0.28, -r * 0.10), 2.9, eye_c)
+	if sprite_tex == null:
+		var eye_c := Color(1.0, 0.32, 0.48) if (category in ["predator", "miniboss"]) else Color(0.08, 0.10, 0.14)
+		draw_circle(center + Vector2(-r * 0.28, -r * 0.10), 2.9, eye_c)
+		draw_circle(center + Vector2(r * 0.28, -r * 0.10), 2.9, eye_c)
 
 	# Stun stars
 	if stun_timer > 0.0:

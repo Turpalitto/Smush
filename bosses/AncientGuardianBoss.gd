@@ -36,6 +36,8 @@ var slow_factor: float = 0.0
 var hurt_flash: float = 0.0
 var _anim_time: float = 0.0
 var arena_ref: Node = null
+## Painted boss art from enemies.json ("sprite"); null keeps the procedural guardian.
+var sprite_tex: Texture2D = null
 
 
 func setup_boss(cfg: Dictionary, spawn_pos: Vector2, p_arena: Node, hp_mult: float = 1.0, damage_mult: float = 1.0) -> void:
@@ -48,6 +50,12 @@ func setup_boss(cfg: Dictionary, spawn_pos: Vector2, p_arena: Node, hp_mult: flo
 	move_speed = float(cfg.get("move_speed", 98.0))
 	armor = float(cfg.get("armor", 0.34))
 	contact_damage = float(cfg.get("contact_damage", 20.0)) * maxf(0.1, damage_mult)
+	var sprite_name := str(cfg.get("sprite", ""))
+	sprite_tex = null
+	if not sprite_name.is_empty():
+		sprite_tex = AssetRegistry.get_texture("res://resources/art/creatures/" + sprite_name)
+	if sprite_tex != null:
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	phase = 1
 	action_state = ActionState.PURSUIT
 	_state_timer = 2.4
@@ -307,17 +315,26 @@ func _draw() -> void:
 		vein_col = Color(1.0, 0.36, 0.52, 0.86)
 	bark_outer = bark_outer.lerp(Color.WHITE, hurt_flash * 0.65)
 	bark_inner = bark_inner.lerp(Color.WHITE, hurt_flash * 0.65)
-	draw_circle(Vector2.ZERO, r, bark_outer)
-	draw_circle(Vector2(0.0, -3.0), r * 0.84, bark_inner)
-	draw_arc(Vector2.ZERO, r * 0.92, 0.0, TAU, 32, vein_col, 2.6)
+	if sprite_tex != null:
+		# Painted guardian art: the phase is carried by the aura ring and the heart core
+		# (both already colour-shift per phase) instead of recolouring the whole body.
+		var side := r * 2.3
+		draw_texture_rect(sprite_tex, Rect2(-side * 0.5, -side * 0.5, side, side), false, Color.WHITE)
+		draw_arc(Vector2.ZERO, r * 1.02, 0.0, TAU, 40, vein_col, 3.2)
+		if hurt_flash > 0.01:
+			draw_circle(Vector2.ZERO, r * 1.0, Color(1.0, 0.94, 0.94, 0.40 * clampf(hurt_flash, 0.0, 1.0)))
+	else:
+		draw_circle(Vector2.ZERO, r, bark_outer)
+		draw_circle(Vector2(0.0, -3.0), r * 0.84, bark_inner)
+		draw_arc(Vector2.ZERO, r * 0.92, 0.0, TAU, 32, vein_col, 2.6)
 
-	# Upper elder-antler crown
-	for side_h: float in [-1.0, 1.0]:
-		var h_base := Vector2(side_h * r * 0.46, -r * 0.72)
-		var h_mid := Vector2(side_h * r * 0.74, -r * 1.12)
-		var h_tip := Vector2(side_h * r * 0.54, -r * 1.38)
-		draw_polyline(PackedVector2Array([h_base, h_mid, h_tip]), bark_outer.darkened(0.18), 7.0)
-		draw_line(h_mid, h_mid + Vector2(side_h * 11.0, -9.0), bark_outer.darkened(0.18), 4.5)
+		# Upper elder-antler crown
+		for side_h: float in [-1.0, 1.0]:
+			var h_base := Vector2(side_h * r * 0.46, -r * 0.72)
+			var h_mid := Vector2(side_h * r * 0.74, -r * 1.12)
+			var h_tip := Vector2(side_h * r * 0.54, -r * 1.38)
+			draw_polyline(PackedVector2Array([h_base, h_mid, h_tip]), bark_outer.darkened(0.18), 7.0)
+			draw_line(h_mid, h_mid + Vector2(side_h * 11.0, -9.0), bark_outer.darkened(0.18), 4.5)
 
 	# Glowing Ancient Heart Core positioned on lower chest so eyes stay high-contrast above it!
 	var core_pos := Vector2(0.0, r * 0.18)
@@ -327,11 +344,12 @@ func _draw() -> void:
 	draw_circle(core_pos, core_r, core_col)
 	draw_circle(core_pos + Vector2(-core_r * 0.24, -core_r * 0.24), core_r * 0.32, Color(1.0, 1.0, 0.92, 0.85))
 
-	# High-contrast fierce dark-socket eyes above the heart core
-	for side_e: float in [-1.0, 1.0]:
-		var ep := Vector2(side_e * r * 0.32, -r * 0.24)
-		draw_circle(ep, 8.2, Color(0.04, 0.08, 0.10, 0.94))
-		var iris_c := Color(0.55, 1.0, 0.84) if is_vulnerable() else (Color(1.0, 0.92, 0.38) if phase < 3 else Color(1.0, 0.38, 0.52))
-		draw_circle(ep, 5.2, iris_c)
-		if not is_vulnerable():
-			draw_line(ep + Vector2(-side_e * 8.0, -2.0), ep + Vector2(side_e * 8.0, -7.5), bark_outer.darkened(0.42), 3.4)
+	# High-contrast fierce dark-socket eyes above the heart core (the art has its own)
+	if sprite_tex == null:
+		for side_e: float in [-1.0, 1.0]:
+			var ep := Vector2(side_e * r * 0.32, -r * 0.24)
+			draw_circle(ep, 8.2, Color(0.04, 0.08, 0.10, 0.94))
+			var iris_c := Color(0.55, 1.0, 0.84) if is_vulnerable() else (Color(1.0, 0.92, 0.38) if phase < 3 else Color(1.0, 0.38, 0.52))
+			draw_circle(ep, 5.2, iris_c)
+			if not is_vulnerable():
+				draw_line(ep + Vector2(-side_e * 8.0, -2.0), ep + Vector2(side_e * 8.0, -7.5), bark_outer.darkened(0.42), 3.4)

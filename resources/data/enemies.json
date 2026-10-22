@@ -3,6 +3,7 @@
   "enemies": [
     {
       "id": "tiny_mushroom",
+      "sprite": "tiny_mushroom.png",
       "name_key": "enemy.tiny_mushroom.name",
       "desc_key": "enemy.tiny_mushroom.desc",
       "icon": "res://resources/icons/enemies/tiny_mushroom.png",
@@ -25,6 +26,7 @@
     },
     {
       "id": "forest_beetle",
+      "sprite": "forest_beetle.png",
       "name_key": "enemy.forest_beetle.name",
       "desc_key": "enemy.forest_beetle.desc",
       "icon": "res://resources/icons/enemies/forest_beetle.png",
@@ -47,6 +49,7 @@
     },
     {
       "id": "firefly",
+      "sprite": "firefly.png",
       "name_key": "enemy.firefly.name",
       "desc_key": "enemy.firefly.desc",
       "icon": "res://resources/icons/enemies/firefly.png",
@@ -69,6 +72,7 @@
     },
     {
       "id": "stone_slug",
+      "sprite": "stone_slug.png",
       "name_key": "enemy.stone_slug.name",
       "desc_key": "enemy.stone_slug.desc",
       "icon": "res://resources/icons/enemies/stone_slug.png",
@@ -91,6 +95,7 @@
     },
     {
       "id": "poison_toad",
+      "sprite": "poison_toad.png",
       "name_key": "enemy.poison_toad.name",
       "desc_key": "enemy.poison_toad.desc",
       "icon": "res://resources/icons/enemies/poison_toad.png",
@@ -113,6 +118,7 @@
     },
     {
       "id": "predator_flower",
+      "sprite": "predator_flower.png",
       "name_key": "enemy.predator_flower.name",
       "desc_key": "enemy.predator_flower.desc",
       "icon": "res://resources/icons/enemies/predator_flower.png",
@@ -126,7 +132,7 @@
       "detect_radius": 185.0,
       "xp_reward": 32.0,
       "mass_gain": 4.5,
-      "essence_chance": 0.50,
+      "essence_chance": 0.5,
       "essence_amount": 3,
       "min_run_time": 85.0,
       "spawn_weight": 11,
@@ -135,6 +141,7 @@
     },
     {
       "id": "electric_beetle",
+      "sprite": "electric_beetle.png",
       "name_key": "enemy.electric_beetle.name",
       "desc_key": "enemy.electric_beetle.desc",
       "icon": "res://resources/icons/enemies/electric_beetle.png",
@@ -157,6 +164,7 @@
     },
     {
       "id": "shadow_slime",
+      "sprite": "shadow_slime.png",
       "name_key": "enemy.shadow_slime.name",
       "desc_key": "enemy.shadow_slime.desc",
       "icon": "res://resources/icons/enemies/shadow_slime.png",
@@ -170,7 +178,7 @@
       "detect_radius": 320.0,
       "xp_reward": 42.0,
       "mass_gain": 6.0,
-      "essence_chance": 0.70,
+      "essence_chance": 0.7,
       "essence_amount": 4,
       "min_run_time": 135.0,
       "spawn_weight": 9,
@@ -181,6 +189,7 @@
   "special_encounters": [
     {
       "id": "umbral_alpha",
+      "sprite": "umbral_alpha.png",
       "name_key": "enemy.umbral_alpha.name",
       "desc_key": "enemy.umbral_alpha.desc",
       "icon": "res://resources/icons/enemies/umbral_alpha.png",
@@ -198,6 +207,7 @@
     },
     {
       "id": "ancient_guardian",
+      "sprite": "ancient_guardian.png",
       "name_key": "boss.ancient_guardian.name",
       "desc_key": "boss.ancient_guardian.desc",
       "icon": "res://resources/icons/enemies/ancient_guardian.png",

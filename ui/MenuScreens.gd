@@ -544,6 +544,7 @@ func _build_collection_page() -> void:
 				tr.modulate = Color.WHITE if seen_cnt > 0 else Color(0.15, 0.20, 0.22, 0.85)
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 				tr.custom_minimum_size = Vector2(58, 58)
 				hb.add_child(tr)
 
