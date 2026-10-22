@@ -206,7 +206,7 @@
     (`reports/macos-automated-playthrough-premium-2026-10-22.json`; прогоны прошлых итераций —
     `reports/macos-automated-playthrough-art-2026-10-22.json`, `reports/macos-automated-playthrough-2026-10-22.json`,
     консоль `reports/macos-playthrough-console-2026-10-22.log`);
-  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (64 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (63 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
   - скриншоты `deliverables/macos_screenshots/` — 23 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
     включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с новым артом
     и переснятые `06`–`10` из финального прогона.
