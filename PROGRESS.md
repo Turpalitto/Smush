@@ -69,6 +69,40 @@
 - **Автономный десктопный билд для личного плейтеста (`Linux x86_64`)**: поскольку сборка Android APK локально заблокирована отсутствием Android SDK / JDK и запретом принимать лицензии Google SDK без согласия владельца (`python3 tools/android_preflight.py --offline` → код `2`), добавлен воспроизводимый сборщик `./scripts/build_linux_playtest.sh` и собран автономный пакет `deliverables/SlimeRushEvolution_Linux_x86_64_Playtest_v1.0.0.tar.gz` (официальный `linux_release.x86_64` Godot `4.5.stable.official.876b29033` + `SlimeRushEvolution.pck` + `launch_playtest.sh` + `launch_clean_profile.sh` + памятка RU/EN).
 - **Скачиваемый архив доказательств**: поскольку неиндексируемая Git папка `builds/verification_2026_10_22/` очищается при перезапуске контейнера, сохранены исходные логи `reports/*`, заново сняты нативные кадры `720x1280` (`visual_before` с коммита `e3b2e2a` и `visual_after` текущей ветки) и пост-лимитерные `.wav`-записи боя с боссом, и всё упаковано в `deliverables/SlimeRushEvolution_Verification_Evidence_2026-10-22.zip` с подробным `MANIFEST.md`.
 
+### 4. Нативная сборка и проверка на macOS (Apple Silicon, Metal)
+- **Окружение**: Mac с `Apple M5`, macOS `27.0` (`arm64`), дисплей Retina `2560x1664` (`1470x956` pt, scale `2.0`);
+  установлен официальный `Godot 4.5.stable.official.876b29033` (universal `.app`) и шаблоны экспорта `4.5.stable`.
+  Рендер — `Metal 3.2 — Forward Mobile`, устройство `Apple M5`. Linux-бинарник не использовался.
+- **Что мешало сборке и было исправлено**:
+  - `rendering/textures/vram_compression/import_etc2_astc` не был включён, поэтому Godot отказывался
+    экспортировать `Universal`/`arm64` (`Невозможно экспортировать для Universal или Arm64, если отключен формат текстур ETC2 ASTC`);
+  - в `export_presets.cfg` не было macOS-пресета. Добавлен аддитивный `preset.3` — `macOS Universal (Ad-hoc)`;
+    пресеты `0–2` (Android) не изменялись.
+- **Артефакт**: `SlimeRushEvolution.app` — universal `x86_64 + arm64`, `Metal`, ad-hoc подпись
+  (`Signature=adhoc`, флаг hardened runtime, `codesign --verify --deep --strict` → `valid on disk`),
+  **не Developer ID и не notarized**. `spctl` ожидаемо отклоняет пакет; карантинного атрибута у локальной
+  сборки нет, поэтому запуск с этой машины проходит без вмешательства. `web/` не изменялся.
+- **Проверено на собранном `.app`**: запуск через LaunchServices даёт реальное окно (`360x640` pt при
+  нативном `720x1280`), рендер меню снят **из самого экспортированного бинарника** через `--write-movie`
+  (реальные кадры GPU, не скриншот редактора).
+- **Автоматизированное прохождение на macOS** (тот же скриптовый агент, без читов, чистый профиль через
+  подмену `HOME`): `VICTORY` на `316.6 с` игрового времени (`497.5 с` реального — разница из-за автопаузы
+  при потере фокуса окна), мини-босс `165.0 с`, Страж `270.0 с`, фазы II/III `290.7`/`299.8 с`,
+  поглощено `234`, пик массы `123.2`, эволюция `8`, синергии `piercing_strike` + `ice_armor`, сохранено `428` эссенции.
+- **Пауза/продолжение** проверены реальным событием `InputEventKey` (`Esc`) через штатный `_unhandled_input`:
+  `paused=true`, `resumed=true`, игровое время на паузе не идёт.
+- **Звук** (численно, без прослушивания): запись шины `Master` строго после `AudioEffectHardLimiter`
+  (`["0:AudioEffectCapture", "1:AudioEffectHardLimiter", "2:AudioEffectRecord"]`) в бою со Стражем —
+  `227.211 с`, `48 kHz`, 16-bit stereo, пик **`-1.200 dBFS`** ровно по потолку, `0` клиппированных сэмплов,
+  `0` сэмплов выше потолка, RMS `-27.58 dBFS`; музыка по умолчанию выключена (`music_enabled=false`).
+- **Исправлено по результатам реального рендера**: у таймера и счётчика эссенции в правом верхнем углу HUD
+  не было подложки, и проходящий позади яркий враг «съедал» цифры (воспроизведено: зелёная слизь ровно за
+  счётчиком `✦ 0`). Добавлена тёмная обводка (`outline_size 4`) — вёрстка, размеры и баланс не менялись.
+- **Инструменты**: `scripts/run_macos_playthrough.sh` (изоляция профиля через `HOME`, т.к. Godot на macOS
+  игнорирует `XDG_DATA_HOME`), `scripts/build_macos_playtest.sh` (экспорт + ad-hoc подпись + zip + SHA256 +
+  метаданные), `scripts/run_qa.sh` больше не требует `ripgrep` (fallback на `grep`), а
+  `tools/automated_playthrough_driver.gd` умеет снимать кадры и переживать автопаузу по потере фокуса.
+
 ## Последние зафиксированные проверки и артефакты
 
 - `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **324 assertions, 0 failures**, `0` ошибок `ERROR:`/`SCRIPT ERROR` (`reports/gameplay-source-qa-2026-10-22.log`).
@@ -76,15 +110,28 @@
 - Автоматизированное прохождение на чистом профиле + одновременный замер шины `Master` до/после лимитера:
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
+- **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
+  - `./scripts/run_qa.sh` → **324 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-2026-10-22.log`);
+  - автоматизированное прохождение `VICTORY` + запись шины `Master` (`reports/macos-automated-playthrough-2026-10-22.json`,
+    `reports/macos-audio-limiter-2026-10-22.json`, консоль `reports/macos-playthrough-console-2026-10-22.log`);
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (62 MB) + `.sha256` + `.build.json`;
+  - скриншоты `deliverables/macos_screenshots/` — 14 реальных кадров GPU (`720x1280`, `540x1200`, `1080x1682`, `1280x720`).
 - Готовые скачиваемые пакеты в рабочей области (каталог `deliverables/`, исключён из Git, но доступен для скачивания в файловом менеджере платформы):
-  - `deliverables/SlimeRushEvolution_Linux_x86_64_Playtest_v1.0.0.tar.gz` — автономный билд для Linux x86_64;
-  - `deliverables/SlimeRushEvolution_Verification_Evidence_2026-10-22.zip` — скриншоты `720x1280` (Before/After), `.wav`-записи шины `Master` после лимитера, JSON/QA-отчёты и `MANIFEST.md`.
+  - `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` — **основной результат для macOS**;
+  - `deliverables/SlimeRushEvolution_macOS_Verification_2026-10-22.zip` — скриншоты реального рендера, сводки
+    `reports/macos-*`, фрагмент записи шины `Master` после лимитера и `MANIFEST.md`;
+  - ранее собранные пакеты (`Linux x86_64` и архив доказательств от предыдущей итерации) в этом рабочем
+    каталоге отсутствуют — они создавались в другом окружении; скрипты их сборки остались в `scripts/`.
 - Подробный отчёт: [TEST_REPORT.md](TEST_REPORT.md).
 
 ## Границы проверенного (что ещё требует реального устройства и человека)
 
-1. Управление проверялось эмуляцией сенсорных событий (`InputEventScreenTouch`/`InputEventScreenDrag`) и программным водителем на чистом профиле — **живое тактильное ощущение большого пальца на стекле смартфона и учёт случайных касаний ладонью требуют ручной проверки человеком на телефоне**.
+1. Управление проверялось эмуляцией сенсорных событий (`InputEventScreenTouch`/`InputEventScreenDrag`) и программным водителем на чистом профиле — **живое тактильное ощущение большого пальца на стеке смартфона и учёт случайных касаний ладонью требуют ручной проверки человеком на телефоне**.
 2. Звук проверен записью выходного микса `AudioServer` (`Master`) и анализом сигнала/пиков/клиппинга — **субъективное прослушивание ушами человека через динамик телефона и наушники не выполнялось**.
 3. Программный рендер `SwiftShader` подтверждает корректность шейдеров, слоёв и вёрстки, но **не заменяет замер реальных 60 FPS, времени кадра мобильного GPU, нагрева и расхода батареи на физическом Android-устройстве**.
+4. На macOS **живой ввод мышью/клавиатурой с уровня ОС не выполнялся**: процессу агента не выданы разрешения
+   Accessibility (`AXIsProcessTrusted=false`) и Screen Recording (`screencapture` → `could not create image from display`).
+   Поэтому интерактив проверен инъекцией событий на уровне движка, а **реальный плейтест мышью и клавиатурой остаётся за владельцем**.
+   Кадры сняты из самого приложения (viewport / `--write-movie`), а не с экрана рабочего стола.
 
 Отложенные коммерческие и релизные этапы: [RELEASE_STATUS.md](RELEASE_STATUS.md).

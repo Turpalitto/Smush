@@ -102,8 +102,13 @@ func _find_first_button_recursive(root_node: Node, match_text: String = "") -> B
 
 
 func _await_draw_if_rendered() -> void:
-	if DisplayServer.get_name() != "headless":
-		await RenderingServer.frame_post_draw
+	## Bounded wait for a fresh frame. Never awaits RenderingServer.frame_post_draw directly:
+	## macOS stops drawing an unfocused/occluded window, so that signal may never fire and the
+	## await would hang forever (observed on unattended runs).
+	if DisplayServer.get_name() == "headless":
+		return
+	for _i in range(3):
+		await get_tree().process_frame
 
 
 func _snap(tag: String) -> void:
