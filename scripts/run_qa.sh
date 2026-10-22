@@ -7,12 +7,20 @@ GODOT_BIN="${GODOT_BIN:-godot4}"
 python3 tools/sync_godot_cache.py
 QA_LOG="$(mktemp)"
 trap 'rm -f "$QA_LOG"' EXIT
+
+# Prefer ripgrep, fall back to grep: macOS/CI images often ship without rg.
+if command -v rg >/dev/null 2>&1; then
+  log_matches() { rg -q "$1" "$QA_LOG"; }
+else
+  log_matches() { grep -Eq "$1" "$QA_LOG"; }
+fi
+
 "$GODOT_BIN" --headless --quit-after 600 --path "$TASK_ROOT" res://tests/TestRunner.tscn 2>&1 | tee "$QA_LOG"
-if rg -q 'SCRIPT ERROR:|^ERROR:|\[FAIL\]' "$QA_LOG"; then
+if log_matches 'SCRIPT ERROR:|^ERROR:|\[FAIL\]'; then
   echo "Godot reported an error during QA." >&2
   exit 1
 fi
-if ! rg -q 'TOTAL ASSERTIONS: [1-9][0-9]* PASSED, 0 FAILED' "$QA_LOG"; then
+if ! log_matches 'TOTAL ASSERTIONS: [1-9][0-9]* PASSED, 0 FAILED'; then
   echo "Godot did not complete the test suite." >&2
   exit 1
 fi

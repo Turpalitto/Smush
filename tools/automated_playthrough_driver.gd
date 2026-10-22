@@ -12,12 +12,25 @@ extends Node
 const SUMMARY_OUT_ENV := "PLAYTHROUGH_SUMMARY_PATH"
 const BOSS_WAV_OUT_ENV := "PLAYTHROUGH_BOSS_WAV_PATH"
 const RESULT_PNG_OUT_ENV := "PLAYTHROUGH_RESULT_PNG_PATH"
+const SCREENSHOT_DIR_ENV := "PLAYTHROUGH_SCREENSHOT_DIR"
 
 var main: MainRoot
 var _joy_touch_active: bool = false
 var _joy_origin_logical: Vector2 = Vector2(260.0, 980.0)
 var _stutter_checked: bool = false
 var _accidental_double_tap_dash: bool = false
+var _shot_dir: String = ""
+var _shots_written: Array[String] = []
+var _pause_checked: bool = false
+var _pause_resume_ok: bool = false
+var _draft_snapped: bool = false
+var _draft_hold_frames: int = 0
+var _in_pause_probe: bool = false
+var _gameplay_snapped: bool = false
+var _last_state_logged: int = -1
+var _watch_pos: Vector2 = Vector2.ZERO
+var _watch_t: float = 0.0
+var _pending_shots: Array = []
 
 var _evo_times: Array[float] = []
 var _last_evo_lv: int = 0
@@ -93,13 +106,77 @@ func _await_draw_if_rendered() -> void:
 		await RenderingServer.frame_post_draw
 
 
+func _snap(tag: String) -> void:
+	## Saves the real rendered viewport (GPU output) as a PNG. No-op in headless.
+	if _shot_dir.is_empty() or DisplayServer.get_name() == "headless":
+		return
+	var img := get_viewport().get_texture().get_image()
+	if img == null or img.is_empty():
+		push_warning("screenshot failed: " + tag)
+		return
+	var path := _shot_dir.path_join(tag + ".png")
+	if img.save_png(path) == OK:
+		_shots_written.append("%s (%dx%d)" % [tag, img.get_width(), img.get_height()])
+		print("SCREENSHOT ", tag, " ", img.get_width(), "x", img.get_height())
+
+
+func _queue_snap(tag: String, delay_frames: int = 10) -> void:
+	## Queues a screenshot to be taken after `delay_frames` rendered frames.
+	_pending_shots.append({"tag": tag, "at": Engine.get_process_frames() + delay_frames})
+
+
+func _press_escape() -> void:
+	## Delivers a real key event through the engine input pipeline (same path as a physical Esc).
+	var down := InputEventKey.new()
+	down.keycode = KEY_ESCAPE
+	down.physical_keycode = KEY_ESCAPE
+	down.pressed = true
+	Input.parse_input_event(down)
+	await get_tree().process_frame
+	var up := InputEventKey.new()
+	up.keycode = KEY_ESCAPE
+	up.physical_keycode = KEY_ESCAPE
+	up.pressed = false
+	Input.parse_input_event(up)
+	await get_tree().process_frame
+
+
+func _layout_checks() -> void:
+	## Captures the same menu at several window sizes to verify stretch/aspect and clipping.
+	if _shot_dir.is_empty() or DisplayServer.get_name() == "headless":
+		return
+	var sizes := [
+		{"tag": "00_menu_720x1280", "size": Vector2i(720, 1280)},
+		{"tag": "00_menu_540x1200_narrow", "size": Vector2i(540, 1200)},
+		{"tag": "00_menu_1080x1920_big", "size": Vector2i(1080, 1920)},
+		{"tag": "00_menu_1280x720_landscape", "size": Vector2i(1280, 720)},
+	]
+	for s in sizes:
+		DisplayServer.window_set_size(s["size"])
+		for _i in range(4):
+			await get_tree().process_frame
+		await _await_draw_if_rendered()
+		await _snap(str(s["tag"]))
+	DisplayServer.window_set_size(Vector2i(720, 1280))
+	for _i in range(4):
+		await get_tree().process_frame
+	await _await_draw_if_rendered()
+
+
 func _boot_and_run() -> void:
+	_shot_dir = OS.get_environment(SCREENSHOT_DIR_ENV)
+	if not _shot_dir.is_empty():
+		DirAccess.make_dir_recursive_absolute(_shot_dir)
+
 	var packed := load("res://scenes/Main.tscn") as PackedScene
 	main = packed.instantiate() as MainRoot
 	get_tree().root.add_child(main)
 	for _i in range(4):
 		await get_tree().process_frame
 	await _await_draw_if_rendered()
+
+	await _snap("01_main_menu")
+	await _layout_checks()
 
 	_prev_playing_flags.resize(Audio._sfx_players.size())
 	_prev_playing_flags.fill(false)
@@ -111,6 +188,7 @@ func _boot_and_run() -> void:
 	for _i in range(3):
 		await get_tree().process_frame
 	await _await_draw_if_rendered()
+	await _snap("02_mode_select")
 
 	# Tap first Start Run button (Standard mode) on Mode Select via InputEventScreenTouch
 	var std_btn := _find_first_button_recursive(main.menus, Loc.t("mode.start_btn"))
@@ -133,10 +211,12 @@ func _boot_and_run() -> void:
 	Events.miniboss_spawned.connect(func(_id: String) -> void:
 		if main != null and main.arena != null:
 			_miniboss_spawn_t = roundf(main.arena.run_elapsed * 10.0) / 10.0
+		_queue_snap("06_miniboss", 45)
 	)
 	Events.boss_spawned.connect(func(_id: String, _mx: float) -> void:
 		if main != null and main.arena != null:
 			_boss_spawn_t = roundf(main.arena.run_elapsed * 10.0) / 10.0
+		_queue_snap("07_boss_phase1", 90)
 	)
 	Events.player_damaged.connect(func(amt: float, src: String) -> void:
 		if main != null and main.arena != null and main.arena.player != null:
@@ -263,8 +343,10 @@ func _compute_steering() -> Vector2:
 	if is_instance_valid(boss) and boss.action_state != AncientGuardianBoss.ActionState.DEFEATED:
 		if boss.phase >= 2 and _boss_p2_t < 0.0:
 			_boss_p2_t = roundf(arena.run_elapsed * 10.0) / 10.0
+			_queue_snap("08_boss_phase2", 30)
 		if boss.phase >= 3 and _boss_p3_t < 0.0:
 			_boss_p3_t = roundf(arena.run_elapsed * 10.0) / 10.0
+			_queue_snap("09_boss_phase3", 30)
 		var to_b := boss.global_position - ppos
 		var bd := maxf(1.0, to_b.length())
 		var bdir := to_b / bd
@@ -352,6 +434,40 @@ func _compute_steering() -> Vector2:
 	return steer.normalized() if steer.length_squared() > 0.001 else Vector2.RIGHT
 
 
+func _flush_pending_shots() -> void:
+	if _pending_shots.is_empty():
+		return
+	var now := Engine.get_process_frames()
+	var keep: Array = []
+	for p in _pending_shots:
+		if int(p["at"]) <= now:
+			_snap(str(p["tag"]))
+		else:
+			keep.append(p)
+	_pending_shots = keep
+
+
+func _run_pause_check() -> void:
+	_in_pause_probe = true
+	_set_joystick_dir(Vector2.ZERO)
+	var t_before := main.arena.run_elapsed
+	await _press_escape()
+	for _i in range(10):
+		await get_tree().process_frame
+	var paused_ok := App.state == App.State.PAUSED
+	var t_paused := main.arena.run_elapsed
+	_snap("05_pause_overlay")
+	await _press_escape()
+	for _i in range(10):
+		await get_tree().process_frame
+	var resumed_ok := App.state == App.State.PLAYING
+	var frozen := absf(t_paused - t_before) < 0.5
+	_pause_resume_ok = paused_ok and resumed_ok and frozen
+	_joy_touch_active = false
+	_in_pause_probe = false
+	print("PAUSE_RESUME_CHECK paused=", paused_ok, " resumed=", resumed_ok, " run_time_frozen=", frozen)
+
+
 func _run_stutter_step_check() -> void:
 	_stutter_checked = true
 	var arena := main.arena
@@ -391,16 +507,41 @@ func _physics_process(_delta: float) -> void:
 	if player == null:
 		return
 
+	if App.state != _last_state_logged:
+		_last_state_logged = App.state
+		var cards := -1
+		if main.draft_overlay != null:
+			cards = main.draft_overlay._cards_box.get_child_count()
+		print("STATE_CHANGE t=", roundf(arena.run_elapsed * 10.0) / 10.0, " state=", App.state, " draft_cards=", cards)
+
 	if not _recording_boss and arena.run_elapsed >= arena.boss_spawn_time - 2.0:
 		_setup_boss_audio_capture()
 
 	if App.state == App.State.MUTATION_DRAFT:
 		_set_joystick_dir(Vector2.ZERO)
 		if main.draft_overlay._cards_box.get_child_count() > 0:
+			# Hold the first draft open briefly so the overlay is actually rendered and captured.
+			if not _draft_snapped:
+				_draft_snapped = true
+				_draft_hold_frames = 14
+			if _draft_hold_frames > 0:
+				_draft_hold_frames -= 1
+				if _draft_hold_frames == 0:
+					_snap("04_mutation_draft")
+				return
 			var pick_idx := _pick_best_draft_card_index()
 			var card_btn := main.draft_overlay._cards_box.get_child(pick_idx) as Button
 			if card_btn != null:
 				card_btn.pressed.emit()
+		return
+
+	# The game auto-pauses on window focus loss (mobile interruption safety). Unattended runs
+	# lose focus constantly, so undo ONLY that external pause; our own pause probe is excluded.
+	# Any state exit from PLAYING calls joystick.reset_stick(), so the held touch must be
+	# re-armed with a fresh touch-down or the following drags would be ignored.
+	if App.state == App.State.PAUSED and not _in_pause_probe:
+		_joy_touch_active = false
+		App.handle_back_navigation()
 		return
 
 	if App.state == App.State.VICTORY or App.state == App.State.DEFEAT:
@@ -411,6 +552,16 @@ func _physics_process(_delta: float) -> void:
 
 	if App.state != App.State.PLAYING:
 		return
+
+	_flush_pending_shots()
+
+	if not _gameplay_snapped and arena.run_elapsed > 1.5:
+		_gameplay_snapped = true
+		_queue_snap("03_gameplay_start", 2)
+
+	if not _pause_checked and arena.run_elapsed > 12.0:
+		_pause_checked = true
+		call_deferred("_run_pause_check")
 
 	if arena.run_elapsed >= _next_heartbeat_sec:
 		var b_hp := -1.0
@@ -431,6 +582,15 @@ func _physics_process(_delta: float) -> void:
 	var dir := _compute_steering()
 	_set_joystick_dir(dir)
 
+	# Watchdog: if the slime is not moving while we hold a direction, the joystick lost the
+	# touch (e.g. reset by a state change). Re-arm the touch so the run cannot silently stall.
+	if arena.run_elapsed - _watch_t > 2.0:
+		_watch_t = arena.run_elapsed
+		if _joy_touch_active and player.global_position.distance_to(_watch_pos) < 4.0:
+			_joy_touch_active = false
+			print("JOY_REARM t=", roundf(arena.run_elapsed * 10.0) / 10.0)
+		_watch_pos = player.global_position
+
 
 func _finalize_and_quit() -> void:
 	for _i in range(4):
@@ -441,6 +601,7 @@ func _finalize_and_quit() -> void:
 	var png_out := OS.get_environment(RESULT_PNG_OUT_ENV)
 	if not png_out.is_empty() and DisplayServer.get_name() != "headless":
 		get_viewport().get_texture().get_image().save_png(png_out)
+	await _snap("10_run_result")
 
 	var wav_out := OS.get_environment(BOSS_WAV_OUT_ENV)
 	var boss_rec_dur_wall := 0.0
@@ -490,6 +651,11 @@ func _finalize_and_quit() -> void:
 		"boss_p2_t": _boss_p2_t,
 		"boss_p3_t": _boss_p3_t,
 		"accidental_double_tap_dash": _accidental_double_tap_dash,
+		"pause_resume_check": {
+			"performed": _pause_checked,
+			"paused_and_resumed_with_time_frozen": _pause_resume_ok
+		},
+		"screenshots_written": _shots_written,
 		"essence_earned_base": int(App.last_run_summary.get("base_essence", 0)),
 		"saved_essence_after_run": SaveData.get_essence(),
 		"damage_events_count": _damage_events.size(),
