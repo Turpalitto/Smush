@@ -28,6 +28,7 @@ var active_clones: Array[SlimeClone] = []
 var active_boss: AncientGuardianBoss = null
 
 var mode_id: String = "standard"
+var difficulty_cfg: Dictionary = {}
 var run_elapsed: float = 0.0
 var boss_spawn_time: float = 270.0 # 4:30 boss awakening -> ~5-7 min total run
 var miniboss_spawn_time: float = 165.0
@@ -118,6 +119,8 @@ func _setup_canopy_background() -> void:
 
 func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	mode_id = p_mode
+	# Difficulty is snapshotted at run start: changing it mid-run must not alter a live run.
+	difficulty_cfg = ConfigDB.get_difficulty(SaveData.get_difficulty_id())
 	run_elapsed = 0.0
 	_enemy_spawn_timer = 0.5
 	_orb_spawn_timer = 0.3
@@ -273,6 +276,7 @@ func _process_spawning_and_waves(delta: float) -> void:
 	_enemy_spawn_timer -= delta
 	if _enemy_spawn_timer <= 0.0:
 		var pace := 1.28 if not boss_spawned else 3.2
+		pace /= maxf(0.5, float(difficulty_cfg.get("spawn_rate_mult", 1.0)))
 		_enemy_spawn_timer = pace
 		if enemy_pool.active_count() < MAX_ACTIVE_ENEMIES - 4:
 			var chosen_id := _pick_weighted_enemy_for_time(run_elapsed)
@@ -311,7 +315,22 @@ func spawn_enemy_by_id(enemy_id: String, pos: Vector2) -> EnemyEntity:
 	var diff_scale := 1.0 + clampf(t_equiv / 300.0, 0.0, 0.65)
 	var mass_scale := 1.0 + clampf((t_equiv - 45.0) / 185.0, 0.0, 1.02)
 	en.setup_from_config(cfg, pos, self, diff_scale, mass_scale)
+	_apply_difficulty_to_enemy(en)
 	return en
+
+
+func _apply_difficulty_to_enemy(en: EnemyEntity) -> void:
+	## Difficulty is an opt-in layer on top of the existing time-based scaling.
+	## With the default difficulty both multipliers are 1.0, so nothing changes.
+	if en == null:
+		return
+	var hp_mult := float(difficulty_cfg.get("enemy_hp_mult", 1.0))
+	var dmg_mult := float(difficulty_cfg.get("enemy_damage_mult", 1.0))
+	if hp_mult != 1.0:
+		en.max_hp *= hp_mult
+		en.hp = en.max_hp
+	if dmg_mult != 1.0:
+		en.contact_damage *= dmg_mult
 
 
 func spawn_ancient_guardian_boss() -> AncientGuardianBoss:
@@ -322,7 +341,13 @@ func spawn_ancient_guardian_boss() -> AncientGuardianBoss:
 	var bpos := world.pick_valid_spawn_point(player.global_position, 320.0, 480.0)
 	active_boss = AncientGuardianBoss.new()
 	_entities_layer.add_child(active_boss)
-	active_boss.setup_boss(bcfg, bpos, self)
+	active_boss.setup_boss(
+		bcfg,
+		bpos,
+		self,
+		float(difficulty_cfg.get("boss_hp_mult", 1.0)),
+		float(difficulty_cfg.get("enemy_damage_mult", 1.0))
+	)
 	Analytics.track("boss_encountered", {"boss": "ancient_guardian", "elapsed_sec": int(run_elapsed)})
 	Events.toast_requested.emit(Loc.t("hud.boss_incoming"), Color(1.0, 0.78, 0.35))
 	return active_boss
@@ -931,10 +956,17 @@ func _finish_run(victory: bool) -> void:
 	var mass_bonus: int = int(maxf(0.0, player.peak_mass - 10.0) * 0.45)
 	var victory_bonus: int = 30 if victory else 0
 	var total_essence := run_essence_earned + time_bonus + mass_bonus + victory_bonus
+	# Harder difficulties pay more; the default difficulty has a 1.0 multiplier,
+	# so the baseline reward is untouched.
+	var essence_mult := float(difficulty_cfg.get("essence_mult", 1.0))
+	if essence_mult != 1.0:
+		total_essence = int(round(float(total_essence) * essence_mult))
 
 	App.last_run_summary = {
 		"victory": victory,
 		"mode": mode_id,
+		"difficulty": str(difficulty_cfg.get("id", ConfigDB.get_default_difficulty_id())),
+		"difficulty_essence_mult": essence_mult,
 		"duration_sec": run_elapsed,
 		"peak_mass": snappedf(player.peak_mass, 0.1),
 		"absorbed": player.absorbed_count,
@@ -966,6 +998,7 @@ func commit_run_rewards() -> void:
 	App.last_run_summary["can_revive"] = false
 	var amt: int = int(App.last_run_summary.get("final_essence", 0))
 	SaveData.add_essence(amt)
+	App.last_run_summary["record"] = SaveData.submit_run_record(App.last_run_summary)
 	var dur: float = float(App.last_run_summary.get("duration_sec", 0.0))
 	SaveData.increment_stat("total_playtime_sec", dur)
 	SaveData.save_to_disk()

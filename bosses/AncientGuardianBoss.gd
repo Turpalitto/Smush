@@ -38,16 +38,16 @@ var _anim_time: float = 0.0
 var arena_ref: Node = null
 
 
-func setup_boss(cfg: Dictionary, spawn_pos: Vector2, p_arena: Node) -> void:
+func setup_boss(cfg: Dictionary, spawn_pos: Vector2, p_arena: Node, hp_mult: float = 1.0, damage_mult: float = 1.0) -> void:
 	arena_ref = p_arena
 	global_position = spawn_pos
 	boss_id = str(cfg.get("id", "ancient_guardian"))
 	mass = float(cfg.get("base_mass", 85.0))
-	max_hp = float(cfg.get("hp", 3750.0))
+	max_hp = float(cfg.get("hp", 3750.0)) * maxf(0.1, hp_mult)
 	hp = max_hp
 	move_speed = float(cfg.get("move_speed", 98.0))
 	armor = float(cfg.get("armor", 0.34))
-	contact_damage = float(cfg.get("contact_damage", 20.0))
+	contact_damage = float(cfg.get("contact_damage", 20.0)) * maxf(0.1, damage_mult)
 	phase = 1
 	action_state = ActionState.PURSUIT
 	_state_timer = 2.4

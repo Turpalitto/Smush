@@ -17,6 +17,8 @@ var achievements: Dictionary = {}
 var achievement_order: Array[String] = []
 var store_catalog: Dictionary = {}
 var store_order: Array[String] = []
+var difficulties: Dictionary = {}
+var difficulty_order: Array[String] = []
 
 
 func _ready() -> void:
@@ -66,6 +68,12 @@ func load_all() -> void:
 		store_catalog[sku] = item
 		store_order.append(sku)
 
+	var diff_doc := _read_json("res://resources/data/difficulties.json")
+	for item: Dictionary in diff_doc.get("difficulties", []):
+		var did: String = item["id"]
+		difficulties[did] = item
+		difficulty_order.append(did)
+
 
 func _read_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
@@ -96,3 +104,18 @@ func get_upgrade_cost(upgrade_id: String, current_level: int) -> int:
 	var base_cost: float = float(cfg.get("base_cost", 25))
 	var growth: float = float(cfg.get("cost_growth", 1.45))
 	return int(round(base_cost * pow(growth, float(current_level))))
+
+
+func get_difficulty(difficulty_id: String) -> Dictionary:
+	## Always returns a usable config: unknown/empty ids fall back to the first
+	## declared difficulty, which is "normal" (all multipliers 1.0).
+	var cfg: Dictionary = difficulties.get(difficulty_id, {})
+	if not cfg.is_empty():
+		return cfg
+	if not difficulty_order.is_empty():
+		return difficulties.get(difficulty_order[0], {})
+	return {}
+
+
+func get_default_difficulty_id() -> String:
+	return difficulty_order[0] if not difficulty_order.is_empty() else "normal"

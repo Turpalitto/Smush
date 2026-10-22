@@ -168,6 +168,22 @@
       "metric": "bosses_defeated",
       "target": 1,
       "reward_essence": 75
+    },
+    {
+      "id": "hunter_clear",
+      "name_key": "ach.hunter_clear.name",
+      "desc_key": "ach.hunter_clear.desc",
+      "metric": "hunter_victories",
+      "target": 1,
+      "reward_essence": 60
+    },
+    {
+      "id": "nightmare_clear",
+      "name_key": "ach.nightmare_clear.name",
+      "desc_key": "ach.nightmare_clear.desc",
+      "metric": "nightmare_victories",
+      "target": 1,
+      "reward_essence": 120
     }
   ],
   "store_catalog": [
