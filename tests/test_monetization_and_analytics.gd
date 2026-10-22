@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Tests Rewarded Ads (SDK confirmation, duplicate-callback guard, per-run caps, commercial mock block),
 ## Google Play Billing (non-P2W entitlements, restore_purchases, commercial safety), and Analytics KPIs.
 

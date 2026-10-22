@@ -47,6 +47,18 @@ var _narrow_toast_cd: float = 0.0
 var _boss_ram_cd: float = 0.0
 var _tracked_miniboss: EnemyEntity = null
 
+# --- game feel -------------------------------------------------------------------
+# Impact is carried by three cheap effects rather than more particles: a camera shake
+# that decays quadratically, a hit-stop that freezes the world for a few frames on the
+# beats that matter, and a low-HP vignette that pulses harder as health drops.
+var _shake_time: float = 0.0
+var _shake_duration: float = 0.0
+var _shake_strength: float = 0.0
+var _last_boss_phase: int = 0
+var _vignette_layer: CanvasLayer
+var _vignette_rect: TextureRect
+var _vignette_alpha: float = 0.0
+
 var _entities_layer: Node2D
 var _hazards_layer: Node2D
 var _orbs_layer: Node2D
@@ -56,6 +68,11 @@ var _fx_layer: Node2D
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_setup_canopy_background()
+	_setup_vignette()
+	Events.player_damaged.connect(_on_player_damaged)
+	Events.boss_updated.connect(_on_boss_updated)
+	Events.boss_defeated.connect(_on_boss_defeated_feel)
+	Events.miniboss_spawned.connect(_on_miniboss_spawned_feel)
 
 	world = WorldGenerator.new()
 	world.name = "EnchantedForest"
@@ -100,6 +117,118 @@ func _ready() -> void:
 	fx_pool = ObjectPool.new(_fx_layer, func() -> Node2D: return BurstFX.new(), 40, 8)
 
 
+func _setup_vignette() -> void:
+	_vignette_layer = CanvasLayer.new()
+	_vignette_layer.name = "LowHpVignette"
+	_vignette_layer.layer = 6
+	add_child(_vignette_layer)
+	_vignette_rect = TextureRect.new()
+	_vignette_rect.texture = _make_vignette_texture()
+	_vignette_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_vignette_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	_vignette_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_vignette_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_vignette_layer.add_child(_vignette_rect)
+
+
+func _make_vignette_texture(size: int = 96) -> Texture2D:
+	# Generated once at runtime: a radial falloff that only darkens the outer third of
+	# the screen, so the arena stays readable while low HP still reads as "danger".
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var half := float(size) * 0.5
+	for y in range(size):
+		for x in range(size):
+			var d := Vector2(float(x) - half, float(y) - half).length() / half
+			var a := clampf((d - 0.58) / 0.42, 0.0, 1.0)
+			img.set_pixel(x, y, Color(0.72, 0.04, 0.07, a * a))
+	return ImageTexture.create_from_image(img)
+
+
+## Decaying camera shake. Repeated calls take the strongest value instead of stacking,
+## so a burst of hits does not leave the camera vibrating for seconds.
+func add_shake(strength: float, duration: float = 0.26) -> void:
+	_shake_strength = maxf(_shake_strength, strength)
+	_shake_duration = maxf(_shake_duration, duration)
+	_shake_time = maxf(_shake_time, duration)
+
+
+## Freezes the world for a few real-time frames. Used on boss phase changes and kills,
+## where the pause itself is the feedback. The restore runs on a timer that ignores
+## time_scale and keeps running while the tree is paused, so a result overlay can never
+## leave the whole game stuck in slow motion.
+func add_hitstop(duration: float = 0.09, scale: float = 0.12) -> void:
+	if duration <= 0.0 or not is_inside_tree():
+		return
+	Engine.time_scale = clampf(scale, 0.02, 1.0)
+	get_tree().create_timer(duration, true, false, true).timeout.connect(_end_hitstop)
+
+
+func _end_hitstop() -> void:
+	Engine.time_scale = 1.0
+
+
+func _reset_game_feel() -> void:
+	_shake_time = 0.0
+	_shake_strength = 0.0
+	_shake_duration = 0.0
+	Engine.time_scale = 1.0
+	_last_boss_phase = 0
+	_vignette_alpha = 0.0
+	if _vignette_rect != null:
+		_vignette_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	if camera != null:
+		camera.offset = Vector2.ZERO
+
+
+func _update_game_feel(delta: float) -> void:
+	if camera != null:
+		if _shake_time > 0.0:
+			_shake_time = maxf(0.0, _shake_time - delta)
+			var k := _shake_time / maxf(_shake_duration, 0.001)
+			var amp := _shake_strength * k * k
+			camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * amp
+		elif camera.offset != Vector2.ZERO:
+			camera.offset = camera.offset.lerp(Vector2.ZERO, clampf(delta * 14.0, 0.0, 1.0))
+			if camera.offset.length() < 0.4:
+				camera.offset = Vector2.ZERO
+
+	if _vignette_rect != null and player != null:
+		var hp_ratio := clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
+		var target := 0.0
+		if hp_ratio < 0.35:
+			# Pulse faster the closer the slime is to death.
+			var urgency := 1.0 - hp_ratio / 0.35
+			var pulse := 0.55 + 0.45 * sin(run_elapsed * lerpf(4.0, 9.0, urgency))
+			target = lerpf(0.25, 0.85, urgency) * pulse
+		_vignette_alpha = lerpf(_vignette_alpha, target, clampf(delta * 6.0, 0.0, 1.0))
+		_vignette_rect.modulate = Color(1.0, 1.0, 1.0, _vignette_alpha)
+
+
+func _on_player_damaged(_amount: float, _source_id: String) -> void:
+	add_shake(9.0, 0.24)
+	Haptics.play("damage")
+
+
+func _on_boss_updated(_current_hp: float, _max_hp: float, phase: int) -> void:
+	if phase != _last_boss_phase and phase > 0:
+		_last_boss_phase = phase
+		add_shake(16.0, 0.42)
+		add_hitstop(0.07, 0.15)
+		Haptics.play("boss_phase")
+
+
+func _on_boss_defeated_feel(_boss_id: String) -> void:
+	add_shake(22.0, 0.6)
+	add_hitstop(0.12, 0.1)
+	Haptics.play("boss_down")
+
+
+func _on_miniboss_spawned_feel(_enemy_id: String) -> void:
+	add_shake(7.0, 0.3)
+	Haptics.play("miniboss")
+
+
 func _setup_canopy_background() -> void:
 	canopy_bg = CanvasLayer.new()
 	canopy_bg.layer = -10
@@ -119,6 +248,7 @@ func _setup_canopy_background() -> void:
 
 func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	mode_id = p_mode
+	_reset_game_feel()
 	# Difficulty is snapshotted at run start: changing it mid-run must not alter a live run.
 	difficulty_cfg = ConfigDB.get_difficulty(SaveData.get_difficulty_id())
 	run_elapsed = 0.0
@@ -183,6 +313,8 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Runs before the early-out so a hit-stop can never leave Engine.time_scale stuck.
+	_update_game_feel(delta)
 	if run_ended or App.state != App.State.PLAYING:
 		return
 
@@ -337,6 +469,7 @@ func spawn_ancient_guardian_boss() -> AncientGuardianBoss:
 	if boss_spawned and active_boss != null and is_instance_valid(active_boss):
 		return active_boss
 	boss_spawned = true
+	_dismiss_miniboss_for_boss()
 	var bcfg: Dictionary = ConfigDB.special_encounters.get("ancient_guardian", {})
 	var bpos := world.pick_valid_spawn_point(player.global_position, 320.0, 480.0)
 	active_boss = AncientGuardianBoss.new()
@@ -351,6 +484,22 @@ func spawn_ancient_guardian_boss() -> AncientGuardianBoss:
 	Analytics.track("boss_encountered", {"boss": "ancient_guardian", "elapsed_sec": int(run_elapsed)})
 	Events.toast_requested.emit(Loc.t("hud.boss_incoming"), Color(1.0, 0.78, 0.35))
 	return active_boss
+
+
+## The Guardian does not share the arena.
+##
+## A miniboss left alive when the boss timer fires would keep landing 20-damage contacts
+## in the middle of the Guardian's phase telegraphs: the player has to read a wide charge
+## lane and a charging chaser at the same time, and the automated run died exactly there.
+## The herald is dismissed into the Guardian with a burst and no reward — skipping the
+## miniboss costs its essence, not the run.
+func _dismiss_miniboss_for_boss() -> void:
+	var mb := _tracked_miniboss
+	_tracked_miniboss = null
+	if mb == null or not is_instance_valid(mb) or not mb.is_active_combatant():
+		return
+	_spawn_burst(mb.global_position, mb.color_primary, 14, mb.get_body_radius() * 1.8)
+	enemy_pool.release(mb)
 
 
 func spawn_boss_minions(boss_pos: Vector2, count: int) -> void:
@@ -950,6 +1099,8 @@ func on_player_died() -> void:
 
 
 func _finish_run(victory: bool) -> void:
+	# The result overlay is not a place for a frozen world: always release the hit-stop.
+	_reset_game_feel()
 	run_ended = not (not victory and not player.revive_used)
 	# Base participation reward guarantees meaningful early progression even on defeat!
 	var time_bonus: int = maxi(8, int(run_elapsed * 0.14))

@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Verifies the difficulty layer (config, save migration, arena multipliers) and the
 ## per-mode/per-difficulty personal record table, plus the localization keys the new UI needs.
 

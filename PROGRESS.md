@@ -154,23 +154,62 @@
   кольца читаемости, телеграфы, звёзды стана и HP-бары рисуются поверх спрайта.
 - У босса та же схема (`AncientGuardianBoss.sprite_tex`), аура фазы и ядро-сердце сохранены.
 
+### 6. Премиум-проход: саундтрек и ощущение удара
+Игра звучала как заглушка: единственная «музыка» — шестисекундный луп, выключенный по умолчанию,
+и ни одного эффекта на удар.
+
+- **Саундтрек** — `tools/generate_music.py` сочиняет три лупа на numpy (чистая лицензия, ни одного
+  стороннего сэмпла): спокойная тема меню (Am-F-C-G, 72 BPM), драйв забега (100 BPM, кик/хэт/клэп,
+  16-е арпеджио) и тревожная тема босса (D harmonic minor, 126 BPM, остинато и тома).
+  Рендер идёт в буфер «луп + хвост», хвост складывается с началом — поэтому реверб и затухания
+  не обрываются на стыке. Темпы кратны целому числу сэмплов на удар, чтобы сетка не плыла.
+- **Микс** — tilt-EQ и обрез ниже 70 Гц (замер до правки: 63–84% энергии ниже 250 Гц, то есть гул
+  вместо музыки), мягкий клиппер и компрессор с порогом от RMS трека: все три трека сведены
+  к −22.5 dBFS RMS, чтобы тема босса не звучала тише меню.
+- **Формат** — OGG Vorbis, 1.3 МБ на три трека вместо ~17 МБ WAV. `AssetRegistry.get_audio_stream()`
+  понимает и импортированный ресурс, и сырой `.pck`.
+- **Режиссёр** — `AudioManager.play_music()` с двумя плеерами и кроссфейдом: меню/результат → `menu`,
+  старт забега → `run`, появление босса → `boss`. Музыка теперь **включена по умолчанию**
+  (тумблер и ползунок в настройках остались).
+- **Ощущение удара** — затухающая тряска камеры (урон, мини-босс, смена фазы, смерть босса),
+  hit-stop на смене фазы и убийстве босса, пульсирующая красная виньетка ниже 35% HP.
+  Hit-stop снимается таймером, который игнорирует `time_scale` и работает на паузе, поэтому
+  экран результата не может оставить игру в замедлении.
+- **Вибрация** — `systems/Haptics.gd`: урон, смена фазы Стража, смерть Стража, выход мини-босса.
+  Всплеск попаданий склеивается минимальным интервалом (иначе серия контактов превращается
+  в сплошную дрожь), на десктопе и в headless-прогонах вибрация отключена по платформе —
+  иначе `vibrate_handheld()` печатает предупреждение на каждый вызов. Тумблер появился
+  в настройках только там, где вибратор есть.
+- **Страж приходит один** — мини-босс, доживший до выхода босса, убирается с арены
+  (`_dismiss_miniboss_for_boss`). Раньше он продолжал бить на 20 урона в телеграфы фаз:
+  в прогоне это сняло 60 HP на 281/298/300 с, а на кадре 3-й фазы рядом со Стражем
+  виден живой `umbral_alpha`. Пропуск мини-босса теперь стоит его эссенции, но не забега.
+- **Мастеринг и упаковка** — треки выровнены по интегральной громкости EBU R128
+  (`−19.8 / −20.1 / −20.9 LUFS`, true peak `−8.4 / −2.3 / −1.2 dBTP`): без этого тема босса
+  звучала на 2.3 LU тише меню. Гейн подбирается по замеру **закодированного** файла, потому
+  что Vorbis перерисовывает волну. Из `.pck` убраны скрипты QA и драйвера прогона: экспортёр
+  кладёт в пакет каждый `.gd` независимо от `exclude_filter`, поэтому `tests/` и `tools/`
+  откладываются на время экспорта.
+
 ## Последние зафиксированные проверки и артефакты
 
-- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **464 assertions, 0 failures**, `exit 0`
-  (`reports/macos-source-qa-difficulty-2026-10-22.log`; 324 — прошлая итерация, +128 `DifficultyAndRecordsSuite`
-  и +12 живых проверок множителей в арене).
+- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **522 assertions, 0 failures**, `exit 0`
+  (`reports/macos-source-qa-premium-2026-10-22.log`; 464 → 495 дал премиум-проход по звуку и ощущению удара,
+  495 → 522 — вибрация и проверка «Страж приходит один»).
 - Автономный запуск `PCK` из изолированного `/tmp`: **324 assertions, 0 failures** (`reports/gameplay-packed-qa-2026-10-22.log`).
 - Автоматизированное прохождение на чистом профиле + одновременный замер шины `Master` до/после лимитера:
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
-  - `./scripts/run_qa.sh` → **464 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-art-2026-10-22.log`;
-    тот же набор, что и `reports/macos-source-qa-difficulty-2026-10-22.log`, перезапущен после арт-прохода);
-  - автоматизированное прохождение `VICTORY` + запись шины `Master` (`reports/macos-automated-playthrough-art-2026-10-22.json`,
-    `reports/macos-automated-playthrough-2026-10-22.json` — прогон предыдущей итерации, консоль `reports/macos-playthrough-console-2026-10-22.log`);
-  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (62 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
-  - скриншоты `deliverables/macos_screenshots/` — 22 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
-    включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с новым артом.
+  - `./scripts/run_qa.sh` → **522 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-premium-2026-10-22.log`);
+  - автоматизированное прохождение `VICTORY` за `320.8 с` + запись шины `Master`
+    (`reports/macos-automated-playthrough-premium-2026-10-22.json`; прогоны прошлых итераций —
+    `reports/macos-automated-playthrough-art-2026-10-22.json`, `reports/macos-automated-playthrough-2026-10-22.json`,
+    консоль `reports/macos-playthrough-console-2026-10-22.log`);
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (64 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
+  - скриншоты `deliverables/macos_screenshots/` — 23 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
+    включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с новым артом
+    и переснятые `06`–`10` из финального прогона.
 - Готовые скачиваемые пакеты в рабочей области (каталог `deliverables/`, исключён из Git, но доступен для скачивания в файловом менеджере платформы):
   - `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` — **основной результат для macOS**;
   - `deliverables/SlimeRushEvolution_macOS_Verification_2026-10-22.zip` — скриншоты реального рендера, сводки

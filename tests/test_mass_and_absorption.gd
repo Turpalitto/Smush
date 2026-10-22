@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Unit tests for non-linear MassSystem math, high-mass trade-offs, and multi-factor AbsorptionRules.
 
 

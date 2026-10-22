@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Tests persistent upgrades, rewards, save/load roundtrip, and corrupted save auto-recovery.
 
 const TEST_SAVE := "user://test_slime_save.json"
@@ -32,7 +32,7 @@ func _cleanup_files() -> void:
 
 func _test_save_load_and_upgrades() -> void:
 	SaveData.data = SaveData.create_default_data()
-	assert_eq(SaveData.get_setting("music_enabled", true), false, "Music is OFF by default per spec")
+	assert_eq(SaveData.get_setting("music_enabled", false), true, "Music is ON by default (soundtrack ships with the game)")
 	assert_eq(SaveData.get_setting("locale", ""), "ru", "Primary language is Russian ('ru') by default")
 
 	SaveData.add_essence(150)

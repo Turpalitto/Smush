@@ -35,6 +35,26 @@ touch "$ROOT_DIR/builds/.gdignore" "$ROOT_DIR/reports/.gdignore" "$OUT_DIR/.gdig
 
 python3 tools/sync_godot_cache.py
 
+# The exporter packs every GDScript in the project regardless of the preset's
+# `exclude_filter` (verified: after a plain export the .pck still listed all 8 QA
+# suites and the playthrough driver, ~100 KB of test code in a player build). The
+# two directories are therefore moved aside for the duration of the export and
+# restored by the EXIT trap, so an interrupted build cannot lose them.
+STASH_DIR="$(mktemp -d /tmp/smush_export_stash.XXXXXX)"
+STAGE_DIR=""
+restore_tree() {
+  for d in tests tools; do
+    if [[ -d "$STASH_DIR/$d" && ! -d "$ROOT_DIR/$d" ]]; then
+      mv "$STASH_DIR/$d" "$ROOT_DIR/$d"
+    fi
+  done
+  [[ -n "$STAGE_DIR" && -d "$STAGE_DIR" ]] && rm -rf "$STAGE_DIR"
+  rm -rf "$STASH_DIR"
+}
+trap restore_tree EXIT
+mv "$ROOT_DIR/tests" "$STASH_DIR/tests"
+mv "$ROOT_DIR/tools" "$STASH_DIR/tools"
+
 BUILD_ROOT="$ROOT_DIR/builds/macos"
 rm -rf "$BUILD_ROOT"
 mkdir -p "$BUILD_ROOT"
@@ -59,7 +79,7 @@ ARCH_INFO="$(file -b "$APP_PATH/Contents/MacOS/$BIN_PATH")"
 
 mkdir -p "$OUT_DIR"
 STAGE_DIR="$(mktemp -d /tmp/smush_macos_playtest.XXXXXX)"
-trap 'rm -rf "$STAGE_DIR"' EXIT
+# (cleanup of both the staging dir and the stashed tests/tools is handled by restore_tree)
 
 PKG_DIR="$STAGE_DIR/SlimeRushEvolution_macOS_Universal"
 mkdir -p "$PKG_DIR"
@@ -88,7 +108,7 @@ Bundle ID: com.turpalitto.slimerush
 Code signature: ad-hoc ("codesign --sign -"), hardened runtime flag set.
   This is NOT a Developer ID signature and the app is NOT notarized by Apple.
 Live Ads / Real-Money IAP / Cloud Analytics: DISABLED (offline stubs only)
-Default Background Music: OFF (toggleable in Settings)
+Default Background Music: ON (three composed loops: menu / run / boss, toggleable in Settings)
 EOF
 
 cat licenses/THIRD_PARTY_LICENSES.txt > "$PKG_DIR/THIRD_PARTY_NOTICES.txt" 2>/dev/null || \

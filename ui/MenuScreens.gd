@@ -644,10 +644,10 @@ func _build_settings_page() -> void:
 	)
 	list.add_child(sfx_slider)
 
-	# Music Toggle (OFF by default per Section 12!) & Music Volume
+	# Music toggle (ON by default: the game ships with a real soundtrack) & volume
 	var mus_chk := CheckButton.new()
 	mus_chk.text = Loc.t("settings.music_toggle")
-	mus_chk.button_pressed = bool(SaveData.get_setting("music_enabled", false))
+	mus_chk.button_pressed = bool(SaveData.get_setting("music_enabled", true))
 	mus_chk.toggled.connect(func(on: bool) -> void:
 		SaveData.set_setting("music_enabled", on)
 	)
@@ -683,6 +683,20 @@ func _build_settings_page() -> void:
 		SaveData.set_setting("auto_absorb", on)
 	)
 	list.add_child(auto_chk)
+
+	# Haptics toggle. Only on devices with a vibrator: on desktop the option would be
+	# a switch that does nothing, and the game is played one-handed on a phone where
+	# the impact feedback matters.
+	if Haptics.is_supported():
+		var hap_chk := CheckButton.new()
+		hap_chk.text = Loc.t("settings.haptics")
+		hap_chk.button_pressed = bool(SaveData.get_setting("haptics_enabled", true))
+		hap_chk.toggled.connect(func(on: bool) -> void:
+			SaveData.set_setting("haptics_enabled", on)
+			if on:
+				Haptics.play("ui")
+		)
+		list.add_child(hap_chk)
 
 	# FX Quality cycle
 	var fxq := str(SaveData.get_setting("fx_quality", "high"))

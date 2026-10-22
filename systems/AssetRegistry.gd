@@ -66,6 +66,30 @@ static func get_texture(res_path: String) -> Texture2D:
 	return null
 
 
+## Returns a looping-capable stream for either a WAV (SFX) or an OGG (music).
+## Music ships as OGG because a 38-second stereo WAV would cost ~7 MB per track; the
+## three loops together are ~1.3 MB.
+static func get_audio_stream(res_path: String, loop_enabled: bool = false) -> AudioStream:
+	if res_path.ends_with(".ogg"):
+		var cache_key := "%s|%s|ogg" % [res_path, str(loop_enabled)]
+		if _wav_cache.has(cache_key):
+			return _wav_cache[cache_key]
+		var ogg: AudioStreamOggVorbis = null
+		if _can_use_imported_resource(res_path):
+			var loaded := ResourceLoader.load(res_path)
+			if loaded is AudioStreamOggVorbis:
+				ogg = (loaded as AudioStreamOggVorbis).duplicate() as AudioStreamOggVorbis
+		if ogg == null and FileAccess.file_exists(res_path):
+			ogg = AudioStreamOggVorbis.load_from_file(res_path)
+		if ogg == null:
+			return null
+		ogg.loop = loop_enabled
+		ogg.loop_offset = 0.0
+		_wav_cache[cache_key] = ogg
+		return ogg
+	return get_wav_stream(res_path, loop_enabled)
+
+
 static func get_wav_stream(res_path: String, loop_enabled: bool = false) -> AudioStreamWAV:
 	var cache_key := "%s|%s" % [res_path, str(loop_enabled)]
 	if _wav_cache.has(cache_key):

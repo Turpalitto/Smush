@@ -8,6 +8,7 @@ const SaveSuite = preload("res://tests/test_save_and_progression.gd")
 const DifficultySuite = preload("res://tests/test_difficulty_and_records.gd")
 const MonetizationSuite = preload("res://tests/test_monetization_and_analytics.gd")
 const IntegrationSuite = preload("res://tests/test_full_game_integration.gd")
+const TestSuiteBase = preload("res://tests/TestSuiteBase.gd")
 
 
 func _ready() -> void:

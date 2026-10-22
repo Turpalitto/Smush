@@ -80,9 +80,10 @@ func create_default_data() -> Dictionary:
 		"settings": {
 			"sfx_volume": 0.85,
 			"music_volume": 0.55,
-			"music_enabled": false,
+			"music_enabled": true,
 			"joystick_mode": "floating",
 			"auto_absorb": true,
+			"haptics_enabled": true,
 			"fx_quality": "high",
 			"locale": "ru",
 			"difficulty": "normal",

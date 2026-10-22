@@ -38,11 +38,22 @@ const PRIORITY_EVENTS: Dictionary = {
 	"victory": true,
 	"defeat": true
 }
-const MUSIC_PATH: String = "res://audio/music/ambient_forest.wav"
+## Three composed loops (see tools/generate_music.py). Menu / exploration / boss, so the
+## soundtrack reacts to what the player is doing instead of looping one 6-second placeholder.
+const MUSIC_TRACKS: Dictionary = {
+	"menu": "res://audio/music/theme_menu.ogg",
+	"run": "res://audio/music/theme_run.ogg",
+	"boss": "res://audio/music/theme_boss.ogg"
+}
+const MUSIC_FADE_SEC: float = 1.6
+const MUSIC_SILENT_DB: float = -60.0
 
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _player_events: Array[String] = []
-var _music_player: AudioStreamPlayer
+var _music_players: Array[AudioStreamPlayer] = []
+var _music_target_db: Array[float] = []
+var _music_db_per_sec: Array[float] = []
+var _music_id: String = ""
 var _next_idx: int = 0
 var _move_cooldown: float = 0.0
 var _event_cooldowns: Dictionary = {}
@@ -59,11 +70,23 @@ func _ready() -> void:
 		_sfx_players.append(p)
 		_player_events.append("")
 
-	_music_player = AudioStreamPlayer.new()
-	_music_player.name = "MusicPlayer"
-	add_child(_music_player)
+	_music_players.clear()
+	_music_target_db.clear()
+	_music_db_per_sec.clear()
+	for i in range(2):
+		var m := AudioStreamPlayer.new()
+		m.name = "Music_%d" % i
+		m.volume_db = MUSIC_SILENT_DB
+		add_child(m)
+		_music_players.append(m)
+		_music_target_db.append(MUSIC_SILENT_DB)
+		_music_db_per_sec.append(120.0)
 
 	Events.settings_changed.connect(_sync_volumes)
+	Events.game_state_changed.connect(_on_game_state_changed)
+	Events.run_started.connect(_on_run_started)
+	Events.run_finished.connect(_on_run_finished)
+	Events.boss_spawned.connect(_on_boss_spawned)
 	_sync_volumes()
 
 
@@ -76,6 +99,112 @@ func _process(delta: float) -> void:
 			_event_cooldowns.erase(k)
 		else:
 			_event_cooldowns[k] = rem
+	_advance_music_fades(delta)
+
+
+func _advance_music_fades(delta: float) -> void:
+	for i in range(_music_players.size()):
+		var p := _music_players[i]
+		var target := _music_target_db[i]
+		var step := _music_db_per_sec[i] * delta
+		if absf(p.volume_db - target) <= step:
+			p.volume_db = target
+		else:
+			p.volume_db = move_toward(p.volume_db, target, step)
+		# A player that faded out is stopped so it does not keep decoding the loop.
+		if p.volume_db <= MUSIC_SILENT_DB + 0.05 and target <= MUSIC_SILENT_DB + 0.05 and p.playing:
+			p.stop()
+
+
+## Plays a track from MUSIC_TRACKS, crossfading from whatever is already playing.
+## Calling it again with the same id is a no-op, so state changes can be chatty.
+func play_music(track_id: String, fade_sec: float = MUSIC_FADE_SEC) -> void:
+	if not MUSIC_TRACKS.has(track_id):
+		return
+	if track_id == _music_id and _music_active_player() != null:
+		return
+	if DisplayServer.get_name() == "headless":
+		_music_id = track_id
+		return
+
+	var stream := AssetRegistry.get_audio_stream(str(MUSIC_TRACKS[track_id]), true)
+	if stream == null:
+		return
+
+	var next_idx := 0
+	if not _music_players.is_empty() and _music_players[0].playing:
+		next_idx = 1
+	var player := _music_players[next_idx]
+	player.stream = stream
+	player.volume_db = MUSIC_SILENT_DB
+	player.play()
+
+	var target := _music_volume_db()
+	_music_target_db[next_idx] = target
+	_music_db_per_sec[next_idx] = maxf(6.0, absf(target - MUSIC_SILENT_DB) / maxf(0.1, fade_sec))
+
+	for i in range(_music_players.size()):
+		if i == next_idx:
+			continue
+		_music_target_db[i] = MUSIC_SILENT_DB
+		_music_db_per_sec[i] = maxf(6.0, absf(_music_players[i].volume_db - MUSIC_SILENT_DB) / maxf(0.1, fade_sec))
+
+	_music_id = track_id
+
+
+func stop_music(fade_sec: float = MUSIC_FADE_SEC) -> void:
+	_music_id = ""
+	for i in range(_music_players.size()):
+		_music_target_db[i] = MUSIC_SILENT_DB
+		_music_db_per_sec[i] = maxf(6.0, absf(_music_players[i].volume_db - MUSIC_SILENT_DB) / maxf(0.1, fade_sec))
+
+
+func current_music_id() -> String:
+	return _music_id
+
+
+func is_music_playing() -> bool:
+	return _music_active_player() != null
+
+
+func _music_active_player() -> AudioStreamPlayer:
+	for p in _music_players:
+		if p.playing and p.volume_db > MUSIC_SILENT_DB + 0.5:
+			return p
+	return null
+
+
+func _music_volume_db() -> float:
+	if not bool(SaveData.get_setting("music_enabled", true)):
+		return MUSIC_SILENT_DB
+	return _linear_to_db_safe(float(SaveData.get_setting("music_volume", 0.55)))
+
+
+# --- music follows the app state -------------------------------------------------
+
+
+func _on_game_state_changed(_old_state: int, new_state: int) -> void:
+	match new_state:
+		App.State.MAIN_MENU, App.State.MODE_SELECT, App.State.VICTORY, App.State.DEFEAT:
+			play_music("menu")
+		App.State.PLAYING:
+			# The boss keeps its own theme until the run ends.
+			if _music_id != "boss":
+				play_music("run")
+		_:
+			pass
+
+
+func _on_run_started(_mode_id: String) -> void:
+	play_music("run")
+
+
+func _on_run_finished(_victory: bool, _summary: Dictionary) -> void:
+	stop_music(2.2)
+
+
+func _on_boss_spawned(_boss_id: String, _max_hp: float) -> void:
+	play_music("boss", 2.4)
 
 
 func _linear_to_db_safe(linear: float) -> float:
@@ -86,24 +215,24 @@ func _linear_to_db_safe(linear: float) -> float:
 
 func _sync_volumes() -> void:
 	var sfx_vol: float = float(SaveData.get_setting("sfx_volume", 0.85))
-	var music_vol: float = float(SaveData.get_setting("music_volume", 0.55))
-	var music_on: bool = bool(SaveData.get_setting("music_enabled", false))
+	var music_on: bool = bool(SaveData.get_setting("music_enabled", true))
 
 	var sfx_db := _linear_to_db_safe(sfx_vol)
 	for p in _sfx_players:
 		p.volume_db = sfx_db
 
-	if _music_player != null:
-		_music_player.volume_db = _linear_to_db_safe(music_vol)
-		if music_on:
-			if not _music_player.playing:
-				var mstream := AssetRegistry.get_wav_stream(MUSIC_PATH, true)
-				if mstream != null:
-					_music_player.stream = mstream
-					_music_player.play()
-		else:
-			if _music_player.playing:
-				_music_player.stop()
+	var target := _music_volume_db()
+	if not music_on:
+		stop_music(0.6)
+		return
+	if _music_id.is_empty():
+		# First enable (or the very first boot): the menu theme is the safe default.
+		play_music("menu", 2.0)
+		return
+	# A volume slider move should not restart the track, only re-aim the fade.
+	for i in range(_music_players.size()):
+		if _music_target_db[i] > MUSIC_SILENT_DB + 0.5:
+			_music_target_db[i] = target
 
 
 func _ensure_master_limiter() -> void:

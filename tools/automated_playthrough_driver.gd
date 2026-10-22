@@ -50,6 +50,9 @@ var _sfx_counts: Dictionary = {}
 var _sfx_total: int = 0
 var _sfx_max_concurrent: int = 0
 var _prev_playing_flags: Array[bool] = []
+var _music_ids_seen: Dictionary = {}
+var _music_switch_count: int = 0
+var _last_music_id: String = ""
 
 var _pre_lim_capture: AudioEffectCapture = null
 var _post_lim_recorder: AudioEffectRecord = null
@@ -281,6 +284,19 @@ func _poll_sfx_telemetry() -> void:
 	_sfx_max_concurrent = maxi(_sfx_max_concurrent, conc)
 
 
+## Records which music track the director is on, so the summary proves that the
+## soundtrack actually followed the run instead of staying on the menu theme.
+func _poll_music_telemetry() -> void:
+	var id := Audio.current_music_id()
+	if id == _last_music_id:
+		return
+	if not id.is_empty():
+		_music_ids_seen[id] = int(_music_ids_seen.get(id, 0)) + 1
+	if not _last_music_id.is_empty() or not id.is_empty():
+		_music_switch_count += 1
+	_last_music_id = id
+
+
 func _set_joystick_dir(dir: Vector2) -> void:
 	if dir.length_squared() < 0.01:
 		if _joy_touch_active:
@@ -389,6 +405,8 @@ func _compute_steering() -> Vector2:
 		# Pre-boss foraging & threat avoidance
 		var best_score := -99999.0
 		var best_target := Vector2.ZERO
+		var threat_pos := Vector2.ZERO
+		var threat_d := 1.0e9
 		for n in arena.enemy_pool.get_active_items():
 			var en := n as EnemyEntity
 			if en == null or not en.visible:
@@ -400,8 +418,16 @@ func _compute_steering() -> Vector2:
 				if sc > best_score:
 					best_score = sc
 					best_target = en.global_position - ppos
-			elif en.contact_damage >= 14.0 and d < 175.0:
-				steer -= (en.global_position - ppos).normalized() * ((180.0 - d) / 90.0)
+			elif en.contact_damage >= 14.0:
+				if d < 175.0:
+					steer -= (en.global_position - ppos).normalized() * ((180.0 - d) / 90.0)
+				# Remember the nearest threat that can actually catch the slime: the escape
+				# below overrides foraging, because a nudge is not enough against a miniboss
+				# that closes faster than the slime runs (that is what used to corner the bot).
+				# A slow heavy hitter (predator_flower) is left to the mild repulsion above.
+				if (en.is_miniboss or en.move_speed >= 95.0) and d < threat_d:
+					threat_d = d
+					threat_pos = en.global_position
 
 		for n in arena.orb_pool.get_active_items():
 			var ob := n as CollectibleOrb
@@ -418,6 +444,18 @@ func _compute_steering() -> Vector2:
 			steer += best_target.normalized() * 1.15
 		else:
 			steer += (-ppos).normalized() * 0.6 + Vector2.RIGHT.rotated(arena.run_elapsed * 0.5) * 0.5
+
+		if threat_d < 215.0:
+			# Run away, but curve toward the arena centre: a straight escape pins the slime
+			# against the wall where the miniboss's contact damage finishes it.
+			var away := (ppos - threat_pos).normalized() if threat_d > 0.5 else Vector2.UP
+			var tangent := away.orthogonal()
+			if tangent.dot(-ppos) < 0.0:
+				tangent = -tangent
+			var urgency := clampf((215.0 - threat_d) / 120.0, 0.0, 1.0)
+			steer = (away * 1.5 + tangent * 0.85 * urgency).normalized()
+			if player.dash_cooldown <= 0.0 and threat_d < 165.0 and main.hud._dash_btn.visible:
+				main.hud._dash_btn.pressed.emit()
 
 	# Hazard & arena-wall avoidance
 	for n in arena.hazard_pool.get_active_items():
@@ -505,6 +543,7 @@ func _physics_process(_delta: float) -> void:
 	if _finished or main == null or main.arena == null:
 		return
 	_poll_sfx_telemetry()
+	_poll_music_telemetry()
 	_poll_pre_limiter_capture()
 
 	var arena := main.arena
@@ -597,11 +636,47 @@ func _physics_process(_delta: float) -> void:
 		_watch_pos = player.global_position
 
 
+func _start_quit_watchdog(sec: float = 25.0) -> void:
+	var timer := get_tree().create_timer(sec, true, false, true)
+	timer.timeout.connect(func() -> void:
+		printerr("PLAYTHROUGH_WATCHDOG: finalize exceeded %.0fs, forcing quit" % sec)
+		get_tree().quit(3)
+	)
+
+
+## Written before the full telemetry sweep so the summary file always exists, even if a
+## later property read errors out. The complete summary overwrites it with partial=false.
+func _write_partial_summary() -> void:
+	var sum_out := OS.get_environment(SUMMARY_OUT_ENV)
+	if sum_out.is_empty():
+		return
+	var f := FileAccess.open(sum_out, FileAccess.WRITE)
+	if f == null:
+		return
+	var arena := main.arena
+	var partial := {
+		"verification_kind": "automated_playthrough_script_agent",
+		"partial": true,
+		"note": "Preliminary write; overwritten by the full summary. Seeing this means telemetry collection failed.",
+		"final_state": "VICTORY" if App.state == App.State.VICTORY else "DEFEAT",
+		"in_game_run_elapsed_sec": roundf(arena.run_elapsed * 10.0) / 10.0,
+		"final_hp": roundf(arena.player.hp * 10.0) / 10.0
+	}
+	f.store_string(JSON.stringify(partial, "\t") + "\n")
+	f.close()
+
+
 func _finalize_and_quit() -> void:
+	# Watchdog first: if any telemetry call below hits a runtime error, GDScript aborts
+	# the rest of this function and quit() is never reached — the process then hangs on
+	# the result screen forever. A hard deadline guarantees the runner always terminates.
+	_start_quit_watchdog()
+	_write_partial_summary()
 	for _i in range(4):
 		await get_tree().process_frame
 	await _await_draw_if_rendered()
 	_poll_pre_limiter_capture()
+	_poll_music_telemetry()
 
 	var png_out := OS.get_environment(RESULT_PNG_OUT_ENV)
 	if not png_out.is_empty() and DisplayServer.get_name() != "headless":
@@ -624,6 +699,7 @@ func _finalize_and_quit() -> void:
 
 	var summary := {
 		"verification_kind": "automated_playthrough_script_agent",
+		"partial": false,
 		"human_operated": false,
 		"cheats_or_direct_stat_edits": false,
 		"input_delivery": "InputEventScreenTouch + InputEventScreenDrag via VirtualJoystick & UI Button signals",
@@ -666,7 +742,10 @@ func _finalize_and_quit() -> void:
 		"damage_events_count": _damage_events.size(),
 		"damage_events": _damage_events,
 		"music_enabled_default": bool(SaveData.get_setting("music_enabled", false)),
-		"music_playing": Audio._music_player.playing,
+		"music_playing": Audio.is_music_playing(),
+		"music_track_at_finish": Audio.current_music_id(),
+		"music_tracks_seen": _music_ids_seen,
+		"music_switch_count": _music_switch_count,
 		"sfx_total_plays": _sfx_total,
 		"sfx_max_concurrent_streams": _sfx_max_concurrent,
 		"sfx_counts_by_event": _sfx_counts,

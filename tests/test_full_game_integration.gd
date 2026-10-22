@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Full end-to-end integration & QA suite running the live Main.tscn scene inside Godot 4.5:
 ## Verifies tutorial, all 12 UI screens, multi-aspect-ratio layouts, all 8 enemy FSMs,
 ## active combat mutations, 3-phase Ancient Forest Guardian Boss fight & Victory,
@@ -31,6 +31,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_evolution_queue_and_restart(tree, main_inst)
 	await _test_verified_controls_visual_combat_and_audio_polish(tree, main_inst)
 	await _test_difficulty_multipliers(tree, main_inst)
+	await _test_miniboss_dismissed_by_boss(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -510,7 +511,39 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 	assert_gt(sep_after_first_hit, player.get_radius() + miniboss.get_body_radius(), "Miniboss contact hit immediately separates overlapping bodies")
 	assert_eq(hits_taken, 1, "Miniboss contact cooldown prevents multi-hit overlap burst within 0.5s")
 
-	# 6. Audio Master limiter, priority voice-stealing protection, music default OFF & movement SFX gating
+	# 5b. Game feel: shake decays to rest, hit-stop restores, low-HP vignette reacts
+	arena.camera.offset = Vector2.ZERO
+	arena._shake_time = 0.0
+	arena.add_shake(18.0, 0.3)
+	assert_eq(arena._shake_strength, 18.0, "add_shake records the requested strength")
+	arena._update_game_feel(1.0 / 60.0)
+	assert_gt(arena.camera.offset.length(), 0.5, "Shake displaces the camera on the first frame")
+	for _f in range(30):
+		arena._update_game_feel(1.0 / 60.0)
+	assert_true(arena.camera.offset.length() < 0.01, "Shake returns the camera to rest after its duration")
+
+	arena.add_shake(30.0, 0.5)
+	arena.add_shake(4.0, 0.1)
+	assert_eq(arena._shake_strength, 30.0, "Overlapping shakes keep the strongest value instead of stacking")
+
+	Engine.time_scale = 1.0
+	arena.add_hitstop(0.09, 0.12)
+	assert_true(Engine.time_scale < 0.2, "Hit-stop slows the engine clock")
+	arena._end_hitstop()
+	assert_eq(Engine.time_scale, 1.0, "Hit-stop timer restores Engine.time_scale to 1.0")
+
+	var saved_hp := player.hp
+	player.hp = player.max_hp * 0.1
+	for _f in range(20):
+		arena._update_game_feel(1.0 / 60.0)
+	assert_gt(arena._vignette_alpha, 0.05, "Low HP raises the vignette alpha")
+	player.hp = player.max_hp
+	for _f in range(60):
+		arena._update_game_feel(1.0 / 60.0)
+	assert_true(arena._vignette_alpha < 0.02, "Healing back to full clears the vignette")
+	player.hp = saved_hp
+
+	# 6. Audio Master limiter, priority voice-stealing protection, music default ON & movement SFX gating
 	var master_idx := AudioServer.get_bus_index("Master")
 	var has_limiter := false
 	for eff_i in range(AudioServer.get_bus_effect_count(master_idx)):
@@ -527,7 +560,49 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 	assert_gt(rec_idx, int(lim_info["limiter_effect_index"]), "Post-limiter recorder is placed strictly downstream of AudioEffectHardLimiter")
 	assert_approx(float(lim_info["bus_volume_db"]), 0.0, 0.01, "Master bus fader stays at 0.0 dB without post-limiter gain boost")
 	AudioServer.remove_bus_effect(master_idx, rec_idx)
-	assert_false(bool(SaveData.get_setting("music_enabled", false)), "Music remains disabled by default")
+	assert_true(bool(SaveData.get_setting("music_enabled", false)), "Music is ON by default (the game ships a soundtrack)")
+
+	# 6b. Soundtrack: three composed loops load, loop, and the director switches between them
+	assert_eq(Audio.MUSIC_TRACKS.size(), 3, "Soundtrack ships three tracks (menu / run / boss)")
+	var expected_lengths := {"menu": 26.7, "run": 38.4, "boss": 30.5}
+	var seen_streams: Array[AudioStream] = []
+	for track_id in Audio.MUSIC_TRACKS.keys():
+		var path := str(Audio.MUSIC_TRACKS[track_id])
+		assert_true(FileAccess.file_exists(path), "Music file exists: " + path)
+		var stream := AssetRegistry.get_audio_stream(path, true)
+		assert_true(stream != null, "Music stream decodes: " + str(track_id))
+		if stream == null:
+			continue
+		assert_approx(stream.get_length(), float(expected_lengths[track_id]), 1.5,
+			"Track length matches the composed loop: " + str(track_id))
+		var ogg := stream as AudioStreamOggVorbis
+		assert_true(ogg != null and ogg.loop, "Music stream is set to loop: " + str(track_id))
+		assert_false(seen_streams.has(stream), "Each music track is a distinct stream")
+		seen_streams.append(stream)
+		assert_true(AssetRegistry.get_audio_stream(path, true) == stream, "Music streams are cached, not re-decoded")
+
+	Audio.play_music("run")
+	assert_eq(Audio.current_music_id(), "run", "Director switches to the exploration track on a run")
+	Audio.play_music("boss")
+	assert_eq(Audio.current_music_id(), "boss", "Director switches to the boss track when the boss spawns")
+	Audio.play_music("does_not_exist")
+	assert_eq(Audio.current_music_id(), "boss", "Unknown track ids are ignored instead of silencing the music")
+	Audio.stop_music(0.1)
+	assert_eq(Audio.current_music_id(), "", "stop_music clears the current track id")
+
+	# 6c. Haptics: gated off-device, and the tables stay inside sensible ranges
+	assert_false(Haptics.is_supported(), "Haptics are gated to mobile platforms (desktop has no vibrator)")
+	SaveData.set_setting("haptics_enabled", true)
+	assert_false(Haptics.is_enabled(), "Haptics stay disabled on desktop even when the setting is on")
+	Haptics.play("damage")
+	Haptics.reset_for_tests()
+	assert_eq(Haptics.DURATION_MS.size(), Haptics.MIN_GAP_MS.size(), "Every haptic kind has both a duration and a gap")
+	for kind in Haptics.DURATION_MS.keys():
+		assert_true(Haptics.MIN_GAP_MS.has(kind), "Haptic gap defined for kind: " + str(kind))
+		var dur := int(Haptics.DURATION_MS[kind])
+		assert_true(dur >= 10 and dur <= 130, "Haptic pulse length is perceptible but not a rattle: " + str(kind))
+		assert_true(int(Haptics.MIN_GAP_MS[kind]) >= dur, "Haptic gap is at least as long as the pulse: " + str(kind))
+	SaveData.set_setting("haptics_enabled", true)
 
 	var test_wav := AssetRegistry.get_wav_stream(Audio.SFX_PATHS["boss_warning"], false)
 	for v_idx in range(Audio.SFX_POOL_SIZE):
@@ -616,3 +691,36 @@ func _test_difficulty_multipliers(tree: SceneTree, main: MainRoot) -> void:
 		arena.active_boss = null
 	await tree.process_frame
 	assert_eq(App.state, App.State.MAIN_MENU, "Returned to menu after difficulty checks")
+
+
+## The Guardian arrives alone. A live miniboss would keep landing 20-damage contacts in
+## the middle of the phase telegraphs: the automated run lost 60 HP that way at 281/298/
+## 300 s while the boss was charging, which makes a fair fight unreadable.
+func _test_miniboss_dismissed_by_boss(tree: SceneTree, main: MainRoot) -> void:
+	main._start_run("standard")
+	await tree.process_frame
+	var arena := main.arena
+	arena.miniboss_spawned = false
+	arena.miniboss_spawn_time = 0.0
+	arena._process_spawning_and_waves(0.016)
+	var mb := arena._tracked_miniboss
+	assert_true(mb != null and mb.is_active_combatant(), "Miniboss spawns and is tracked before the boss")
+	if mb == null:
+		main._return_to_main_menu()
+		await tree.process_frame
+		return
+
+	var boss := arena.spawn_ancient_guardian_boss()
+	assert_true(boss != null, "Boss still spawns when the miniboss is alive")
+	assert_true(arena._tracked_miniboss == null, "Boss spawn clears the tracked miniboss")
+	# Releasing to the pool is what removes an enemy from play; the FSM state is left
+	# alone, so the assertion has to look at the pool and the node, not at the state.
+	assert_false(arena.enemy_pool.get_active_items().has(mb), "Miniboss leaves the active enemy pool")
+	assert_false(mb.visible, "Miniboss is hidden, so it cannot fight beside the Guardian")
+
+	if is_instance_valid(boss):
+		boss.queue_free()
+		arena.active_boss = null
+	main._return_to_main_menu()
+	await tree.process_frame
+	assert_eq(App.state, App.State.MAIN_MENU, "Returned to menu after the miniboss dismissal check")

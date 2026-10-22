@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Unit tests for all 12 mutations, draft rules, level caps, and all 5 data-driven synergies.
 
 
