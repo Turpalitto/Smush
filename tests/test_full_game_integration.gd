@@ -27,6 +27,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_all_ui_screens_and_aspect_ratios(tree, main_inst)
 	await _test_full_run_enemies_mutations_and_boss_victory(tree, main_inst)
 	await _test_defeat_revive_and_app_interruptions(tree, main_inst)
+	await _test_evolution_queue_and_restart(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -129,7 +130,12 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	assert_true(main.draft_overlay.visible, "MutationDraftOverlay visible")
 	var first_choice_id := str(arena.current_draft_choices[0]["id"])
 	arena.select_draft_mutation(first_choice_id)
-	assert_eq(App.state, App.State.PLAYING, "Selecting mutation resumes PLAYING")
+	# A large XP grant can earn several drafts; finish them before combat resumes.
+	var extra_choices := 0
+	while App.state == App.State.MUTATION_DRAFT and extra_choices < 20:
+		arena.select_draft_mutation(str(arena.current_draft_choices[0]["id"]))
+		extra_choices += 1
+	assert_eq(App.state, App.State.PLAYING, "Selecting all earned mutations resumes PLAYING")
 	assert_gt(float(arena.player.evolution_level), float(start_evo_lv), "Evolution level incremented")
 	assert_false(arena.tutorial.active, "Tutorial completed after first mutation")
 
@@ -213,3 +219,47 @@ func _test_defeat_revive_and_app_interruptions(tree: SceneTree, main: MainRoot) 
 	# Return to menu
 	main._return_to_main_menu()
 	assert_eq(App.state, App.State.MAIN_MENU, "Cleanly returned to MAIN_MENU")
+
+
+func _test_evolution_queue_and_restart(tree: SceneTree, main: MainRoot) -> void:
+	main._start_run("standard")
+	await tree.process_frame
+	var arena := main.arena
+	arena.player.add_evolution_xp(500.0)
+	assert_eq(main.draft_overlay._cards_box.get_child_count(), 3, "Draft displays exactly three cards")
+	var initial_cards := arena.current_draft_choices.duplicate(true)
+	arena.player.add_evolution_xp(1.0)
+	assert_eq(arena.current_draft_choices, initial_cards, "Extra XP never replaces open mutation cards")
+	assert_eq(arena.player.evolution_level, 1, "Pending evolution waits for current selection")
+	arena.select_draft_mutation("not_offered")
+	assert_eq(arena.player.mutations.get_total_picks(), 0, "Only offered mutations can be selected")
+	assert_eq(App.state, App.State.MUTATION_DRAFT, "Invalid selection keeps draft open")
+	var picks := 0
+	while App.state == App.State.MUTATION_DRAFT and picks < 10:
+		var card := main.draft_overlay._cards_box.get_child(0) as Button
+		card.pressed.emit()
+		picks += 1
+		if App.state == App.State.MUTATION_DRAFT:
+			assert_eq(main.draft_overlay._cards_box.get_child_count(), 3, "Chained draft replaces cards immediately")
+	assert_eq(picks, 4, "501 XP produces four consecutive choices without another pickup")
+	assert_eq(App.state, App.State.PLAYING, "Combat resumes after all earned choices")
+	assert_approx(arena.player.evolution_xp, 145.0, 0.01, "Unspent evolution XP preserved")
+	main.hud.joystick._begin_drag(0, Vector2(100, 100))
+	main.hud.joystick._update_drag(Vector2(160, 100))
+	arena.player.move_input = main.hud.joystick.output_vector
+	App.change_state(App.State.PAUSED)
+	assert_eq(main.hud.joystick.output_vector, Vector2.ZERO, "Pause releases joystick")
+	assert_eq(arena.player.move_input, Vector2.ZERO, "Pause clears movement input")
+	App.change_state(App.State.PLAYING)
+	arena.player._electro_timer = 99.0
+	arena.player._freeze_timer = 99.0
+	arena.player._combat_quiet_timer = 0.0
+	arena._enemy_spawn_timer = 99.0
+	arena._orb_spawn_timer = 99.0
+	main._start_run("standard")
+	assert_eq(arena.player._electro_timer, 1.5, "Restart resets electric ability timing")
+	assert_eq(arena.player._freeze_timer, 2.0, "Restart resets freeze timing")
+	assert_eq(arena._enemy_spawn_timer, 0.5, "Restart restores opening enemy wave timing")
+	assert_eq(arena._orb_spawn_timer, 0.3, "Restart restores early food spawn timing")
+	assert_eq(arena.player.mutations.get_total_picks(), 0, "Run mutations do not leak into restart")
+	main._return_to_main_menu()

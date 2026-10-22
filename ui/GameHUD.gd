@@ -180,6 +180,12 @@ func _build_layout() -> void:
 
 
 func _connect_signals() -> void:
+	Events.game_state_changed.connect(func(_old: int, next_state: int) -> void:
+		if next_state != App.State.PLAYING:
+			joystick.reset_stick()
+			if arena != null and arena.player != null:
+				arena.player.move_input = Vector2.ZERO
+	)
 	Events.player_hp_changed.connect(func(cur: float, mx: float) -> void:
 		_hp_bar.max_value = maxf(1.0, mx)
 		_hp_bar.value = cur

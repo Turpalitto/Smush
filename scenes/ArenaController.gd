@@ -116,6 +116,10 @@ func _setup_canopy_background() -> void:
 func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	mode_id = p_mode
 	run_elapsed = 0.0
+	_enemy_spawn_timer = 0.5
+	_orb_spawn_timer = 0.3
+	_narrow_toast_cd = 0.0
+	current_draft_choices.clear()
 	run_ended = false
 	miniboss_spawned = false
 	boss_spawned = false
@@ -194,7 +198,11 @@ func _physics_process(delta: float) -> void:
 	_rebuild_spatial_grids()
 	_process_spawning_and_waves(delta)
 	_process_orb_interactions(delta)
+	if App.state != App.State.PLAYING:
+		return
 	_process_enemy_interactions(delta)
+	if App.state != App.State.PLAYING:
+		return
 	_process_boss_interactions(delta)
 	_cleanup_pools()
 
@@ -348,6 +356,8 @@ func _process_orb_interactions(_delta: float) -> void:
 	var scan_r := pr + (36.0 if auto_suck else 10.0)
 	var nearby := orb_grid.query_radius(player.global_position, scan_r)
 	for node in nearby:
+		if App.state != App.State.PLAYING:
+			break
 		var orb := node as CollectibleOrb
 		if orb == null or not orb.visible:
 			continue
@@ -374,6 +384,8 @@ func _process_enemy_interactions(delta: float) -> void:
 	var p_ctx := player.mutations.build_player_absorption_context(player.mass, player.is_dashing, player.mimicry_ambush_ready)
 
 	for node in candidates:
+		if App.state != App.State.PLAYING:
+			break
 		var en := node as EnemyEntity
 		if en == null or not en.is_active_combatant():
 			continue
@@ -679,6 +691,8 @@ func _cleanup_pools() -> void:
 # --- Draft, Victory, Defeat & Revive Flows ---
 
 func request_mutation_draft() -> void:
+	if App.state == App.State.MUTATION_DRAFT:
+		return
 	current_draft_choices = player.mutations.roll_draft_choices(3)
 	if current_draft_choices.is_empty():
 		# All unlocked mutations maxed out: bonus heal + essence!
@@ -693,12 +707,21 @@ func request_mutation_draft() -> void:
 func select_draft_mutation(mutation_id: String) -> void:
 	if App.state != App.State.MUTATION_DRAFT:
 		return
+	var offered := false
+	for choice in current_draft_choices:
+		if str(choice.get("id", "")) == mutation_id:
+			offered = true
+			break
+	if not offered or not player.mutations.can_upgrade_mutation(mutation_id):
+		return
 	Audio.play_sfx("mutation_pick", 1.0)
 	player.mutations.apply_mutation(mutation_id)
 	player._sync_mass_metrics()
 	tutorial.notify_mutation_picked()
 	current_draft_choices.clear()
 	App.change_state(App.State.PLAYING)
+	# Offer every earned evolution before returning to combat.
+	player.add_evolution_xp(0.0)
 
 
 func reroll_draft_choices() -> bool:

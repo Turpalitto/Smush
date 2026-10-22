@@ -61,6 +61,8 @@ func bind_arena(p_arena: ArenaController) -> void:
 func _populate_choices(choices: Array) -> void:
 	_title_lbl.text = Loc.t("draft.title")
 	for ch in _cards_box.get_children():
+		# Remove immediately so chained drafts never show two sets of cards.
+		_cards_box.remove_child(ch)
 		ch.queue_free()
 
 	for item: Dictionary in choices:

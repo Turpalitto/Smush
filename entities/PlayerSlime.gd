@@ -69,6 +69,15 @@ func initialize_for_run(p_arena: Node) -> void:
 	evolution_xp = 0.0
 	evolution_level = 0
 	velocity = Vector2.ZERO
+	move_input = Vector2.ZERO
+	_dash_timer = 0.0
+	_dash_dir = Vector2.DOWN
+	_poison_drop_timer = 0.0
+	_electro_timer = 1.5
+	_freeze_timer = 2.0
+	_tendril_tick = 0.0
+	_combat_quiet_timer = 5.0
+	mimicry_ambush_ready = false
 
 	var start_mass_bonus := SaveData.get_upgrade_bonus("start_mass")
 	mass = MassSystem.clamp_mass(MassSystem.DEFAULT_START_MASS + start_mass_bonus)
@@ -385,21 +394,26 @@ func complete_absorption(entity_id: String, mass_gain: float, xp_gain: float, es
 
 
 func add_evolution_xp(amount: float) -> void:
-	if amount <= 0.0 or is_dead:
+	if amount < 0.0 or is_dead:
 		return
 	evolution_xp += amount
 	var threshold := MassSystem.evolution_threshold_for_level(evolution_level)
 	Events.evolution_progress_changed.emit(evolution_xp, threshold, evolution_level)
-
-	if evolution_xp >= threshold:
+	# Keep the current cards stable if several pickups complete in one frame.
+	if App.state == App.State.MUTATION_DRAFT:
+		return
+	while evolution_xp >= threshold:
 		evolution_xp -= threshold
 		evolution_level += 1
 		if visual != null:
 			visual.trigger_evolution()
 		Audio.play_sfx("evolution", 1.0)
-		Events.evolution_progress_changed.emit(evolution_xp, MassSystem.evolution_threshold_for_level(evolution_level), evolution_level)
+		threshold = MassSystem.evolution_threshold_for_level(evolution_level)
+		Events.evolution_progress_changed.emit(evolution_xp, threshold, evolution_level)
 		if arena_ref != null and arena_ref.has_method("request_mutation_draft"):
 			arena_ref.call("request_mutation_draft")
+			if App.state == App.State.MUTATION_DRAFT:
+				return
 
 
 func heal(amount: float) -> void:

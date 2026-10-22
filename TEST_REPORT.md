@@ -13,13 +13,20 @@
 | MutationsAndSynergiesSuite | 64 | 0 |
 | SaveAndProgressionSuite | 38 | 0 |
 | MonetizationAndAnalyticsSuite | 41 | 0 |
-| FullGameIntegrationSuite | 105 | 0 |
-| **Итого** | **268** | **0** |
+| FullGameIntegrationSuite | 123 | 0 |
+| **Итого** | **286** | **0** |
 
 PCK собран `python3 tools/build_pck.py /tmp/smush-release-candidate.pck`.
 Из `/tmp` запущен `godot4 --headless --quit-after 600 --main-pack
-/tmp/smush-release-candidate.pck res://tests/TestRunner.tscn`: **268 passed, 0 failed**.
+/tmp/smush-release-candidate.pck res://tests/TestRunner.tscn`: **286 passed, 0 failed**.
 Это отдельный запуск упакованной игры, без использования исходной директории.
+
+Дополнение игровой сессии: проверены четыре последовательных выбора за 501 XP,
+сохранность открытых вариантов при новом опыте, отклонение невыданной мутации,
+клики по настоящим UI-кнопкам, отсутствие наложенных карточек, отпускание джойстика
+при паузе и сброс способности/спавна при рестарте. Свежие логи:
+`reports/gameplay-source-qa-2026-10-22.log` и `reports/gameplay-packed-qa-2026-10-22.log`.
+Исторические логи предыдущей сессии сохранены отдельно.
 
 Новые проверки покрывают:
 - Повреждённые поля save с верной контрольной суммой и отсутствие временного файла после atomic rename.
