@@ -1,4 +1,8 @@
-# Актуальный Android release gate — 22.10.2026
+# Android release checklist — отложенный этап
+
+**Сейчас этот этап не выполняется.** Приоритет владельца — сама игра; следующий
+шаг находится в [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). Не запрашивать SDK/аккаунты
+до возвращения к релизу.
 
 **APK и AAB пока не собраны; игру нельзя считать проверенным Android RC.**
 Текущий статус: [RELEASE_STATUS.md](RELEASE_STATUS.md), фактические проверки:

@@ -16,9 +16,9 @@
 | FullGameIntegrationSuite | 123 | 0 |
 | **Итого** | **286** | **0** |
 
-PCK собран `python3 tools/build_pck.py /tmp/smush-release-candidate.pck`.
+PCK собран `python3 tools/build_pck.py builds/slime-rush-gameplay.pck`.
 Из `/tmp` запущен `godot4 --headless --quit-after 600 --main-pack
-/tmp/smush-release-candidate.pck res://tests/TestRunner.tscn`: **286 passed, 0 failed**.
+/workspace/smush/builds/slime-rush-gameplay.pck res://tests/TestRunner.tscn`: **286 passed, 0 failed**.
 Это отдельный запуск упакованной игры, без использования исходной директории.
 
 Дополнение игровой сессии: проверены четыре последовательных выбора за 501 XP,
