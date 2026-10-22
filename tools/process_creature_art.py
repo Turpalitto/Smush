@@ -2,10 +2,15 @@
 """Cut a FLUX creature render out of its magenta backdrop and export a game sprite.
 
 FLUX.1-schnell cannot emit alpha, so creatures are generated on a saturated magenta
-backdrop (hue ~335). The backdrop is uniform across the whole frame, including the
-baked drop shadow, which means a hue-band key removes the background and the shadow
-in one step while leaving the creature's own reds/oranges untouched (the cap sits at
-hue ~2, a good 25 degrees away from the key band).
+backdrop. Two properties of those renders drive the key:
+
+* the backdrop hue is not fixed. Measured across one batch it drifts between 314 and
+  343 degrees, so the key band is centred on the hue actually measured on this
+  image's border instead of a hard-coded constant;
+* interior colours can land inside that band (a hot-pink eye, a magenta core), so
+  alpha is only cleared for backdrop pixels *connected to the frame edge*. A flood
+  fill from the border removes the backdrop and its baked drop shadow in one pass
+  while every enclosed detail stays opaque.
 
 Usage:
     python3 tools/process_creature_art.py RAW_DIR OUT_DIR [--size 256]
@@ -20,18 +25,18 @@ from __future__ import annotations
 import argparse
 import colorsys
 import json
+from collections import deque
 from pathlib import Path
 
 from PIL import Image, ImageFilter
 
-# Backdrop hue measured on real renders; the band is deliberately narrow so warm
-# creature colours (red cap, amber glow) survive the key.
-KEY_HUE = 335.0
-KEY_HUE_TOL = 18.0
-KEY_SAT_MIN = 0.55
-# No brightness limit: FLUX renders the backdrop anywhere between V=0.82 and V=0.99
-# depending on the subject, and an upper bound silently kept the bright magenta
-# frames fully opaque (the umbral_alpha and poison_toad renders).
+# Half-width of the hue band around the measured backdrop hue. Wide enough to absorb
+# the gradient across a single frame, narrow enough that warm creature reds (~0-20)
+# stay clear of a ~335 degree backdrop.
+KEY_HUE_TOL = 22.0
+# Saturation floor for "this pixel is backdrop". Grey/white highlights on the
+# creature are below it, so they are never treated as background.
+KEY_SAT_MIN = 0.45
 
 
 def _hue_distance(a: float, b: float) -> float:
@@ -39,23 +44,81 @@ def _hue_distance(a: float, b: float) -> float:
     return min(d, 360.0 - d)
 
 
+def measure_backdrop_hue(rgb: Image.Image) -> float:
+    """Median hue of the saturated border pixels — the colour FLUX actually painted."""
+    w, h = rgb.size
+    px = rgb.load()
+    hues = []
+    step = max(1, min(w, h) // 96)
+    for x in range(0, w, step):
+        for y in (0, 1, 2, h - 3, h - 2, h - 1):
+            hues.append(px[x, y])
+    for y in range(0, h, step):
+        for x in (0, 1, 2, w - 3, w - 2, w - 1):
+            hues.append(px[x, y])
+
+    sat_hues = []
+    for r, g, b in hues:
+        hh, ss, _vv = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        if ss >= 0.35:
+            sat_hues.append(hh * 360.0)
+    if not sat_hues:
+        return 335.0
+    sat_hues.sort()
+    return sat_hues[len(sat_hues) // 2]
+
+
 def cutout(img: Image.Image) -> Image.Image:
     rgb = img.convert("RGB")
     w, h = rgb.size
     px = rgb.load()
 
-    alpha = Image.new("L", (w, h), 255)
-    ap = alpha.load()
+    bg_hue = measure_backdrop_hue(rgb)
 
+    # 1. Which pixels *could* be backdrop, ignoring position.
+    candidate = bytearray(w * h)
     for y in range(h):
+        row = y * w
         for x in range(w):
             r, g, b = px[x, y]
-            hh, ss, vv = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
-            if ss >= KEY_SAT_MIN and _hue_distance(hh * 360.0, KEY_HUE) <= KEY_HUE_TOL:
-                ap[x, y] = 0
+            hh, ss, _vv = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            if ss >= KEY_SAT_MIN and _hue_distance(hh * 360.0, bg_hue) <= KEY_HUE_TOL:
+                candidate[row + x] = 1
 
-    # Kill the 1px magenta fringe JPEG leaves on the silhouette, then soften the cut
-    # so the sprite does not look like a sticker pasted on the arena floor.
+    # 2. Keep only what is reachable from the frame edge, so enclosed hot-pink eyes
+    #    and cores survive while the backdrop and its shadow are cleared.
+    alpha = Image.new("L", (w, h), 255)
+    ap = alpha.load()
+    seen = bytearray(w * h)
+    queue: deque[int] = deque()
+
+    def push(idx: int) -> None:
+        if candidate[idx] and not seen[idx]:
+            seen[idx] = 1
+            queue.append(idx)
+
+    for x in range(w):
+        push(x)
+        push((h - 1) * w + x)
+    for y in range(h):
+        push(y * w)
+        push(y * w + w - 1)
+
+    while queue:
+        idx = queue.popleft()
+        ap[idx % w, idx // w] = 0
+        x = idx % w
+        if x > 0:
+            push(idx - 1)
+        if x < w - 1:
+            push(idx + 1)
+        if idx >= w:
+            push(idx - w)
+        if idx < (h - 1) * w:
+            push(idx + w)
+
+    # 3. Kill the 1px magenta fringe JPEG leaves on the silhouette, then soften the
+    #    cut so the sprite does not look like a sticker pasted on the arena floor.
     alpha = alpha.filter(ImageFilter.MinFilter(3))
     alpha = alpha.filter(ImageFilter.GaussianBlur(0.9))
 
@@ -65,7 +128,10 @@ def cutout(img: Image.Image) -> Image.Image:
 
 
 def autocrop(img: Image.Image, pad_ratio: float = 0.04) -> Image.Image:
-    bbox = img.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+    # Threshold well above the noise floor: the requested neon rim light leaves a
+    # faint halo around the silhouette, and counting it as subject would shrink the
+    # creature inside its square and make every enemy read smaller than its hitbox.
+    bbox = img.getchannel("A").point(lambda v: 255 if v > 96 else 0).getbbox()
     if not bbox:
         return img
     l, t, r, b = bbox

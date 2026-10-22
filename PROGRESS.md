@@ -130,6 +130,30 @@
 - Старые сохранения не требуют миграции: отсутствующая сложность читается как `normal`,
   отсутствующая таблица рекордов — как пустая.
 
+### 5. Существа нарисованы, а не собраны из кружков — яркий магический арт
+Раньше все 10 противников рисовались кодом из `draw_circle`/`draw_colored_polygon`: силуэт
+читался, но выглядел как отладочная заглушка. Теперь у каждого есть рисованный спрайт.
+
+- Генерация — FLUX.1-schnell через `flux-gen` (4 аккаунта Cloudflare параллельно, 10 промптов
+  за один батч ≈ 18 с). Промпты сохранены в `tools/creature_prompts.txt`, чтобы партию можно
+  было повторить. Направление: не «тёмное фэнтези», а яркий магический мобильный арт —
+  насыщенные цвета, неоновый контровой свет, светящиеся руны, искры, крупный читаемый силуэт.
+- Вырезка — `tools/process_creature_art.py`. Модель не отдаёт альфу, поэтому существа
+  рендерятся на маджентовом фоне, а фон снимается по оттенку. Оттенок у FLUX не постоянный
+  (314–343° в одной партии), поэтому он измеряется по рамке кадра, а альфа обнуляется только
+  для связанных с краем пикселей фона (flood fill): так снимается и запечённая тень, а
+  внутренние детали в той же полосе оттенка (розовый глаз, маджентовое ядро) остаются целыми.
+- Отбраковка — по числу пикселей: у трёх кадров первого батча флуд-фил не смог пройти
+  (световой столб у слизня, петля молнии у жука, тень под жабой). Для слизня и жука
+  сгенерированы варианты, из них выбраны кадры без «карманов» фона.
+- Иконки энциклопедии (`resources/icons/enemies/*.png`, 128×128) теперь выводятся из тех же
+  спрайтов (`--icons-from`), поэтому список и арена показывают одно и то же существо.
+- Рантайм — `EnemyEntity.sprite_tex` + `_draw_sprite_body()`: squash-stretch по прыжку,
+  зеркалирование по направлению, тинт заморозки/яда и аддитивная вспышка попадания.
+  Процедурный силуэт остался веткой `else`, поэтому отсутствие файла ничего не ломает;
+  кольца читаемости, телеграфы, звёзды стана и HP-бары рисуются поверх спрайта.
+- У босса та же схема (`AncientGuardianBoss.sprite_tex`), аура фазы и ядро-сердце сохранены.
+
 ## Последние зафиксированные проверки и артефакты
 
 - `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **464 assertions, 0 failures**, `exit 0`
@@ -140,11 +164,13 @@
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
-  - `./scripts/run_qa.sh` → **464 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-difficulty-2026-10-22.log`);
-  - автоматизированное прохождение `VICTORY` + запись шины `Master` (`reports/macos-automated-playthrough-2026-10-22.json`,
-    `reports/macos-audio-limiter-2026-10-22.json`, консоль `reports/macos-playthrough-console-2026-10-22.log`);
-  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (61 MiB / 63.8 МБ, коммит `78d6bf0`) + `.sha256` + `.build.json`;
-  - скриншоты `deliverables/macos_screenshots/` — 14 реальных кадров GPU (`720x1280`, `540x1200`, `1080x1682`, `1280x720`).
+  - `./scripts/run_qa.sh` → **464 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-art-2026-10-22.log`;
+    тот же набор, что и `reports/macos-source-qa-difficulty-2026-10-22.log`, перезапущен после арт-прохода);
+  - автоматизированное прохождение `VICTORY` + запись шины `Master` (`reports/macos-automated-playthrough-art-2026-10-22.json`,
+    `reports/macos-automated-playthrough-2026-10-22.json` — прогон предыдущей итерации, консоль `reports/macos-playthrough-console-2026-10-22.log`);
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (62 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
+  - скриншоты `deliverables/macos_screenshots/` — 22 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
+    включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с новым артом.
 - Готовые скачиваемые пакеты в рабочей области (каталог `deliverables/`, исключён из Git, но доступен для скачивания в файловом менеджере платформы):
   - `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` — **основной результат для macOS**;
   - `deliverables/SlimeRushEvolution_macOS_Verification_2026-10-22.zip` — скриншоты реального рендера, сводки
