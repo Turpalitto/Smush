@@ -226,17 +226,17 @@
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
   - `./scripts/run_qa.sh` → **551 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-environment-2026-10-23.log`);
-  - автоматизированное прохождение `VICTORY` за `320.8 с` + запись шины `Master`
-    (`reports/macos-automated-playthrough-premium-2026-10-22.json`; прогоны прошлых итераций —
+  - автоматизированное прохождение `VICTORY` за `330.3 с` + запись шины `Master`
+    (`reports/macos-automated-playthrough-environment-2026-10-23.json`; прогоны прошлых итераций —
     `reports/macos-automated-playthrough-art-2026-10-22.json`, `reports/macos-automated-playthrough-2026-10-22.json`,
     консоль `reports/macos-playthrough-console-2026-10-22.log`);
-  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (63 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
+  - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (64 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
   - скриншоты `deliverables/macos_screenshots/` — 23 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
-    включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с новым артом
-    и переснятые `06`–`10` из финального прогона.
+    включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с артом существ
+    и переснятые `00`–`10` из финального прогона — уже с мшистым полом, нарисованным реквизитом и кромкой леса.
 - Готовые скачиваемые пакеты в рабочей области (каталог `deliverables/`, исключён из Git, но доступен для скачивания в файловом менеджере платформы):
   - `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` — **основной результат для macOS**;
-  - `deliverables/SlimeRushEvolution_macOS_Verification_2026-10-22.zip` — скриншоты реального рендера, сводки
+  - `deliverables/SlimeRushEvolution_macOS_Verification_2026-10-23.zip` — скриншоты реального рендера, сводки
     `reports/macos-*`, фрагмент записи шины `Master` после лимитера и `MANIFEST.md`;
   - ранее собранные пакеты (`Linux x86_64` и архив доказательств от предыдущей итерации) в этом рабочем
     каталоге отсутствуют — они создавались в другом окружении; скрипты их сборки остались в `scripts/`.
