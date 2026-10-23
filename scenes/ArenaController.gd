@@ -325,10 +325,11 @@ func _on_wonder_awakened(pos: Vector2, kind: String) -> void:
 
 
 func _apply_env_growth(env: float) -> void:
-	## Three levers, all driven by the same 0..1 value: the streamed props and their
-	## fireflies (WorldGenerator), the floor shader's warmth, and the screen grade.
-	## Nothing here rebuilds a chunk or allocates.
+	## Four levers, all driven by the same 0..1 value: the streamed props and their
+	## fireflies (WorldGenerator), the floor shader's warmth, the screen grade, and the
+	## grove's breath. Nothing here rebuilds a chunk or allocates.
 	var v := clampf(env, 0.0, 1.0)
+	Audio.set_grove_env(v)
 	if world != null:
 		world.set_growth(v)
 	if mood != null:

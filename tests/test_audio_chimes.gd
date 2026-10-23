@@ -24,6 +24,7 @@ func run() -> void:
 	_test_notes_are_actually_pitched()
 	_test_ladder_steps_and_resets()
 	_test_zen_track()
+	_test_grove_breath()
 
 
 func _chime_path(i: int) -> String:
@@ -174,3 +175,84 @@ func _test_zen_track() -> void:
 		assert_true(Audio.MUSIC_TRACKS.has(track), "%s resolves to a known track (%s)" % [mode_id, track])
 		assert_true(FileAccess.file_exists(str(Audio.MUSIC_TRACKS[track])),
 			"%s track file exists (%s)" % [mode_id, track])
+
+
+func _test_grove_breath() -> void:
+	## The grove bed (tools/generate_grove_breath.py, systems/AudioManager.gd).
+	##
+	## Two separate claims to check. The file has to be a real looping bed of the
+	## right length, and the *level* has to behave: silent at the bottom of the
+	## ladder, arriving late, capped well under the music, and slewing rather than
+	## snapping when growth steps up. A bed that is 6 dB too loud does not fail any
+	## other test in the project — it just makes every run slightly worse.
+	var path: String = Audio.GROVE_PATH
+	assert_true(FileAccess.file_exists(path), "Grove bed file exists")
+	var stream := AssetRegistry.get_audio_stream(path, true)
+	assert_true(stream != null, "Grove bed decodes")
+	if stream != null:
+		assert_true(stream is AudioStreamOggVorbis, "Grove bed is an OGG stream")
+		var ogg := stream as AudioStreamOggVorbis
+		assert_true(ogg.loop, "Grove bed is set to loop")
+		# 16 s: long enough that the gust pattern is not a rhythm, short enough that a
+		# broadband bed does not cost half a megabyte in the APK.
+		assert_gt(ogg.get_length(), 12.0, "Grove bed is at least 12 s")
+		assert_lt(ogg.get_length(), 24.0, "Grove bed is not needlessly long")
+
+	# --- the curve ---------------------------------------------------------------
+	assert_approx(Audio.grove_db_for(0.0), Audio.GROVE_SILENT_DB, 0.001,
+		"No growth means no air at all")
+	assert_approx(Audio.grove_db_for(1.0), Audio.GROVE_MAX_DB, 0.001,
+		"Full growth reaches the cap exactly")
+	# 1 - (1-0.5)^2 = 0.75 of the way from -60 to -6.
+	assert_approx(Audio.grove_db_for(0.5), -19.5, 0.01,
+		"Half growth sits 13.5 dB under the cap, not 27")
+	var prev := -1000.0
+	for i in range(21):
+		var e := float(i) / 20.0
+		var db := Audio.grove_db_for(e)
+		assert_gte(db, prev - 0.0001, "The curve never goes backwards (env %.2f)" % e)
+		prev = db
+	# The point of the quadratic: a linear ramp in dB would be at -33 here.
+	assert_lt(Audio.grove_db_for(0.33), -28.0,
+		"The first third of the ladder is still essentially silent")
+	# It is a bed, not a second track.
+	assert_lte(Audio.GROVE_MAX_DB, -4.0, "The bed sits at least 4 dB under the music at full growth")
+
+	# --- the slew ----------------------------------------------------------------
+	# Growth is a step (an evolution fires it), the air is a swell. Both halves matter:
+	# a snap would be audible as a click in the bed, and a climb that takes too long
+	# would arrive after the moment it belongs to.
+	var saved_env: float = Audio.grove_env()
+	var saved_active: bool = Audio.grove_is_active()
+	var saved_db: float = Audio.grove_db()
+	Audio._grove_active = true
+	Audio._grove_env = 1.0
+	Audio._grove_db = Audio.GROVE_SILENT_DB
+	Audio._advance_grove(1.0)
+	var after_one := Audio.grove_db()
+	assert_gt(after_one, Audio.GROVE_SILENT_DB + 1.0, "The bed starts rising immediately")
+	assert_lt(after_one, Audio.grove_target_db() - 20.0, "One second does not cover the whole climb")
+	var elapsed := 1.0
+	while elapsed < 20.0:
+		Audio._advance_grove(0.1)
+		elapsed += 0.1
+	assert_approx(Audio.grove_db(), Audio.grove_target_db(), 0.05,
+		"The bed reaches its target level")
+	# The cap holds: the layer can never sit above the music minus GROVE_MAX_DB.
+	assert_lte(Audio.grove_target_db(), Audio._music_volume_db() + Audio.GROVE_MAX_DB + 0.001,
+		"The bed is capped relative to the music, not to full scale")
+
+	# --- music off means air off -------------------------------------------------
+	var saved_music := bool(SaveData.get_setting("music_enabled", true))
+	SaveData.set_setting("music_enabled", false)
+	assert_approx(Audio.grove_target_db(), Audio.GROVE_SILENT_DB, 0.001,
+		"Turning the music off takes the air with it")
+	SaveData.set_setting("music_enabled", saved_music)
+	# No run in progress means no air either, whatever the growth value says.
+	Audio._grove_active = false
+	assert_approx(Audio.grove_target_db(), Audio.GROVE_SILENT_DB, 0.001,
+		"Outside a run the bed is silent")
+
+	Audio._grove_env = saved_env
+	Audio._grove_active = saved_active
+	Audio._grove_db = saved_db

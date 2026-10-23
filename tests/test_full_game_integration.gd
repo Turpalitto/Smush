@@ -36,6 +36,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_moss_trail_and_caustics(tree, main_inst)
 	await _test_biomes_undergrowth_and_wonders(tree, main_inst)
 	await _test_glass_draft_and_breathing_hud(tree, main_inst)
+	await _test_grove_breath_wiring(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -1943,3 +1944,28 @@ func _composite_over(fg: Color, bg: Color) -> Color:
 		fg.r * a + bg.r * (1.0 - a),
 		fg.g * a + bg.g * (1.0 - a),
 		fg.b * a + bg.b * (1.0 - a), 1.0)
+
+
+func _test_grove_breath_wiring(tree: SceneTree, main: MainRoot) -> void:
+	## The grove bed is driven by the same envelope as the visuals, so the wiring is
+	## what has to be checked here: growth in, air out, and silence outside a run.
+	## The curve and the file are covered by AudioChimesSuite.
+	main._start_run("standard", 424242)
+	await tree.process_frame
+	assert_true(Audio.grove_is_active(), "A run starts the grove bed")
+	assert_approx(Audio.grove_env(), 0.0, 0.001, "A new run starts with the forest asleep")
+	assert_approx(Audio.grove_db_for(Audio.grove_env()), Audio.GROVE_SILENT_DB, 0.001,
+		"An asleep forest is silent, not merely quiet")
+
+	# The real path: mass changes, the arena converts it to the envelope, the mixer
+	# follows. Emitting the signal is what the player's eating does.
+	Events.player_mass_changed.emit(128.0, 24.0)
+	await tree.process_frame
+	assert_approx(Audio.grove_env(), 1.0, 0.001,
+		"Growth reaches the mixer through the same envelope the visuals use")
+	assert_gt(Audio.grove_target_db(), Audio.GROVE_SILENT_DB + 30.0,
+		"At full growth the bed has a real level (%0.1f dB)" % Audio.grove_target_db())
+
+	main._return_to_main_menu()
+	await tree.process_frame
+	assert_false(Audio.grove_is_active(), "Leaving the run stops the grove bed")

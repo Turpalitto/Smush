@@ -74,6 +74,26 @@ const ORB_CHIME_WINDOW_SEC: float = 1.8
 const WONDER_CHIME_COUNT: int = 3
 const WONDER_CHIME_PATH: String = "res://audio/sfx/wonder_chime_%02d.wav"
 
+## The grove's breath (audio/music/forest_breath.ogg, built by
+## tools/generate_grove_breath.py): a 16 s wind-and-rustle bed that fades in with
+## growth. It is driven by `env_for_mass`, the same 0..1 value that already wakes the
+## bloom, the fireflies and the screen grade, so the forest becomes audible at the
+## same rate it becomes visible.
+##
+## It is part of the music mix rather than a separate slider: `music_enabled` and
+## `music_volume` govern it too, because "the soundtrack" is one thing to a player.
+const GROVE_PATH: String = "res://audio/music/forest_breath.ogg"
+## Level at full growth, relative to the music bed. -6 dB is roughly 10 LU under the
+## run theme once the file's own -24 LUFS master is taken into account: audible as
+## air, never as a second track.
+const GROVE_MAX_DB: float = -6.0
+const GROVE_SILENT_DB: float = -60.0
+## Seconds for the level to travel the full 54 dB range when growth changes. Long on
+## purpose: an evolution is a step, and the air should swell into it.
+const GROVE_SLEW_DB_PER_SEC: float = 4.5
+## Leaving a run is a fade, not a swell.
+const GROVE_STOP_DB_PER_SEC: float = 45.0
+
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _player_events: Array[String] = []
 var _music_players: Array[AudioStreamPlayer] = []
@@ -91,6 +111,13 @@ var _chime_step: int = 0
 ## first pause/resume, because `run_started` fires before the state change.
 var _run_mode: String = "standard"
 var _chime_window: float = 0.0
+
+## Grove bed state: the growth value the world last reported, the level the player is
+## actually at, and whether a run is in progress at all.
+var _grove: AudioStreamPlayer
+var _grove_env: float = 0.0
+var _grove_db: float = GROVE_SILENT_DB
+var _grove_active: bool = false
 
 
 func _ready() -> void:
@@ -115,6 +142,11 @@ func _ready() -> void:
 		_music_target_db.append(MUSIC_SILENT_DB)
 		_music_db_per_sec.append(120.0)
 
+	_grove = AudioStreamPlayer.new()
+	_grove.name = "GroveBreath"
+	_grove.volume_db = GROVE_SILENT_DB
+	add_child(_grove)
+
 	Events.settings_changed.connect(_sync_volumes)
 	Events.game_state_changed.connect(_on_game_state_changed)
 	Events.run_started.connect(_on_run_started)
@@ -135,6 +167,7 @@ func _process(delta: float) -> void:
 		else:
 			_event_cooldowns[k] = rem
 	_advance_music_fades(delta)
+	_advance_grove(delta)
 
 
 func _advance_music_fades(delta: float) -> void:
@@ -194,6 +227,89 @@ func stop_music(fade_sec: float = MUSIC_FADE_SEC) -> void:
 		_music_db_per_sec[i] = maxf(6.0, absf(_music_players[i].volume_db - MUSIC_SILENT_DB) / maxf(0.1, fade_sec))
 
 
+# --- the grove's breath -----------------------------------------------------------
+
+
+## Level offset for a growth value, relative to the music bed. Pure, so the curve can
+## be asserted without running a mixer.
+##
+## The bed arrives late: `1 - (1 - env)^2` keeps it near-silent for the first third of
+## the ladder and brings it in over the last third. A straight ramp in dB would
+## already be at half volume by stage 8, which is the middle of a run — the forest
+## would sound awake before it looked awake.
+func grove_db_for(env: float) -> float:
+	var e := clampf(env, 0.0, 1.0)
+	var t := 1.0 - pow(1.0 - e, 2.0)
+	return lerpf(GROVE_SILENT_DB, GROVE_MAX_DB, t)
+
+
+## Called by the arena with `EvolutionStages.env_for_mass(mass)` — the same value that
+## drives the bloom, the fireflies and the screen grade. One number, many readers.
+func set_grove_env(t: float) -> void:
+	_grove_env = clampf(t, 0.0, 1.0)
+
+
+func grove_env() -> float:
+	return _grove_env
+
+
+func grove_db() -> float:
+	return _grove_db
+
+
+func grove_is_active() -> bool:
+	return _grove_active
+
+
+func grove_is_playing() -> bool:
+	## Whether the bed is actually decoding, as opposed to merely having a level. The
+	## two can disagree when the stream is missing, which is exactly the failure a
+	## level-only check would miss.
+	return _grove != null and _grove.playing
+
+
+func grove_target_db() -> float:
+	return _grove_target_db()
+
+
+func _grove_target_db() -> float:
+	if not _grove_active:
+		return GROVE_SILENT_DB
+	if not bool(SaveData.get_setting("music_enabled", true)):
+		return GROVE_SILENT_DB
+	return maxf(GROVE_SILENT_DB, _music_volume_db() + grove_db_for(_grove_env))
+
+
+func _start_grove() -> void:
+	if _grove == null:
+		return
+	if _grove.stream == null:
+		var stream := AssetRegistry.get_audio_stream(GROVE_PATH, true)
+		if stream == null:
+			# A missing bed must not take the run down: the music keeps playing and
+			# the grove simply never fades in.
+			return
+		_grove.stream = stream
+	_grove_active = true
+
+
+func _advance_grove(delta: float) -> void:
+	if _grove == null:
+		return
+	var target := _grove_target_db()
+	# Leaving a run is a fade; waking with growth is a swell.
+	var rate := GROVE_STOP_DB_PER_SEC if target <= GROVE_SILENT_DB + 0.01 else GROVE_SLEW_DB_PER_SEC
+	_grove_db = move_toward(_grove_db, target, rate * delta)
+	_grove.volume_db = _grove_db
+	if DisplayServer.get_name() == "headless":
+		return
+	if _grove_db <= GROVE_SILENT_DB + 0.05:
+		if _grove.playing:
+			_grove.stop()
+	elif not _grove.playing and _grove.stream != null:
+		_grove.play()
+
+
 func current_music_id() -> String:
 	return _music_id
 
@@ -222,6 +338,7 @@ func _on_game_state_changed(_old_state: int, new_state: int) -> void:
 	match new_state:
 		App.State.MAIN_MENU, App.State.MODE_SELECT, App.State.VICTORY, App.State.DEFEAT:
 			play_music("menu")
+			_grove_active = false
 		App.State.PLAYING:
 			# The boss keeps its own theme until the run ends.
 			if _music_id != "boss":
@@ -234,10 +351,16 @@ func _on_run_started(mode_id: String) -> void:
 	# Zen gets its own beatless ambient bed; every other mode keeps the run theme.
 	_run_mode = GameModes.normalize(mode_id)
 	play_music(GameModes.music_for(_run_mode))
+	# A new run starts at growth 0, so the grove starts silent and fades in as the
+	# slime grows. Starting it here rather than at boot keeps the menu airless.
+	_grove_env = 0.0
+	_grove_db = GROVE_SILENT_DB
+	_start_grove()
 
 
 func _on_run_finished(_victory: bool, _summary: Dictionary) -> void:
 	stop_music(2.2)
+	_grove_active = false
 
 
 func _on_boss_spawned(_boss_id: String, _max_hp: float) -> void:

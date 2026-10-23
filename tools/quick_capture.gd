@@ -104,6 +104,8 @@ func _boot() -> void:
 		# After the wait, because the camera lerps its zoom every frame.
 		_apply_zoom_override()
 		await _open_draft_if_requested()
+		print("QUICK_CAPTURE grove env=%.3f db=%.2f playing=%s" % [
+			Audio.grove_env(), Audio.grove_db(), str(Audio.grove_is_playing())])
 
 	# A couple of extra frames so the last shader/filter pass is definitely on screen.
 	for _i in range(4):
