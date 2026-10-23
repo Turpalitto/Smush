@@ -56,6 +56,18 @@ func _boot() -> void:
 
 	if stage != "menu":
 		await _enter_arena()
+		# QUICK_CAPTURE_SEED was declared here from the start but never applied, so
+		# every capture compared a DIFFERENT forest: generate_world(0) seeds itself
+		# from the clock. Any two art variants were therefore judged on two different
+		# worlds, which quietly made every A/B in this project meaningless.
+		var seed_env := OS.get_environment(SEED_ENV)
+		if not seed_env.is_empty() and main.arena != null and main.arena.world != null:
+			main.arena.world.generate_world(int(seed_env))
+			main.arena.world.stream_around(main.arena.player.global_position, true)
+			print("QUICK_CAPTURE seed_requested=%s seed_active=%d props=%d decor=%d chunks=%d" % [
+				seed_env, main.arena.world._world_seed, main.arena.world.obstacles.size(),
+				main.arena.world.decor_flora.size(), main.arena.world.streamed_chunk_count()])
+			await get_tree().process_frame
 		# Optional teleport, so the arena border can be inspected without walking there.
 		var pos_env := OS.get_environment("QUICK_CAPTURE_POS")
 		if not pos_env.is_empty():

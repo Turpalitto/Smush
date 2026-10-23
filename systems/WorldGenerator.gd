@@ -46,6 +46,9 @@ const PROPS_PER_CHUNK: float = 1.6
 const FOG_START: float = 460.0
 const FOG_END: float = 1250.0
 const FOG_TINT: Color = Color(0.050, 0.098, 0.105)
+## Sentinel chunk id for things that are not owned by a chunk (the gate pillars).
+## _free_chunk filters by chunk id, so this key guarantees they are never dropped.
+const GATE_CHUNK: Vector2i = Vector2i(0x3FFFFFFF, 0x3FFFFFFF)
 ## Nothing is drawn past this, so the world's canvas item keeps a small bounding
 ## box no matter how far the player has walked.
 const DRAW_RADIUS: float = 1700.0
@@ -124,6 +127,17 @@ var _fogged: Array[Dictionary] = []
 var _swayers: Array[Dictionary] = []
 var _player: Node2D = null
 var _fog_tick: int = 0
+
+## Opt-in microsecond counters. Off in the exported game (a debug build turns them
+## on by itself, which is what the perf probe runs in), so the shipped game never
+## pays for the measurement. They exist because the endless world draws ~600
+## sprites and "it feels fine on my laptop" is not a number.
+var profile_enabled: bool = OS.is_debug_build()
+var perf_us: Dictionary = {"process": 0, "stream": 0, "drain": 0, "fog": 0, "sway": 0, "spores": 0}
+var perf_frames: int = 0
+var perf_chunks_built: int = 0
+var perf_build_us_max: int = 0
+var perf_build_us_total: int = 0
 
 
 func _prop_texture(kind: String) -> Texture2D:
@@ -240,7 +254,13 @@ func stream_around(center: Vector2, immediate: bool = false) -> void:
 func _drain_pending(budget: int = CHUNKS_PER_FRAME) -> void:
 	var built := 0
 	while not _pending.is_empty() and built < budget:
+		var t0 := Time.get_ticks_usec()
 		_build_chunk(_pending.pop_front())
+		if profile_enabled:
+			var dt := Time.get_ticks_usec() - t0
+			perf_build_us_total += dt
+			perf_build_us_max = maxi(perf_build_us_max, dt)
+			perf_chunks_built += 1
 		built += 1
 
 
@@ -383,7 +403,7 @@ func _build_chunk(key: Vector2i) -> void:
 
 	var ob_list: Array[Dictionary] = []
 	for c: Dictionary in content["props"]:
-		var ob := _add_static_pillar(c, root)
+		var ob := _add_static_pillar(c, root, key)
 		ob["chunk"] = key
 		ob_list.append(ob)
 		obstacles.append(ob)
@@ -438,7 +458,7 @@ func _free_chunk(key: Vector2i) -> void:
 	_fogged = kept_fog
 
 
-func _add_static_pillar(d: Dictionary, root: Node2D) -> Dictionary:
+func _add_static_pillar(d: Dictionary, root: Node2D, key: Vector2i = GATE_CHUNK) -> Dictionary:
 	var pos: Vector2 = d["pos"]
 	var r: float = d["radius"]
 	var kind: String = d["kind"]
@@ -469,6 +489,11 @@ func _add_static_pillar(d: Dictionary, root: Node2D) -> Dictionary:
 	sp.flip_h = bool(d.get("flip", false))
 	sp.rotation = float(d.get("tilt", 0.0))
 	root.add_child(sp)
+	# Props haze out with distance the same way the undergrowth does. Without this
+	# the big silhouettes stay at full brightness while the floor beneath them greys
+	# into the mist, which reads as objects floating in front of the haze instead of
+	# standing in it. Gate pillars use a sentinel key so _free_chunk never drops them.
+	_fogged.append({"node": sp, "base": PROP_TINT, "chunk": key})
 	return d
 
 
@@ -541,17 +566,29 @@ func _process(delta: float) -> void:
 		return
 	_anim_time += delta
 	var p := _player_pos()
+	var t_all := Time.get_ticks_usec()
 
+	var t_part := Time.get_ticks_usec()
 	stream_around(p)
 	_drain_pending()
+	if profile_enabled:
+		perf_us["stream"] += Time.get_ticks_usec() - t_part
+
+	t_part = Time.get_ticks_usec()
 	_update_spores(delta, p)
+	if profile_enabled:
+		perf_us["spores"] += Time.get_ticks_usec() - t_part
 
 	# Distance haze changes slowly; every third frame is indistinguishable from
 	# every frame and saves ~200 modulate writes.
 	_fog_tick += 1
 	if _fog_tick % 3 == 0:
+		t_part = Time.get_ticks_usec()
 		_apply_fog(p)
+		if profile_enabled:
+			perf_us["fog"] += Time.get_ticks_usec() - t_part
 
+	t_part = Time.get_ticks_usec()
 	for swayer: Dictionary in _swayers:
 		var node := swayer["node"] as Sprite2D
 		if node == null or not is_instance_valid(node):
@@ -560,6 +597,10 @@ func _process(delta: float) -> void:
 		if node.position.distance_squared_to(p) > DECOR_RADIUS * DECOR_RADIUS:
 			continue
 		node.rotation = float(swayer["base_rotation"]) + sin(_anim_time * 1.6 + float(swayer["phase"])) * float(swayer["amount"])
+	if profile_enabled:
+		perf_us["sway"] += Time.get_ticks_usec() - t_part
+		perf_us["process"] += Time.get_ticks_usec() - t_all
+		perf_frames += 1
 
 	queue_redraw()
 

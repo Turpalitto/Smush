@@ -146,6 +146,38 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		"Every prop and every painted plant is a real sprite")
 	assert_eq(arena.world._swayers.size(), swaying_plants,
 		"Every plant that should move with the spores does (and only those)")
+	# The floor shader hazes out with distance, and ArenaController says in so many
+	# words that props recede with it. They did not: props were never registered for
+	# the haze, so the big silhouettes stayed at full brightness on a greying floor.
+	# Set membership, not a count: the haze list also holds the four root gates,
+	# which live outside the chunk tree on purpose (they are not streamed).
+	var fogged_nodes := {}
+	for f in arena.world._fogged:
+		fogged_nodes[f["node"]] = true
+	var unfogged := 0
+	if chunk_root != null:
+		for chunk in chunk_root.get_children():
+			for ch in chunk.get_children():
+				if ch is Sprite2D and not fogged_nodes.has(ch):
+					unfogged += 1
+	assert_eq(unfogged, 0, "Every world sprite is registered for the distance haze")
+
+	# ...and the fade actually runs. Pixel diffs cannot show this: two runs differ by
+	# more from random entities than from the haze, so the check is on the sprite.
+	var fog_target: Dictionary = {}
+	for f in arena.world._fogged:
+		if f["base"] == WorldGenerator.PROP_TINT:
+			fog_target = f
+			break
+	assert_false(fog_target.is_empty(), "Props are registered for the distance haze")
+	if not fog_target.is_empty():
+		var fog_sp := fog_target["node"] as Sprite2D
+		var fog_pos := fog_sp.position
+		arena.world._apply_fog(fog_pos + Vector2(WorldGenerator.FOG_END + 200.0, 0.0))
+		assert_eq(fog_sp.modulate.a, 0.0, "A prop past the haze end is fully dissolved")
+		arena.world._apply_fog(fog_pos)
+		assert_eq(fog_sp.modulate.a, 1.0, "A prop at the player is fully opaque again")
+		assert_eq(fog_sp.modulate, WorldGenerator.PROP_TINT, "And it is back to its own tint")
 
 	# The undergrowth set is what stops one fern sprite from repeating hundreds of
 	# times per screen. If any of these goes missing the world quietly falls back to
