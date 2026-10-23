@@ -4,7 +4,7 @@ extends RefCounted
 
 const MIN_MASS: float = 8.0
 const DEFAULT_START_MASS: float = 10.0
-const SOFT_CAP_MASS: float = 115.0
+const SOFT_CAP_MASS: float = 78.0
 const MAX_MASS: float = 220.0
 
 const MIN_RADIUS: float = 18.0
@@ -64,6 +64,8 @@ static func can_fit_narrow_passage(mass: float, passage_half_width: float, is_da
 
 
 static func evolution_threshold_for_level(level: int) -> float:
-	# Fast first mutations (within first 30-60s!), smooth escalation across 5-8 min run
+	# Fast first mutations (within first 15-35s!), smooth escalation to Lv 8-11 across 5-7 min run
 	var lv := maxi(0, level)
-	return roundf(32.0 + float(lv) * 24.0 + pow(float(lv), 1.55) * 9.0)
+	if lv <= 3:
+		return roundf(32.0 + float(lv) * 24.0 + pow(float(lv), 1.55) * 9.0)
+	return roundf(32.0 + float(lv) * 28.0 + pow(float(lv), 1.65) * 11.0)

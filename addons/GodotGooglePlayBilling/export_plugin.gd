@@ -25,12 +25,16 @@ class BillingPluginExportPlugin extends EditorExportPlugin:
 		return false
 
 	func _get_android_libraries(platform, debug):
+		if not get_option("gradle_build/use_gradle_build"):
+			return PackedStringArray()
 		if debug:
 			return PackedStringArray([_plugin_name + "/bin/debug/" + _plugin_name + "-debug.aar"])
 		else:
 			return PackedStringArray([_plugin_name + "/bin/release/" + _plugin_name + "-release.aar"])
 
 	func _get_android_dependencies(platform, debug):
+		if not get_option("gradle_build/use_gradle_build"):
+			return PackedStringArray()
 		if debug:
 			return PackedStringArray(["com.android.billingclient:billing-ktx:9.1.0"])
 		else:

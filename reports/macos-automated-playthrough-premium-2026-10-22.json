@@ -1,0 +1,211 @@
+{
+	"absorbed_count": 121,
+	"accidental_double_tap_dash": false,
+	"boss_p2_t": 294.2,
+	"boss_p3_t": 305.2,
+	"boss_spawn_t": 270.0,
+	"cheats_or_direct_stat_edits": false,
+	"damage_events": [
+		{
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 194.3
+		},
+		{
+			"dmg": 20.0,
+			"hp": 62.4,
+			"src": "umbral_alpha",
+			"t": 203.5
+		},
+		{
+			"dmg": 20.0,
+			"hp": 44.8,
+			"src": "umbral_alpha",
+			"t": 208.7
+		},
+		{
+			"dmg": 20.0,
+			"hp": 70.8,
+			"src": "umbral_alpha",
+			"t": 262.5
+		},
+		{
+			"dmg": 14.6,
+			"hp": 71.4,
+			"src": "stone_slug",
+			"t": 274.5
+		},
+		{
+			"dmg": 11.0,
+			"hp": 75.6,
+			"src": "ancient_guardian",
+			"t": 275.9
+		},
+		{
+			"dmg": 11.0,
+			"hp": 69.5,
+			"src": "ancient_guardian",
+			"t": 281.8
+		},
+		{
+			"dmg": 11.0,
+			"hp": 88.9,
+			"src": "ancient_guardian",
+			"t": 288.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 77.9,
+			"src": "ancient_guardian",
+			"t": 294.2
+		},
+		{
+			"dmg": 24.4,
+			"hp": 68.8,
+			"src": "boss_slam",
+			"t": 297.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 71.8,
+			"src": "ancient_guardian",
+			"t": 300.3
+		},
+		{
+			"dmg": 25.6,
+			"hp": 46.2,
+			"src": "boss_slam",
+			"t": 302.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 36.4,
+			"src": "ancient_guardian",
+			"t": 304.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 53.4,
+			"src": "ancient_guardian",
+			"t": 306.2
+		},
+		{
+			"dmg": 11.0,
+			"hp": 84.4,
+			"src": "ancient_guardian",
+			"t": 310.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 316.4
+		}
+	],
+	"damage_events_count": 16,
+	"essence_earned_base": 185,
+	"evo_level": 6,
+	"evo_times_sec": [
+		5.2,
+		25.1,
+		169.5,
+		213.0,
+		246.6,
+		299.2
+	],
+	"final_hp": 89.0,
+	"final_mass": 84.0,
+	"final_state": "VICTORY",
+	"human_operated": false,
+	"input_delivery": "InputEventScreenTouch + InputEventScreenDrag via VirtualJoystick & UI Button signals",
+	"master_audio_capture": {
+		"limiter_info": {
+			"bus": "Master",
+			"bus_effects": [
+				"0:AudioEffectCapture",
+				"1:AudioEffectHardLimiter",
+				"2:AudioEffectRecord"
+			],
+			"bus_volume_db": 0.0,
+			"ceiling_db": -1.20000004768372,
+			"limiter_effect_index": 1,
+			"mix_rate_hz": 48000.0,
+			"pre_gain_db": 0.0,
+			"release_sec": 0.100000001490116
+		},
+		"pre_limiter_frames": 2545664,
+		"pre_limiter_peak_dbfs": -0.49,
+		"recording_wall_sec": 53.08,
+		"tap_point": "Master bus effect index after AudioEffectHardLimiter (post-limiter)",
+		"wav_path": "/tmp/pt_final/boss.wav"
+	},
+	"max_absorb_gap_sec": 68.6,
+	"miniboss_defeated_t": -1.0,
+	"miniboss_spawn_t": 165.0,
+	"music_enabled_default": true,
+	"music_playing": true,
+	"music_switch_count": 3,
+	"music_track_at_finish": "",
+	"music_tracks_seen": {
+		"boss": 1,
+		"run": 1
+	},
+	"mutation_draft_policy": "heuristic_over_legitimate_3_card_offer (synergy -> dash -> spikes -> magnet -> regeneration -> shield -> freeze)",
+	"mutations": {
+		"dash": 5,
+		"spikes": 1
+	},
+	"partial": false,
+	"pause_resume_check": {
+		"paused_and_resumed_with_time_frozen": true,
+		"performed": true
+	},
+	"peak_mass": 86.6,
+	"saved_essence_after_run": 375,
+	"screenshots_written": [
+		"01_main_menu (720x1280)",
+		"00_menu_720x1280 (720x1280)",
+		"00_menu_540x1200_narrow (540x1200)",
+		"00_menu_1080x1920_big (1080x1682)",
+		"00_menu_1280x720_landscape (1280x720)",
+		"02_mode_select (720x1280)",
+		"03_gameplay_start (720x1280)",
+		"04_mutation_draft (720x1280)",
+		"05_pause_overlay (720x1280)",
+		"06_miniboss (720x1280)",
+		"07_boss_phase1 (720x1280)",
+		"08_boss_phase2 (720x1280)",
+		"09_boss_phase3 (720x1280)",
+		"10_run_result (720x1280)"
+	],
+	"sfx_counts_by_event": {
+		"absorb": 110,
+		"attack": 71,
+		"boss_warning": 3,
+		"button_click": 1,
+		"evolution": 6,
+		"hurt": 16,
+		"move": 591,
+		"mutation_pick": 6,
+		"victory": 1
+	},
+	"sfx_max_concurrent_streams": 5,
+	"sfx_total_plays": 805,
+	"synergies": [
+		"piercing_strike"
+	],
+	"timing": {
+		"in_game_run_elapsed_sec": 320.8,
+		"physics_ticks_per_sec": 60,
+		"wall_clock_elapsed_sec": 322.6
+	},
+	"verification_kind": "automated_playthrough_script_agent",
+	"world_data_visible_to_agent": [
+		"player.global_position / radius / hp / dash_cooldown",
+		"active CollectibleOrb positions / kinds",
+		"active EnemyEntity positions / AbsorptionRules.evaluate()",
+		"active HazardZone positions / radii / detonated flags",
+		"AncientGuardianBoss position / phase / action_state / _charge_dir / is_vulnerable() / hp_ratio"
+	]
+}

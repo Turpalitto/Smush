@@ -41,10 +41,28 @@ func _ready() -> void:
 	if sh != null:
 		var mat := ShaderMaterial.new()
 		mat.shader = sh
+		# The menu is the first thing a player sees, so it gets the floor too — one
+		# step closer, since no gameplay has to read on top of it. The strength is
+		# held back: at full strength the moss grain and the root grooves compete
+		# with the title and the buttons instead of sitting behind them.
+		if ArenaController.apply_floor_texture(mat, 0.55):
+			mat.set_shader_parameter("floor_tile_px", 1400.0)
+			mat.set_shader_parameter("world_offset", Vector2(240.0, 90.0))
+		# The menu is not a run, but it should still promise the forest the game
+		# becomes. At growth 0 the floor is the coldest state in the whole game —
+		# near-black teal — which undersells the subtitle "Зачарованный лес" on the
+		# very first screen. A fixed mid growth gives it the warm light and the
+		# open vignette without touching gameplay.
+		mat.set_shader_parameter("growth", 0.62)
 		bg.material = mat
 	else:
 		bg.color = Color(0.06, 0.14, 0.17)
 	add_child(bg)
+
+	# Drifting motes and a few glowing blooms over the floor, under the UI.
+	var garden := MenuGarden.new()
+	garden.name = "MenuGarden"
+	add_child(garden)
 
 	var root_vbox := VBoxContainer.new()
 	root_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -111,6 +129,15 @@ func show_page(page: Page) -> void:
 			_build_shop_page()
 		Page.PRIVACY:
 			_build_privacy_page()
+
+
+func _format_multiplier(mult: float) -> String:
+	return "×%.1f" % mult
+
+
+func _format_time(seconds: float) -> String:
+	var total := int(maxf(0.0, seconds))
+	return "%02d:%02d" % [total / 60, total % 60]
 
 
 func _make_header_with_back(title_text: String) -> HBoxContainer:
@@ -220,6 +247,46 @@ func _build_mode_select_page() -> void:
 	_page_container.add_child(vb)
 	vb.add_child(_make_header_with_back(Loc.t("mode.title")))
 
+	var cur_diff := SaveData.get_difficulty_id()
+	var diff_cfg: Dictionary = ConfigDB.get_difficulty(cur_diff)
+
+	# --- Difficulty selector ---
+	var diff_lbl := Label.new()
+	diff_lbl.text = Loc.t("difficulty.title")
+	diff_lbl.add_theme_font_size_override("font_size", 18)
+	vb.add_child(diff_lbl)
+
+	var diff_row := HFlowContainer.new()
+	diff_row.add_theme_constant_override("h_separation", 8)
+	diff_row.add_theme_constant_override("v_separation", 8)
+	vb.add_child(diff_row)
+
+	for did in ConfigDB.difficulty_order:
+		var dcfg: Dictionary = ConfigDB.difficulties[did]
+		var dname := Loc.t(str(dcfg.get("name_key", did)))
+		var db := Button.new()
+		db.text = ("✓ " + dname) if did == cur_diff else dname
+		db.custom_minimum_size = Vector2(0, 44)
+		if did == cur_diff:
+			db.add_theme_color_override("font_color", Color(str(dcfg.get("accent", "#6fe3b6"))))
+		db.pressed.connect(func() -> void:
+			Audio.play_sfx("button_click")
+			SaveData.set_difficulty(str(did))
+			show_page(Page.MODE_SELECT)
+		)
+		diff_row.add_child(db)
+
+	var diff_desc := Label.new()
+	diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	diff_desc.add_theme_font_size_override("font_size", 15)
+	var desc_text := Loc.t(str(diff_cfg.get("desc_key", "")))
+	# "Essence ×1.0" on the default difficulty is noise; only advertise a real bonus.
+	var essence_mult := float(diff_cfg.get("essence_mult", 1.0))
+	if essence_mult > 1.0:
+		desc_text += " · " + Loc.t("difficulty.essence_bonus", {"mult": _format_multiplier(essence_mult)})
+	diff_desc.text = desc_text
+	vb.add_child(diff_desc)
+
 	for mode_info in [
 		["standard", "mode.standard.name", "mode.standard.desc"],
 		["quick", "mode.quick.name", "mode.quick.desc"]
@@ -242,6 +309,20 @@ func _build_mode_select_page() -> void:
 		mdesc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		mdesc.add_theme_font_size_override("font_size", 16)
 		cv.add_child(mdesc)
+
+		# Personal best for this mode on the currently selected difficulty.
+		var rec := SaveData.get_record(mid, cur_diff)
+		var rec_lbl := Label.new()
+		rec_lbl.add_theme_font_size_override("font_size", 14)
+		rec_lbl.add_theme_color_override("font_color", Color(0.72, 0.83, 0.87))
+		if float(rec.get("best_time", 0.0)) > 0.0:
+			rec_lbl.text = Loc.t("difficulty.record_line", {
+				"time": _format_time(float(rec["best_time"])),
+				"mass": str(int(round(float(rec["best_mass"]))))
+			})
+		else:
+			rec_lbl.text = Loc.t("difficulty.no_record")
+		cv.add_child(rec_lbl)
 
 		var start_btn := Button.new()
 		start_btn.text = Loc.t("mode.start_btn")
@@ -481,6 +562,7 @@ func _build_collection_page() -> void:
 				tr.modulate = Color.WHITE if seen_cnt > 0 else Color(0.15, 0.20, 0.22, 0.85)
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 				tr.custom_minimum_size = Vector2(58, 58)
 				hb.add_child(tr)
 
@@ -580,10 +662,10 @@ func _build_settings_page() -> void:
 	)
 	list.add_child(sfx_slider)
 
-	# Music Toggle (OFF by default per Section 12!) & Music Volume
+	# Music toggle (ON by default: the game ships with a real soundtrack) & volume
 	var mus_chk := CheckButton.new()
 	mus_chk.text = Loc.t("settings.music_toggle")
-	mus_chk.button_pressed = bool(SaveData.get_setting("music_enabled", false))
+	mus_chk.button_pressed = bool(SaveData.get_setting("music_enabled", true))
 	mus_chk.toggled.connect(func(on: bool) -> void:
 		SaveData.set_setting("music_enabled", on)
 	)
@@ -619,6 +701,20 @@ func _build_settings_page() -> void:
 		SaveData.set_setting("auto_absorb", on)
 	)
 	list.add_child(auto_chk)
+
+	# Haptics toggle. Only on devices with a vibrator: on desktop the option would be
+	# a switch that does nothing, and the game is played one-handed on a phone where
+	# the impact feedback matters.
+	if Haptics.is_supported():
+		var hap_chk := CheckButton.new()
+		hap_chk.text = Loc.t("settings.haptics")
+		hap_chk.button_pressed = bool(SaveData.get_setting("haptics_enabled", true))
+		hap_chk.toggled.connect(func(on: bool) -> void:
+			SaveData.set_setting("haptics_enabled", on)
+			if on:
+				Haptics.play("ui")
+		)
+		list.add_child(hap_chk)
 
 	# FX Quality cycle
 	var fxq := str(SaveData.get_setting("fx_quality", "high"))
@@ -746,8 +842,31 @@ func _build_privacy_page() -> void:
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(card)
 
+	var card_vb := VBoxContainer.new()
+	card_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_vb.add_theme_constant_override("separation", 14)
+	card.add_child(card_vb)
+
 	var body := Label.new()
 	body.text = Loc.t("privacy.body")
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 16)
-	card.add_child(body)
+	card_vb.add_child(body)
+
+	var privacy_options := Button.new()
+	privacy_options.text = "Настройки рекламной конфиденциальности" if Loc.current_locale == "ru" else "Ad privacy choices"
+	privacy_options.custom_minimum_size.y = 56
+	privacy_options.pressed.connect(Ads.show_privacy_options)
+	card_vb.add_child(privacy_options)
+
+	var license_button := Button.new()
+	license_button.text = "Лицензия Godot (MIT)" if Loc.current_locale == "ru" else "Godot license (MIT)"
+	license_button.custom_minimum_size.y = 56
+	card_vb.add_child(license_button)
+	var license_text := Label.new()
+	license_text.text = FileAccess.get_file_as_string("res://licenses/GODOT_LICENSE.txt")
+	license_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	license_text.add_theme_font_size_override("font_size", 14)
+	license_text.visible = false
+	card_vb.add_child(license_text)
+	license_button.pressed.connect(func() -> void: license_text.visible = not license_text.visible)

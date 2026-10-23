@@ -1,0 +1,18 @@
+# FLUX.1-schnell prompts for resources/art/props (one per line, in batch order).
+# Regenerate with:
+#   cf_flux.py --batch-file tools/prop_prompts.txt --out-dir /tmp/flux_props --steps 6
+#   python3 tools/process_prop_art.py /tmp/flux_props resources/art/props --size 256 --manifest <map>
+# Order: root_pillar, rune_stone, mana_crystal, mushroom_cluster, fern_cluster
+#
+# Props share the creatures' painted look but stay a step darker and less saturated,
+# so the arena floor never competes with the things that can eat you.
+
+a gnarled enchanted tree stump, thick twisted buttress roots, deep bark ridges, emerald moss cap on top, tiny glowing amber mushrooms growing on the bark, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+an ancient carved rune monolith, weathered dark stone with glowing turquoise sigils, cracks threaded with faint emerald light, moss creeping up one side, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a cluster of enchanted mana crystals, translucent cyan shards with a bright inner glow, faceted glass edges, faint violet sparkles inside, small stone base, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a small cluster of glowing magical mushrooms, three rounded caps in mint and pale gold, luminous gills, short pale stems, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a tuft of enchanted forest ferns, five curling emerald fronds with glowing pale edges, dew droplets, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size

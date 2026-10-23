@@ -61,12 +61,16 @@ func bind_arena(p_arena: ArenaController) -> void:
 func _populate_choices(choices: Array) -> void:
 	_title_lbl.text = Loc.t("draft.title")
 	for ch in _cards_box.get_children():
+		# Remove immediately so chained drafts never show two sets of cards.
+		_cards_box.remove_child(ch)
 		ch.queue_free()
 
-	for item: Dictionary in choices:
+	for idx in range(choices.size()):
+		var item: Dictionary = choices[idx]
 		var mid: String = str(item.get("id", ""))
 		var cfg := ConfigDB.get_mutation(mid)
 		var rarity: String = str(item.get("rarity", "common"))
+		var cur_lv: int = int(item.get("current_level", 0))
 		var next_lv: int = int(item.get("next_level", 1))
 		var max_lv: int = int(item.get("max_level", 5))
 		var syn_id: String = str(item.get("completes_synergy", ""))
@@ -78,9 +82,20 @@ func _populate_choices(choices: Array) -> void:
 			border_col = Color(0.88, 0.52, 1.0)
 
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 118)
-		btn.add_theme_stylebox_override("normal", UIThemeBuilder.make_box(Color(0.08, 0.17, 0.20, 0.98), border_col, 18, 3, 14, 12))
-		btn.add_theme_stylebox_override("hover", UIThemeBuilder.make_box(Color(0.13, 0.25, 0.28, 1.0), border_col.lightened(0.25), 18, 3, 14, 12))
+		btn.custom_minimum_size = Vector2(0, 128)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# The card is tinted a little toward its rarity and carries a rarity-coloured
+		# halo, so the rarity is readable from the row without reading the word
+		# "Обычная" on every card. Layout and hit area are unchanged.
+		var card_bg := Color(0.08, 0.17, 0.20, 0.98).lerp(border_col, 0.10)
+		var halo := Color(border_col.r, border_col.g, border_col.b, 0.20)
+		var halo_hi := Color(border_col.r, border_col.g, border_col.b, 0.36)
+		btn.add_theme_stylebox_override("normal",
+			UIThemeBuilder.make_box(card_bg, border_col, 18, 3, 14, 12, halo, 9))
+		btn.add_theme_stylebox_override("hover",
+			UIThemeBuilder.make_box(card_bg.lightened(0.06), border_col.lightened(0.25), 18, 3, 14, 12, halo_hi, 15))
+		btn.add_theme_stylebox_override("pressed",
+			UIThemeBuilder.make_box(Color(0.06, 0.14, 0.17, 1.0), Color(0.85, 1.0, 0.92), 18, 3, 14, 12, halo_hi, 12))
 		btn.pressed.connect(func() -> void:
 			if arena != null:
 				arena.select_draft_mutation(mid)
@@ -106,25 +121,27 @@ func _populate_choices(choices: Array) -> void:
 			icon_rect.texture = tex
 			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon_rect.custom_minimum_size = Vector2(68, 68)
+			icon_rect.custom_minimum_size = Vector2(64, 64)
+			icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hbox.add_child(icon_rect)
 
 		var text_col := VBoxContainer.new()
 		text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		text_col.alignment = BoxContainer.ALIGNMENT_CENTER
+		text_col.add_theme_constant_override("separation", 4)
 		text_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.add_child(text_col)
 
+		var lv_tag := ("%s %d→%d/%d" % [Loc.t("common.level"), cur_lv, next_lv, max_lv]) if cur_lv > 0 else ("%s 1/%d ★" % [Loc.t("common.level"), max_lv])
 		var header := Label.new()
-		header.text = "%s  [%s %d/%d · %s]" % [
+		header.text = "%s  [%s · %s]" % [
 			Loc.t(str(cfg.get("name_key", mid))),
-			Loc.t("common.level"),
-			next_lv,
-			max_lv,
+			lv_tag,
 			Loc.t("draft.rarity." + rarity)
 		]
-		header.add_theme_font_size_override("font_size", 19)
+		header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		header.add_theme_font_size_override("font_size", 18)
 		header.add_theme_color_override("font_color", border_col.lightened(0.25))
 		text_col.add_child(header)
 
@@ -138,13 +155,39 @@ func _populate_choices(choices: Array) -> void:
 			var scfg: Dictionary = ConfigDB.synergies.get(syn_id, {})
 			var syn_lbl := Label.new()
 			syn_lbl.text = "★ %s %s!" % [Loc.t("draft.synergy_ready"), Loc.t(str(scfg.get("name_key", syn_id)))]
+			syn_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			syn_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.36))
 			syn_lbl.add_theme_font_size_override("font_size", 15)
 			text_col.add_child(syn_lbl)
 
+		pad.minimum_size_changed.connect(func() -> void:
+			if is_instance_valid(btn) and is_instance_valid(pad):
+				btn.custom_minimum_size.y = maxf(126.0, pad.get_combined_minimum_size().y + 12.0)
+		)
 		_cards_box.add_child(btn)
+		btn.custom_minimum_size.y = maxf(126.0, pad.get_combined_minimum_size().y + 12.0)
 
 	_refresh_reroll_button()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or App.state != App.State.MUTATION_DRAFT or arena == null:
+		return
+	if event is InputEventKey:
+		var ke := event as InputEventKey
+		if ke.pressed and not ke.echo:
+			var idx := -1
+			if ke.keycode == KEY_1 or ke.keycode == KEY_KP_1:
+				idx = 0
+			elif ke.keycode == KEY_2 or ke.keycode == KEY_KP_2:
+				idx = 1
+			elif ke.keycode == KEY_3 or ke.keycode == KEY_KP_3:
+				idx = 2
+			if idx >= 0 and idx < _cards_box.get_child_count():
+				var card_btn := _cards_box.get_child(idx) as Button
+				if card_btn != null:
+					card_btn.pressed.emit()
+					get_viewport().set_input_as_handled()
 
 
 func _refresh_reroll_button() -> void:

@@ -1,0 +1,132 @@
+{
+  "verification_mode": "Godot 4.5 AudioServer Master-bus AudioEffectRecord WAV capture + PCM waveform analysis (not physical speaker listening by human ear)",
+  "music_default_enabled": false,
+  "source_wav_assets": {
+    "audio/music/ambient_forest.wav": {
+      "duration_sec": 6.0,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -15.46,
+      "rms_dbfs": -25.55,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/absorb.wav": {
+      "duration_sec": 0.22,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -6.43,
+      "rms_dbfs": -12.78,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/attack.wav": {
+      "duration_sec": 0.2,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -7.45,
+      "rms_dbfs": -18.26,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/boss_warning.wav": {
+      "duration_sec": 0.95,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -5.5,
+      "rms_dbfs": -13.64,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/button_click.wav": {
+      "duration_sec": 0.07,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -7.64,
+      "rms_dbfs": -17.87,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/defeat.wav": {
+      "duration_sec": 1.2,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -6.66,
+      "rms_dbfs": -16.51,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/evolution.wav": {
+      "duration_sec": 0.75,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -5.1,
+      "rms_dbfs": -16.01,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/hurt.wav": {
+      "duration_sec": 0.24,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -3.02,
+      "rms_dbfs": -14.12,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/move_pulse.wav": {
+      "duration_sec": 0.14,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -11.06,
+      "rms_dbfs": -17.12,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/mutation_pick.wav": {
+      "duration_sec": 0.45,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -6.23,
+      "rms_dbfs": -19.52,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/shield_break.wav": {
+      "duration_sec": 0.22,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -4.46,
+      "rms_dbfs": -17.48,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    },
+    "audio/sfx/victory.wav": {
+      "duration_sec": 1.25,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "peak_dbfs": -5.29,
+      "rms_dbfs": -16.75,
+      "clipped_samples": 0,
+      "samples_above_minus_1dbfs": 0
+    }
+  },
+  "master_bus_boss_combat_before": {
+    "duration_sec": 75.79,
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "peak_dbfs": 0.0,
+    "rms_dbfs": -17.92,
+    "clipped_samples": 48,
+    "samples_above_minus_1dbfs": 346
+  },
+  "master_bus_boss_combat_after": {
+    "duration_sec": 106.533,
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "peak_dbfs": -0.46,
+    "rms_dbfs": -22.59,
+    "clipped_samples": 0,
+    "samples_above_minus_1dbfs": 40
+  }
+}

@@ -1,0 +1,38 @@
+{
+	"version": 1,
+	"difficulties": [
+		{
+			"id": "normal",
+			"name_key": "difficulty.normal.name",
+			"desc_key": "difficulty.normal.desc",
+			"accent": "#6fe3b6",
+			"essence_mult": 1.0,
+			"enemy_hp_mult": 1.0,
+			"enemy_damage_mult": 1.0,
+			"boss_hp_mult": 1.0,
+			"spawn_rate_mult": 1.0
+		},
+		{
+			"id": "hunter",
+			"name_key": "difficulty.hunter.name",
+			"desc_key": "difficulty.hunter.desc",
+			"accent": "#ffc857",
+			"essence_mult": 1.4,
+			"enemy_hp_mult": 1.25,
+			"enemy_damage_mult": 1.2,
+			"boss_hp_mult": 1.2,
+			"spawn_rate_mult": 1.1
+		},
+		{
+			"id": "nightmare",
+			"name_key": "difficulty.nightmare.name",
+			"desc_key": "difficulty.nightmare.desc",
+			"accent": "#ff6b81",
+			"essence_mult": 1.9,
+			"enemy_hp_mult": 1.5,
+			"enemy_damage_mult": 1.35,
+			"boss_hp_mult": 1.35,
+			"spawn_rate_mult": 1.25
+		}
+	]
+}

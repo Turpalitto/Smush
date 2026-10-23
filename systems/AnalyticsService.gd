@@ -20,13 +20,14 @@ const VALID_EVENTS: PackedStringArray = [
 ]
 
 var _session_start_unix: float = 0.0
+var _session_open: bool = false
 var _event_log: Array[Dictionary] = []
 var max_buffered_events: int = 250
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_session_start_unix = Time.get_unix_time_from_system()
+	start_session()
 	_record_cohort_day()
 
 	var stats: Dictionary = SaveData.data.get("stats", {})
@@ -96,6 +97,16 @@ func _update_local_aggregates(event_name: String, props: Dictionary) -> void:
 		return
 	var st: Dictionary = SaveData.data["stats"]
 	match event_name:
+		"session_end":
+			st["session_count"] = int(st.get("session_count", 0)) + 1
+			st["session_time_sec"] = float(st.get("session_time_sec", 0.0)) + maxf(0.0, float(props.get("duration_sec", 0.0)))
+		"run_duration":
+			st["finished_run_count"] = int(st.get("finished_run_count", 0)) + 1
+			st["finished_run_time_sec"] = float(st.get("finished_run_time_sec", 0.0)) + maxf(0.0, float(props.get("seconds", 0.0)))
+		"tutorial_started":
+			st["tutorial_starts"] = int(st.get("tutorial_starts", 0)) + 1
+		"tutorial_completed":
+			st["tutorial_completions"] = int(st.get("tutorial_completions", 0)) + 1
 		"rewarded_ad_offered":
 			st["rewarded_offered"] = int(st.get("rewarded_offered", 0)) + 1
 		"rewarded_ad_completed":
@@ -103,15 +114,26 @@ func _update_local_aggregates(event_name: String, props: Dictionary) -> void:
 		"boss_encountered":
 			st["boss_encounters"] = int(st.get("boss_encounters", 0)) + 1
 		"purchase_completed":
-			st["revenue_usd_total"] = float(st.get("revenue_usd_total", 0.0)) + float(props.get("price_usd", 0.0))
+			if bool(props.get("revenue_verified", false)):
+				st["revenue_usd_total"] = float(st.get("revenue_usd_total", 0.0)) + maxf(0.0, float(props.get("price_usd", 0.0)))
+				st["revenue_verified"] = true
+
+
+func start_session() -> void:
+	if _session_open:
+		return
+	_session_start_unix = Time.get_unix_time_from_system()
+	_session_open = true
 
 
 func end_session() -> void:
-	var dur := maxf(0.0, Time.get_unix_time_from_system() - _session_start_unix)
+	if not _session_open:
+		return
+	_session_open = false
+	var duration := maxf(0.0, Time.get_unix_time_from_system() - _session_start_unix)
+	track("session_end", {"duration_sec": snappedf(duration, 0.1)})
 	if not SaveData.data.is_empty():
-		SaveData.increment_stat("total_playtime_sec", dur)
-	track("session_end", {"duration_sec": snappedf(dur, 0.1)})
-	_session_start_unix = Time.get_unix_time_from_system()
+		SaveData.save_to_disk()
 
 
 func get_kpi_snapshot() -> Dictionary:
@@ -125,18 +147,26 @@ func get_kpi_snapshot() -> Dictionary:
 	var bosses_won: int = int(st.get("bosses_defeated", 0))
 	var offered: int = int(st.get("rewarded_offered", 0))
 	var completed: int = int(st.get("rewarded_completed", 0))
+	var started: int = int(st.get("rewarded_started", 0))
+	var session_count: int = int(st.get("session_count", 0))
+	var encounters: int = int(st.get("boss_encounters", 0))
+	var tutorial_starts: int = int(st.get("tutorial_starts", 0))
+	var finished_runs: int = int(st.get("finished_run_count", 0))
+	var today: int = int(Time.get_unix_time_from_system() / 86400)
 	var active_day_count: int = maxi(1, days.size())
 	var revenue_usd: float = float(st.get("revenue_usd_total", 0.0))
 
 	return {
-		"d1_retention": d1_retained,
-		"d7_retention": d7_retained,
-		"avg_session_duration_sec": float(st.get("total_playtime_sec", 0.0)) / float(maxi(1, active_day_count)),
+		"d1_retention": d1_retained if today >= first_day + 1 else null,
+		"d7_retention": d7_retained if today >= first_day + 7 else null,
+		"avg_session_duration_sec": float(st.get("session_time_sec", 0.0)) / float(session_count) if session_count > 0 else null,
 		"runs_per_user": total_runs,
-		"tutorial_completed_rate": 1.0 if bool(st.get("tutorial_completed", false)) else 0.0,
-		"boss_win_rate": (float(bosses_won) / float(total_runs)) if total_runs > 0 else 0.0,
-		"rewarded_ad_opt_in_rate": (float(completed) / float(offered)) if offered > 0 else 0.0,
-		"arpdau_usd": revenue_usd / float(active_day_count)
+		"tutorial_completed_rate": float(st.get("tutorial_completions", 0)) / float(tutorial_starts) if tutorial_starts > 0 else null,
+		"boss_win_rate": (float(bosses_won) / float(encounters)) if encounters > 0 else null,
+		"rewarded_ad_opt_in_rate": (float(started) / float(offered)) if offered > 0 else null,
+		"rewarded_ad_completion_rate": (float(completed) / float(started)) if started > 0 else null,
+		"avg_run_duration_sec": float(st.get("finished_run_time_sec", 0.0)) / float(finished_runs) if finished_runs > 0 else null,
+		"arpdau_usd": revenue_usd / float(active_day_count) if bool(st.get("revenue_verified", false)) else null
 	}
 
 

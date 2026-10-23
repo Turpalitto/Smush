@@ -8,6 +8,7 @@ signal navigate_to_main_menu()
 var arena: ArenaController = null
 
 var _pause_root: Control
+var _pause_card: PanelContainer
 var _pause_title: Label
 var _pause_build_lbl: Label
 var _pause_resume_btn: Button
@@ -16,9 +17,12 @@ var _pause_restart_btn: Button
 var _pause_quit_btn: Button
 
 var _result_root: Control
+var _result_card: PanelContainer
 var _result_title: Label
 var _result_stats: Label
 var _result_essence: Label
+var _result_difficulty: Label
+var _result_record: Label
 var _revive_btn: Button
 var _double_btn: Button
 var _ad_status_lbl: Label
@@ -33,7 +37,17 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_pause_panel()
 	_build_result_panel()
+	resized.connect(_adapt_modal_widths)
+	_adapt_modal_widths()
 	Events.game_state_changed.connect(_on_state_changed)
+
+
+func _adapt_modal_widths() -> void:
+	var target_w := clampf(size.x - 44.0, 290.0, 520.0)
+	if _pause_card != null:
+		_pause_card.custom_minimum_size = Vector2(target_w, 0.0)
+	if _result_card != null:
+		_result_card.custom_minimum_size = Vector2(target_w, 0.0)
 
 
 func bind_arena(p_arena: ArenaController) -> void:
@@ -65,7 +79,8 @@ func _build_pause_panel() -> void:
 	margin.add_child(center)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(520, 0)
+	_pause_card = card
+	card.custom_minimum_size = Vector2(300, 0)
 	center.add_child(card)
 
 	var vb := VBoxContainer.new()
@@ -134,7 +149,8 @@ func _build_result_panel() -> void:
 	margin.add_child(center)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(540, 0)
+	_result_card = card
+	card.custom_minimum_size = Vector2(300, 0)
 	center.add_child(card)
 
 	var vb := VBoxContainer.new()
@@ -157,6 +173,18 @@ func _build_result_panel() -> void:
 	_result_essence.add_theme_font_size_override("font_size", 23)
 	_result_essence.add_theme_color_override("font_color", Color(0.55, 1.0, 0.82))
 	vb.add_child(_result_essence)
+
+	_result_difficulty = Label.new()
+	_result_difficulty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_difficulty.add_theme_font_size_override("font_size", 15)
+	_result_difficulty.add_theme_color_override("font_color", Color(0.72, 0.83, 0.87))
+	vb.add_child(_result_difficulty)
+
+	_result_record = Label.new()
+	_result_record.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_record.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_result_record.add_theme_font_size_override("font_size", 16)
+	vb.add_child(_result_record)
 
 	_revive_btn = Button.new()
 	_revive_btn.custom_minimum_size = Vector2(0, 56)
@@ -267,6 +295,7 @@ func _refresh_result_panel() -> void:
 		"mutations": str(sum.get("mutations_count", 0))
 	})
 	_result_essence.text = Loc.t("result.essence_earned", {"essence": str(sum.get("final_essence", 0))})
+	_refresh_result_record(sum)
 
 	var can_rev: bool = bool(sum.get("can_revive", false)) and Ads.can_offer(Ads.PLACEMENT_REVIVE)
 	_revive_btn.visible = (not victory) and can_rev
@@ -277,9 +306,50 @@ func _refresh_result_panel() -> void:
 	_double_btn.disabled = (arena != null and arena.reward_doubled)
 	_double_btn.text = Loc.t("result.double_claimed") if (arena != null and arena.reward_doubled) else Loc.t("result.double_ad")
 
-	_ad_status_lbl.visible = (not can_rev and not can_dbl and (arena == null or not arena.reward_doubled))
+	# Only claim "ads are offline" on a platform that can actually serve them, and only
+	# when none of the placements is obtainable. Desktop builds have no ad backend at
+	# all, so the line there would be permanent noise under the result card.
+	_ad_status_lbl.visible = (not can_rev and not can_dbl and (arena == null or not arena.reward_doubled)
+		and Ads.platform_supports_ads() and not Ads.any_placement_available())
 	_ad_status_lbl.text = Loc.t("result.ad_unavailable")
 
 	_again_btn.text = Loc.t("result.play_again")
 	_upgrades_btn.text = Loc.t("result.to_upgrades")
 	_menu_btn.text = Loc.t("result.to_menu")
+
+
+func _format_run_time(seconds: float) -> String:
+	var total := int(maxf(0.0, seconds))
+	return "%02d:%02d" % [total / 60, total % 60]
+
+
+func _refresh_result_record(sum: Dictionary) -> void:
+	## Records are committed together with the essence reward, so on a defeat screen
+	## (revive still offered) the fresh record is not in the summary yet — fall back to
+	## the stored personal best and simply do not claim a new record.
+	var diff_id := str(sum.get("difficulty", SaveData.get_difficulty_id()))
+	var dcfg: Dictionary = ConfigDB.get_difficulty(diff_id)
+	var is_custom_diff := diff_id != ConfigDB.get_default_difficulty_id()
+	_result_difficulty.visible = is_custom_diff
+	_result_difficulty.text = Loc.t("result.difficulty", {"name": Loc.t(str(dcfg.get("name_key", diff_id)))})
+
+	var rec: Dictionary = {}
+	if typeof(sum.get("record")) == TYPE_DICTIONARY:
+		rec = sum["record"]
+	var new_time := bool(rec.get("is_new_best_time", false))
+	var new_mass := bool(rec.get("is_new_best_mass", false))
+	if rec.is_empty():
+		var prev: Dictionary = SaveData.get_record(str(sum.get("mode", "standard")), diff_id)
+		rec = {"best_time": prev.get("best_time", 0.0), "best_mass": prev.get("best_mass", 0.0)}
+
+	var parts: Array[String] = []
+	if new_time:
+		parts.append(Loc.t("result.new_record"))
+	elif float(rec.get("best_time", 0.0)) > 0.0:
+		parts.append(Loc.t("result.record_line", {"time": _format_run_time(float(rec["best_time"]))}))
+	if new_mass:
+		parts.append(Loc.t("result.new_best_mass", {"mass": str(int(round(float(rec.get("best_mass", 0.0)))))}))
+	_result_record.text = "\n".join(parts)
+	_result_record.visible = not parts.is_empty()
+	_result_record.add_theme_color_override("font_color", Color(1.0, 0.86, 0.40) if (new_time or new_mass) else Color(0.72, 0.83, 0.87))
+

@@ -67,7 +67,10 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var r := 15.0 + 1.8 * sin(_wobble)
-	var body_c := Color(0.55, 0.98, 0.38, 0.82) if leaves_toxic_trail else Color(0.32, 0.92, 0.88, 0.82)
+	var body_c := Color(0.55, 0.98, 0.38, 0.84) if leaves_toxic_trail else Color(0.32, 0.92, 0.88, 0.84)
+	# Subtle decoy taunt ripple showing enemies are drawn to this twin
+	var ripple := 1.15 + 0.25 * (0.5 + 0.5 * sin(_wobble * 0.7))
+	draw_arc(Vector2.ZERO, r * ripple, 0.0, TAU, 22, Color(body_c.r, body_c.g, body_c.b, 0.30), 1.8)
 	draw_circle(Vector2(0, 5), r * 0.85, Color(0, 0, 0, 0.25))
 	draw_circle(Vector2.ZERO, r, body_c)
 	draw_circle(Vector2.ZERO, r * 0.42, Color(1.0, 0.96, 0.65, 0.92))

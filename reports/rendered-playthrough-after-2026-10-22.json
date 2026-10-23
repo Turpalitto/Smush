@@ -1,0 +1,412 @@
+{
+	"absorbed_count": 360,
+	"accidental_double_tap_dash": false,
+	"boss_p2_t": 305.7,
+	"boss_p3_t": 362.8,
+	"boss_spawn_t": 270.0,
+	"damage_events": [
+		{
+			"dmg": 6.6,
+			"hp": 93.4,
+			"src": "poison_pool",
+			"t": 75.9
+		},
+		{
+			"dmg": 7.8,
+			"hp": 88.1,
+			"src": "poison_pool",
+			"t": 77.6
+		},
+		{
+			"dmg": 6.9,
+			"hp": 81.7,
+			"src": "poison_pool",
+			"t": 78.0
+		},
+		{
+			"dmg": 4.4,
+			"hp": 89.1,
+			"src": "poison_pool",
+			"t": 82.0
+		},
+		{
+			"dmg": 4.9,
+			"hp": 90.0,
+			"src": "poison_pool",
+			"t": 84.1
+		},
+		{
+			"dmg": 5.2,
+			"hp": 85.3,
+			"src": "poison_pool",
+			"t": 84.5
+		},
+		{
+			"dmg": 4.6,
+			"hp": 93.1,
+			"src": "poison_pool",
+			"t": 86.7
+		},
+		{
+			"dmg": 4.3,
+			"hp": 89.4,
+			"src": "poison_pool",
+			"t": 87.3
+		},
+		{
+			"dmg": 4.6,
+			"hp": 91.1,
+			"src": "poison_pool",
+			"t": 89.6
+		},
+		{
+			"dmg": 8.0,
+			"hp": 86.2,
+			"src": "poison_pool",
+			"t": 90.1
+		},
+		{
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 167.9
+		},
+		{
+			"dmg": 20.0,
+			"hp": 72.0,
+			"src": "umbral_alpha",
+			"t": 171.5
+		},
+		{
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 182.2
+		},
+		{
+			"dmg": 20.0,
+			"hp": 70.5,
+			"src": "umbral_alpha",
+			"t": 186.1
+		},
+		{
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 203.4
+		},
+		{
+			"dmg": 20.0,
+			"hp": 61.3,
+			"src": "umbral_alpha",
+			"t": 204.4
+		},
+		{
+			"dmg": 7.2,
+			"hp": 60.6,
+			"src": "poison_pool",
+			"t": 206.4
+		},
+		{
+			"dmg": 20.0,
+			"hp": 59.6,
+			"src": "umbral_alpha",
+			"t": 212.7
+		},
+		{
+			"dmg": 8.1,
+			"hp": 91.9,
+			"src": "poison_pool",
+			"t": 227.2
+		},
+		{
+			"dmg": 7.7,
+			"hp": 92.3,
+			"src": "poison_pool",
+			"t": 229.3
+		},
+		{
+			"dmg": 7.5,
+			"hp": 92.5,
+			"src": "poison_pool",
+			"t": 232.8
+		},
+		{
+			"dmg": 5.9,
+			"hp": 88.5,
+			"src": "poison_pool",
+			"t": 233.4
+		},
+		{
+			"dmg": 5.9,
+			"hp": 83.2,
+			"src": "poison_pool",
+			"t": 233.9
+		},
+		{
+			"dmg": 6.1,
+			"hp": 82.7,
+			"src": "poison_pool",
+			"t": 235.9
+		},
+		{
+			"dmg": 20.0,
+			"hp": 75.8,
+			"src": "umbral_alpha",
+			"t": 239.9
+		},
+		{
+			"dmg": 20.0,
+			"hp": 63.9,
+			"src": "umbral_alpha",
+			"t": 242.4
+		},
+		{
+			"dmg": 20.0,
+			"hp": 46.5,
+			"src": "umbral_alpha",
+			"t": 243.5
+		},
+		{
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 260.3
+		},
+		{
+			"dmg": 20.0,
+			"hp": 68.2,
+			"src": "umbral_alpha",
+			"t": 263.8
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 276.0
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 282.0
+		},
+		{
+			"dmg": 11.0,
+			"hp": 80.2,
+			"src": "ancient_guardian",
+			"t": 283.7
+		},
+		{
+			"dmg": 31.7,
+			"hp": 53.9,
+			"src": "boss_slam",
+			"t": 285.6
+		},
+		{
+			"dmg": 11.0,
+			"hp": 76.5,
+			"src": "ancient_guardian",
+			"t": 288.2
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 294.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 79.6,
+			"src": "ancient_guardian",
+			"t": 295.4
+		},
+		{
+			"dmg": 9.1,
+			"hp": 90.9,
+			"src": "poison_pool",
+			"t": 300.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 83.7,
+			"src": "ancient_guardian",
+			"t": 302.3
+		},
+		{
+			"dmg": 8.3,
+			"hp": 82.0,
+			"src": "poison_pool",
+			"t": 305.7
+		},
+		{
+			"dmg": 7.5,
+			"hp": 89.0,
+			"src": "poison_pool",
+			"t": 306.0
+		},
+		{
+			"dmg": 28.1,
+			"hp": 71.9,
+			"src": "boss_slam",
+			"t": 308.4
+		},
+		{
+			"dmg": 11.0,
+			"hp": 80.1,
+			"src": "ancient_guardian",
+			"t": 311.2
+		},
+		{
+			"dmg": 11.0,
+			"hp": 71.1,
+			"src": "ancient_guardian",
+			"t": 312.8
+		},
+		{
+			"dmg": 29.4,
+			"hp": 57.2,
+			"src": "boss_slam",
+			"t": 314.2
+		},
+		{
+			"dmg": 11.0,
+			"hp": 63.3,
+			"src": "ancient_guardian",
+			"t": 316.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 322.1
+		},
+		{
+			"dmg": 28.2,
+			"hp": 66.1,
+			"src": "boss_slam",
+			"t": 324.9
+		},
+		{
+			"dmg": 11.0,
+			"hp": 75.7,
+			"src": "ancient_guardian",
+			"t": 327.7
+		},
+		{
+			"dmg": 28.3,
+			"hp": 54.5,
+			"src": "boss_slam",
+			"t": 330.8
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 344.0
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 351.0
+		},
+		{
+			"dmg": 28.4,
+			"hp": 71.6,
+			"src": "boss_slam",
+			"t": 352.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 356.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 360.9
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 362.3
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 368.4
+		},
+		{
+			"dmg": 23.0,
+			"hp": 77.0,
+			"src": "ancient_guardian",
+			"t": 371.6
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 374.1
+		},
+		{
+			"dmg": 11.0,
+			"hp": 81.3,
+			"src": "ancient_guardian",
+			"t": 375.6
+		}
+	],
+	"damage_events_count": 59,
+	"essence_earned": 134,
+	"evo_level": 10,
+	"evo_times_sec": [
+		3.8,
+		17.1,
+		40.6,
+		54.3,
+		67.9,
+		97.1,
+		148.7,
+		221.9,
+		264.2,
+		362.2
+	],
+	"final_hp": 81.4,
+	"final_mass": 156.4,
+	"final_state": "VICTORY",
+	"max_absorb_gap_sec": 7.9,
+	"miniboss_defeated_t": -1.0,
+	"miniboss_spawn_t": 165.0,
+	"music_enabled_default": false,
+	"music_playing": false,
+	"mutations": {
+		"dash": 3,
+		"freeze": 1,
+		"magnet": 3,
+		"regeneration": 2,
+		"spikes": 1
+	},
+	"peak_mass": 156.4,
+	"run_elapsed_sec": 375.6,
+	"saved_essence": 471,
+	"sfx_counts_by_event": {
+		"absorb": 257,
+		"attack": 30,
+		"boss_warning": 1,
+		"button_click": 2,
+		"evolution": 10,
+		"hurt": 59,
+		"move": 398,
+		"mutation_pick": 10,
+		"victory": 1
+	},
+	"sfx_max_concurrent_streams": 4,
+	"sfx_total_plays": 826,
+	"synergies": [
+		"piercing_strike"
+	]
+}

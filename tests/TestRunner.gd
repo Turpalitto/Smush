@@ -5,8 +5,11 @@ extends Node
 const MassSuite = preload("res://tests/test_mass_and_absorption.gd")
 const MutationSuite = preload("res://tests/test_mutations_and_synergies.gd")
 const SaveSuite = preload("res://tests/test_save_and_progression.gd")
+const DifficultySuite = preload("res://tests/test_difficulty_and_records.gd")
 const MonetizationSuite = preload("res://tests/test_monetization_and_analytics.gd")
 const IntegrationSuite = preload("res://tests/test_full_game_integration.gd")
+const GrowthSuite = preload("res://tests/test_growth_ladder.gd")
+const TestSuiteBase = preload("res://tests/TestSuiteBase.gd")
 
 
 func _ready() -> void:
@@ -36,6 +39,14 @@ func _execute_all() -> void:
 	var s4 := MonetizationSuite.new()
 	s4.run()
 	suites.append(s4)
+
+	var s4b := DifficultySuite.new()
+	s4b.run()
+	suites.append(s4b)
+
+	var s4c := GrowthSuite.new()
+	s4c.run()
+	suites.append(s4c)
 
 	var s5 := IntegrationSuite.new()
 	await s5.run_async(get_tree())

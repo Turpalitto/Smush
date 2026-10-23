@@ -3,7 +3,11 @@ extends RefCounted
 ## Generates a cohesive, high-contrast mobile UI Theme for SLIME RUSH: EVOLUTION.
 
 
-static func make_box(bg: Color, border: Color, radius: int = 16, border_w: int = 2, pad_h: int = 16, pad_v: int = 12) -> StyleBoxFlat:
+static func make_box(bg: Color, border: Color, radius: int = 16, border_w: int = 2, pad_h: int = 16, pad_v: int = 12,
+		glow: Color = Color.TRANSPARENT, glow_size: int = 0) -> StyleBoxFlat:
+	## `glow` draws a soft coloured halo outside the border. StyleBoxFlat cannot hold
+	## a gradient, so the only way to make a card look lit rather than pasted on is
+	## its shadow: same colour as the border, zero offset, large blur.
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
@@ -13,6 +17,10 @@ static func make_box(bg: Color, border: Color, radius: int = 16, border_w: int =
 	sb.content_margin_right = pad_h
 	sb.content_margin_top = pad_v
 	sb.content_margin_bottom = pad_v
+	if glow_size > 0 and glow.a > 0.001:
+		sb.shadow_color = glow
+		sb.shadow_size = glow_size
+		sb.shadow_offset = Vector2.ZERO
 	return sb
 
 

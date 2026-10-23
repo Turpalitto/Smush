@@ -1,6 +1,9 @@
-class_name TestSuiteBase
 extends RefCounted
 ## Base assertion helper for SLIME RUSH: EVOLUTION automated GDScript test suites.
+##
+## Deliberately NOT a global class (`class_name`): a registered global class is always
+## packed by the exporter, which dragged the whole QA suite into the shipped .pck even
+## though the preset excludes `tests/*`. Suites extend this by path instead.
 
 var suite_name: String = "UnnamedSuite"
 var assertions_passed: int = 0

@@ -1,4 +1,4 @@
-extends TestSuiteBase
+extends "res://tests/TestSuiteBase.gd"
 ## Unit tests for non-linear MassSystem math, high-mass trade-offs, and multi-factor AbsorptionRules.
 
 
@@ -88,9 +88,14 @@ func _test_multifactor_absorption_thresholds() -> void:
 	assert_true(bool(res_cracked["cracks_shell"]), "Spikes Lv2 + Freeze cracks Stone Slug shell")
 	assert_true(bool(res_cracked["can_absorb"]), "Tactical player absorbs chilled Stone Slug")
 
-	# 4. Boss cannot be gulped at full HP even by huge mass, only at <= 6% execution HP
+	# 4. Miniboss and Boss cannot be gulped at full HP even by huge mass; only below execution thresholds
 	var giant_player := base_player.duplicate()
 	giant_player["mass"] = 220.0
+	var mb_healthy := {"category": "miniboss", "mass": 48.0, "hp_ratio": 0.85}
+	var mb_critical := {"category": "miniboss", "mass": 48.0, "hp_ratio": 0.18}
+	assert_false(bool(AbsorptionRules.evaluate(giant_player, mb_healthy)["can_absorb"]), "Healthy miniboss resists instant high-mass gulp")
+	assert_true(bool(AbsorptionRules.evaluate(giant_player, mb_critical)["can_absorb"]), "Weakened <=22% HP miniboss can be gulped")
+
 	var boss_healthy := {"category": "boss", "mass": 85.0, "hp_ratio": 0.50}
 	var boss_critical := {"category": "boss", "mass": 85.0, "hp_ratio": 0.04}
 	assert_false(bool(AbsorptionRules.evaluate(giant_player, boss_healthy)["can_absorb"]), "Healthy boss immune to instant gulp")

@@ -47,6 +47,7 @@ func create_default_data() -> Dictionary:
 		"achievements": [],
 		"owned_skus": [],
 		"no_ads": false,
+		"records": {},
 		"stats": {
 			"total_runs": 0,
 			"victories": 0,
@@ -56,8 +57,18 @@ func create_default_data() -> Dictionary:
 			"total_mutations_picked": 0,
 			"total_synergies_unlocked": 0,
 			"armored_defeated": 0,
+			"hunter_victories": 0,
+			"nightmare_victories": 0,
 			"peak_mass": 10.0,
 			"total_playtime_sec": 0.0,
+			"session_count": 0,
+			"session_time_sec": 0.0,
+			"finished_run_count": 0,
+			"finished_run_time_sec": 0.0,
+			"tutorial_starts": 0,
+			"tutorial_completions": 0,
+			"rewarded_started": 0,
+			"revenue_verified": false,
 			"tutorial_completed": false,
 			"first_launch_recorded": false,
 			"first_launch_unix": now_unix,
@@ -69,11 +80,13 @@ func create_default_data() -> Dictionary:
 		"settings": {
 			"sfx_volume": 0.85,
 			"music_volume": 0.55,
-			"music_enabled": false,
+			"music_enabled": true,
 			"joystick_mode": "floating",
 			"auto_absorb": true,
+			"haptics_enabled": true,
 			"fx_quality": "high",
 			"locale": "ru",
+			"difficulty": "normal",
 			"analytics_consent": false
 		}
 	}
@@ -117,12 +130,9 @@ func save_to_disk() -> bool:
 				bf.flush()
 				bf.close()
 
-	var pf := FileAccess.open(save_path, FileAccess.WRITE)
-	if pf == null:
+	# Replace the primary only after the complete temporary file is flushed.
+	if DirAccess.rename_absolute(tmp_path, save_path) != OK:
 		return false
-	pf.store_string(raw_out)
-	pf.flush()
-	pf.close()
 
 	# Update backup if none exists yet
 	if not FileAccess.file_exists(backup_path):
@@ -177,7 +187,7 @@ func load_from_disk() -> void:
 
 	var defaults := create_default_data()
 	if loaded_dict != null and typeof(loaded_dict) == TYPE_DICTIONARY:
-		data = _merge_with_defaults(defaults, loaded_dict as Dictionary)
+		data = sanitize_save(loaded_dict as Dictionary)
 	else:
 		data = defaults
 
@@ -187,17 +197,108 @@ func load_from_disk() -> void:
 	_apply_loaded_settings()
 
 
-func _merge_with_defaults(defaults: Dictionary, loaded: Dictionary) -> Dictionary:
-	var result := defaults.duplicate(true)
-	for k in loaded.keys():
-		if result.has(k) and typeof(result[k]) == TYPE_DICTIONARY and typeof(loaded[k]) == TYPE_DICTIONARY:
-			var sub_def: Dictionary = result[k]
-			var sub_ld: Dictionary = loaded[k]
-			for sk in sub_ld.keys():
-				sub_def[sk] = sub_ld[sk]
-		else:
-			result[k] = loaded[k]
+# Borrowed from the browser profile repair approach: a valid checksum does not
+# imply valid field types. Repair partial/older payloads before gameplay reads them.
+func _repair_value(fallback: Variant, value: Variant) -> Variant:
+	match typeof(fallback):
+		TYPE_DICTIONARY:
+			var result: Dictionary = fallback.duplicate(true)
+			if typeof(value) == TYPE_DICTIONARY:
+				for key in result.keys():
+					if value.has(key):
+						result[key] = _repair_value(result[key], value[key])
+			return result
+		TYPE_INT, TYPE_FLOAT:
+			if (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) and is_finite(float(value)) and float(value) >= 0.0:
+				return int(value) if typeof(fallback) == TYPE_INT else float(value)
+		TYPE_ARRAY:
+			if typeof(value) == TYPE_ARRAY:
+				return value.duplicate(true)
+		_:
+			if typeof(value) == typeof(fallback):
+				return value
+	return fallback
+
+
+func _known_ids(value: Variant, allowed: Array, required: Array = []) -> Array:
+	var result: Array = required.duplicate()
+	if typeof(value) == TYPE_ARRAY:
+		for item in value:
+			if typeof(item) == TYPE_STRING and allowed.has(item) and not result.has(item):
+				result.append(item)
 	return result
+
+
+func sanitize_save(loaded: Dictionary) -> Dictionary:
+	var defaults := create_default_data()
+	var result: Dictionary = _repair_value(defaults, loaded)
+	result["version"] = SAVE_VERSION
+	var settings: Dictionary = result["settings"]
+	for volume in ["sfx_volume", "music_volume"]:
+		settings[volume] = clampf(float(settings[volume]), 0.0, 1.0)
+	var allowed: Dictionary = {"locale": ["ru", "en"], "joystick_mode": ["fixed", "floating"], "fx_quality": ["low", "medium", "high"], "difficulty": ConfigDB.difficulty_order}
+	for field in allowed:
+		if not allowed[field].has(settings[field]):
+			settings[field] = defaults["settings"][field]
+	for uid in ConfigDB.upgrade_order:
+		result["upgrades"][uid] = mini(int(result["upgrades"][uid]), int(ConfigDB.upgrades[uid].get("max_level", 8)))
+	result["unlocked_mutations"] = _known_ids(result["unlocked_mutations"], ConfigDB.mutation_order, defaults["unlocked_mutations"])
+	result["unlocked_forms"] = _known_ids(result["unlocked_forms"], ConfigDB.form_order, defaults["unlocked_forms"])
+	result["unlocked_trails"] = _known_ids(result["unlocked_trails"], ConfigDB.trail_fx.keys(), defaults["unlocked_trails"])
+	result["achievements"] = _known_ids(result["achievements"], ConfigDB.achievement_order)
+	result["owned_skus"] = _known_ids(result["owned_skus"], ConfigDB.store_catalog.keys())
+	for field in ["form", "trail"]:
+		if not result["unlocked_" + field + "s"].has(result["selected_" + field]):
+			result["selected_" + field] = defaults["selected_" + field]
+	# Bestiary has dynamic creature IDs; validate its values separately.
+	var bestiary: Dictionary = {}
+	var raw_bestiary: Variant = loaded.get("bestiary", {})
+	if typeof(raw_bestiary) == TYPE_DICTIONARY:
+		for cid in raw_bestiary:
+			if ConfigDB.enemies.has(cid) or ConfigDB.special_encounters.has(cid):
+				bestiary[cid] = _repair_value(0, raw_bestiary[cid])
+	result["bestiary"] = bestiary
+	result["records"] = _sanitize_records(loaded.get("records", {}))
+	var days: Array = []
+	for day in result["stats"]["active_days"]:
+		if (typeof(day) == TYPE_INT or typeof(day) == TYPE_FLOAT) and is_finite(float(day)) and float(day) >= 0.0 and not days.has(int(day)):
+			days.append(int(day))
+	result["stats"]["active_days"] = days
+	return result
+
+
+func _sanitize_records(raw: Variant) -> Dictionary:
+	## Records are keyed by dynamic ids (mode -> difficulty), so _repair_value cannot
+	## handle them; every field is validated explicitly. Old saves simply yield {}.
+	var out: Dictionary = {}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	var allowed_modes: Array = ["standard", "quick"]
+	for mode_key in raw:
+		var mode_id := str(mode_key)
+		if not allowed_modes.has(mode_id):
+			continue
+		var by_mode: Variant = raw[mode_key]
+		if typeof(by_mode) != TYPE_DICTIONARY:
+			continue
+		var clean_modes: Dictionary = {}
+		for diff_key in by_mode:
+			var diff_id := str(diff_key)
+			if not ConfigDB.difficulty_order.has(diff_id):
+				continue
+			var rec: Variant = by_mode[diff_key]
+			if typeof(rec) != TYPE_DICTIONARY:
+				continue
+			clean_modes[diff_id] = {
+				"best_time": maxf(0.0, float(rec.get("best_time", 0.0))),
+				"best_mass": maxf(0.0, float(rec.get("best_mass", 0.0))),
+				"best_essence": maxi(0, int(rec.get("best_essence", 0))),
+				"victories": maxi(0, int(rec.get("victories", 0))),
+				"runs": maxi(0, int(rec.get("runs", 0)))
+			}
+		if not clean_modes.is_empty():
+			out[mode_id] = clean_modes
+	return out
 
 
 func _apply_loaded_settings() -> void:
@@ -385,3 +486,109 @@ func set_setting(key: String, val: Variant) -> void:
 		Loc.set_locale(str(val))
 	save_to_disk()
 	Events.settings_changed.emit()
+
+
+# --- Difficulty & Records ---
+
+func get_difficulty_id() -> String:
+	var did := str(get_setting("difficulty", ConfigDB.get_default_difficulty_id()))
+	if not ConfigDB.difficulty_order.has(did):
+		return ConfigDB.get_default_difficulty_id()
+	return did
+
+
+func set_difficulty(difficulty_id: String) -> bool:
+	if not ConfigDB.difficulty_order.has(difficulty_id):
+		return false
+	set_setting("difficulty", difficulty_id)
+	return true
+
+
+func get_record(mode_id: String, difficulty_id: String) -> Dictionary:
+	var empty := {
+		"best_time": 0.0,
+		"best_mass": 0.0,
+		"best_essence": 0,
+		"victories": 0,
+		"runs": 0
+	}
+	var records: Variant = data.get("records", {})
+	if typeof(records) != TYPE_DICTIONARY:
+		return empty
+	var by_mode: Variant = records.get(mode_id, {})
+	if typeof(by_mode) != TYPE_DICTIONARY:
+		return empty
+	var rec: Variant = by_mode.get(difficulty_id, {})
+	if typeof(rec) != TYPE_DICTIONARY:
+		return empty
+	return {
+		"best_time": float(rec.get("best_time", 0.0)),
+		"best_mass": float(rec.get("best_mass", 0.0)),
+		"best_essence": int(rec.get("best_essence", 0)),
+		"victories": int(rec.get("victories", 0)),
+		"runs": int(rec.get("runs", 0))
+	}
+
+
+func submit_run_record(summary: Dictionary) -> Dictionary:
+	## Stores a finished run into the per-mode/per-difficulty record table and reports
+	## which personal bests improved. Best time only counts victorious runs.
+	var mode_id: String = str(summary.get("mode", "standard"))
+	var diff_id: String = str(summary.get("difficulty", ConfigDB.get_default_difficulty_id()))
+	if not ConfigDB.difficulty_order.has(diff_id):
+		diff_id = ConfigDB.get_default_difficulty_id()
+	var victory := bool(summary.get("victory", false))
+	var duration := maxf(0.0, float(summary.get("duration_sec", 0.0)))
+	var peak_mass := maxf(0.0, float(summary.get("peak_mass", 0.0)))
+	var essence := maxi(0, int(summary.get("base_essence", 0)))
+
+	var prev := get_record(mode_id, diff_id)
+	var out := {
+		"mode": mode_id,
+		"difficulty": diff_id,
+		"is_new_best_time": false,
+		"is_new_best_mass": false,
+		"is_new_best_essence": false,
+		"first_victory": false,
+		"previous_best_time": float(prev["best_time"]),
+		"best_time": float(prev["best_time"]),
+		"best_mass": float(prev["best_mass"]),
+		"best_essence": int(prev["best_essence"]),
+		"victories": int(prev["victories"]),
+		"runs": int(prev["runs"]) + 1
+	}
+	if victory:
+		if float(prev["best_time"]) <= 0.0 or duration < float(prev["best_time"]):
+			out["is_new_best_time"] = true
+			out["best_time"] = duration
+		out["first_victory"] = int(prev["victories"]) <= 0
+		out["victories"] = int(prev["victories"]) + 1
+	if peak_mass > float(prev["best_mass"]):
+		out["is_new_best_mass"] = true
+		out["best_mass"] = peak_mass
+	if essence > int(prev["best_essence"]):
+		out["is_new_best_essence"] = true
+		out["best_essence"] = essence
+
+	var records: Dictionary = data.get("records", {})
+	if typeof(records) != TYPE_DICTIONARY:
+		records = {}
+	var by_mode: Dictionary = records.get(mode_id, {})
+	if typeof(by_mode) != TYPE_DICTIONARY:
+		by_mode = {}
+	by_mode[diff_id] = {
+		"best_time": out["best_time"],
+		"best_mass": out["best_mass"],
+		"best_essence": out["best_essence"],
+		"victories": out["victories"],
+		"runs": out["runs"]
+	}
+	records[mode_id] = by_mode
+	data["records"] = records
+	# Difficulty-clear achievements read flat stat keys, so the counter is named after
+	# the difficulty id. Only non-default clears are counted: the default difficulty
+	# already has its own "defeat_guardian" achievement.
+	if victory and diff_id != ConfigDB.get_default_difficulty_id():
+		increment_stat(diff_id + "_victories", 1)
+	save_to_disk()
+	return out

@@ -12,6 +12,8 @@ var _billing_client: BillingClient = null
 var _product_prices: Dictionary = {}
 var _pending_sku: String = ""
 var _processed_tokens: Dictionary = {}
+var _awaiting_ack: Dictionary = {}
+var _product_offers: Dictionary = {}
 var _test_adapter: RefCounted = null
 
 
@@ -93,7 +95,11 @@ func purchase_sku(sku: String) -> void:
 
 	# 1. Real Google Play Billing path
 	if _billing_client != null and _billing_client.is_ready():
-		_billing_client.purchase(sku)
+		var offer: Dictionary = _product_offers.get(sku, {})
+		var result := _billing_client.purchase(sku, str(offer.get("purchase_option_id", "")), str(offer.get("offer_id", "")))
+		if int(result.get("response_code", -1)) != BillingClient.BillingResponseCode.OK:
+			purchase_failed.emit(sku, "billing_launch_failed")
+			_pending_sku = ""
 		return
 
 	# 2. Isolated automated test adapter (strictly disabled in commercial builds)
@@ -139,9 +145,15 @@ func _on_product_details(response: Dictionary) -> void:
 		return
 	for detail: Dictionary in response.get("product_details", []):
 		var pid: String = str(detail.get("product_id", ""))
-		var one_time: Dictionary = detail.get("one_time_purchase_offer_details", {})
-		if not pid.is_empty() and one_time.has("formatted_price"):
-			_product_prices[pid] = str(one_time["formatted_price"])
+		# Billing plugin 3.3.0 exposes a list of one-time offers (see Utils.kt).
+		var offers: Variant = detail.get("one_time_purchase_offer_details_list", [])
+		if not ConfigDB.store_catalog.has(pid) or not offers is Array:
+			continue
+		for offer: Dictionary in offers:
+			if offer.has("formatted_price"):
+				_product_prices[pid] = str(offer["formatted_price"])
+				_product_offers[pid] = offer
+				break
 	catalog_updated.emit()
 
 
@@ -155,33 +167,61 @@ func _on_purchases_updated(response: Dictionary) -> void:
 
 	var restored: Array[String] = []
 	for p: Dictionary in response.get("purchases", []):
-		var p_state: int = int(p.get("purchase_state", 0))
-		if p_state != BillingClient.PurchaseState.PURCHASED:
+		if int(p.get("purchase_state", 0)) != BillingClient.PurchaseState.PURCHASED:
 			continue
 		var token: String = str(p.get("purchase_token", ""))
-		var is_ack: bool = bool(p.get("is_acknowledged", false))
-		if not is_ack and not token.is_empty() and _billing_client != null:
+		if token.is_empty():
+			continue
+		var skus: Array[String] = []
+		# Native 3.3.0 serializes Purchase.products as product_ids, not products.
+		for product_id in p.get("product_ids", []):
+			var sku := str(product_id)
+			if ConfigDB.store_catalog.has(sku) and not skus.has(sku):
+				skus.append(sku)
+		if skus.is_empty():
+			continue
+		if bool(p.get("is_acknowledged", false)):
+			for sku in skus:
+				_finalize_verified_purchase(sku, token)
+				restored.append(sku)
+		elif _billing_client != null and not _awaiting_ack.has(token):
+			_awaiting_ack[token] = skus
 			_billing_client.acknowledge_purchase(token)
-		for prod_id in p.get("products", []):
-			var sku_str := str(prod_id)
-			_finalize_verified_purchase(sku_str, token)
-			restored.append(sku_str)
 	if not restored.is_empty():
 		purchases_restored.emit(restored)
 
 
-func _on_acknowledge_response(_response: Dictionary) -> void:
-	pass
+func _on_acknowledge_response(response: Dictionary) -> void:
+	# Native plugin returns the acknowledged purchase token in the `token` field.
+	var token: String = str(response.get("token", ""))
+	if not _awaiting_ack.has(token):
+		return
+	var skus: Array[String] = _awaiting_ack[token]
+	_awaiting_ack.erase(token)
+	if int(response.get("response_code", -1)) != BillingClient.BillingResponseCode.OK:
+		for sku in skus:
+			purchase_failed.emit(sku, "acknowledgement_failed")
+		return
+	for sku in skus:
+		_finalize_verified_purchase(sku, token)
+	purchases_restored.emit(skus)
 
 
 func _finalize_verified_purchase(sku: String, purchase_token: String) -> void:
-	if not purchase_token.is_empty() and _processed_tokens.has(purchase_token):
+	if purchase_token.is_empty() or not ConfigDB.store_catalog.has(sku):
 		return
-	if not purchase_token.is_empty():
-		_processed_tokens[purchase_token] = true
-
+	var grant_key := purchase_token + ":" + sku
+	if _processed_tokens.has(grant_key):
+		# Restore must also repair a rolled-back local save in the same app process.
+		if not is_sku_owned(sku):
+			SaveData.apply_sku_entitlement(sku)
+		return
+	_processed_tokens[grant_key] = true
+	var already_owned := is_sku_owned(sku)
 	SaveData.apply_sku_entitlement(sku)
-	var price_usd: float = 2.99 if sku.ends_with("no_ads") else 1.99
-	Analytics.track("purchase_completed", {"sku": sku, "price_usd": price_usd})
+	# Restores and test transactions are not new revenue. Currency conversion and
+	# net USD revenue require verified store reports, never guessed catalog prices.
+	if not already_owned:
+		Analytics.track("purchase_completed", {"sku": sku})
 	_pending_sku = ""
 	purchase_succeeded.emit(sku)

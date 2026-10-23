@@ -1,0 +1,18 @@
+# FLUX.1-schnell prompts for the bloom set in resources/art/props.
+# Regenerate with:
+#   /Users/turpal/.workbuddy-ai/binaries/python/envs/default/bin/python /Users/turpal/Documents/WORK/cf-flux/cf_flux.py --batch-file tools/bloom_prompts.txt --out-dir /tmp/flux_bloom --steps 6
+#   python3 tools/process_creature_art.py /tmp/flux_bloom resources/art/props --size 256
+# Order: bloom_pod, bloom_flower, bloom_bells
+#
+# Why these exist: the fifteen-stage growth ladder has to be visible in the world,
+# not only in a screen grade. These three sprites are streamed into every chunk like
+# the rest of the undergrowth, but WorldGenerator fades them in with the player's
+# growth — so the same forest that starts bare is in full bloom by stage 15 without
+# regenerating a single chunk. Warm gold on purpose: the late stages are the warm
+# end of the palette, and the cool glow mushrooms already cover the early game.
+
+a single luminous seed pod on a short stalk, translucent amber shell with a softly glowing core and fine gold veins, a few thin leaves at the base, seen from directly above, hand-painted 2D game ground cover sprite, warm gold and honey palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+an open enchanted flower with six pale gold petals around a bright warm core, thin glowing stamens, seen from directly above, hand-painted 2D game ground cover sprite, warm gold and honey palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a small cluster of three hanging bell flowers glowing pale gold, slender curved stems, soft light pooling inside each bell, seen from directly above, hand-painted 2D game ground cover sprite, warm gold and honey palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size

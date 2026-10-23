@@ -13,10 +13,16 @@ EXTENDS_RE = re.compile(r"^\s*extends\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
 
 def main() -> None:
     entries: list[dict[str, str]] = []
-    for gd_path in sorted(ROOT.rglob("*.gd")):
-        rel = gd_path.relative_to(ROOT).as_posix()
-        if rel.startswith(".godot/"):
+    scripts: list[Path] = []
+    for current, directories, files in os.walk(ROOT):
+        folder = Path(current)
+        if (folder / ".gdignore").exists():
+            directories.clear()
             continue
+        directories[:] = [name for name in directories if name not in {".git", ".godot", "node_modules", ".next"}]
+        scripts.extend(folder / name for name in files if name.endswith(".gd"))
+    for gd_path in sorted(scripts):
+        rel = gd_path.relative_to(ROOT).as_posix()
         text = gd_path.read_text(encoding="utf-8")
         m_class = CLASS_RE.search(text)
         if not m_class:
