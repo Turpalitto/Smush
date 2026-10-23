@@ -414,7 +414,7 @@
 - Автономный запуск `PCK` из изолированного `/tmp`: **324 assertions, 0 failures** (`reports/gameplay-packed-qa-2026-10-22.log`).
 - Автоматизированное прохождение на чистом профиле + одновременный замер шины `Master` до/после лимитера:
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json`.
-- **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка** (коммит `62c9978`):
+- **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка** (сборка от коммита `6abaf6a`):
   - QA → **1198 assertions, 0 failures**, `exit 0`;
   - автоматизированное прохождение **`VICTORY` за 322.6 с** (wall 327.3), пиковая масса **101.8**,
     15 событий урона, `cheats_or_direct_stat_edits: false`
