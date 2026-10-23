@@ -90,7 +90,7 @@ const PROP_TEXTURES: Dictionary = {
 ## contact shadow, `sway` the rotation amplitude (0 for anything lying flat — a
 ## fallen branch that breathes looks like it is floating).
 const DECOR_KINDS: Dictionary = {
-	0: {"prop": "mushroom_cluster", "px": 44.0, "tint": Color(0.62, 0.46, 0.40), "shadow": 19.0, "sway": 0.02},
+	0: {"prop": "mushroom_cluster", "px": 44.0, "tint": Color(0.46, 0.40, 0.35), "shadow": 19.0, "sway": 0.02},
 	1: {"prop": "", "px": 0.0, "tint": Color(0.14, 0.34, 0.28), "shadow": 22.0, "sway": 0.0}, # moss pad, drawn
 	2: {"prop": "fern_cluster", "px": 58.0, "tint": Color(0.50, 0.60, 0.51), "shadow": 19.0, "sway": 0.035},
 	3: {"prop": "broadleaf_clump", "px": 76.0, "tint": Color(0.46, 0.56, 0.48), "shadow": 26.0, "sway": 0.030},
@@ -793,8 +793,18 @@ func _draw() -> void:
 	# near them: a draw call 6000 px away would blow up this item's bounding box for
 	# no visible pixel.
 	if p.distance_to(Vector2.ZERO) < DRAW_RADIUS:
-		draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.82, Color(0.14, 0.34, 0.29, 0.22))
-		draw_arc(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.75, 0.0, TAU, 48, Color(0.32, 0.85, 0.68, 0.22), 4.0)
+		draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.82, Color(0.14, 0.34, 0.29, 0.16))
+		# A dashed boundary, not a continuous ring. The old version drew one 4 px arc
+		# of radius SAFE_SPAWN_RADIUS*0.75, and because the player spawns on its
+		# centre it read as a UI circle drawn around the character for the whole
+		# opening minute — the least magical thing in the frame. Broken segments with
+		# gaps read as a glade edge.
+		var seg := 22
+		for i in range(seg):
+			var a0 := (TAU / float(seg)) * float(i) + _anim_time * 0.02
+			var a1 := a0 + (TAU / float(seg)) * 0.58
+			draw_arc(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.75, a0, a1, 6,
+				Color(0.42, 0.92, 0.72, 0.20), 3.4)
 
 	# Northern Ancient Guardian Shrine circle (world landmark at (0, -480))
 	if p.distance_to(SHRINE_POS) < DRAW_RADIUS:
@@ -823,6 +833,15 @@ func _draw() -> void:
 			draw_circle(fp, 22.0 * sc, Color(0.14, 0.34, 0.28, 0.38 * fade))
 		else:
 			var spec: Dictionary = DECOR_KINDS.get(fkind, {})
+			if fkind >= BLOOM_KIND_MIN:
+				# The bloom set is the only flora that carries its own light. Three
+				# soft discs behind the sprite (chunk children draw on top) are
+				# cheaper than a shader per plant and read as a flower that is lit
+				# from inside rather than as a yellow sticker.
+				var breathe := 0.82 + 0.18 * sin(_anim_time * 1.4 + fp.x * 0.011 + fp.y * 0.007)
+				for gi in range(3):
+					var gr := (26.0 + 15.0 * float(gi)) * sc * breathe
+					draw_circle(fp, gr, Color(1.0, 0.86, 0.52, (0.030 - 0.008 * float(gi)) * fade))
 			_draw_ground_shadow(fp, float(spec.get("shadow", 19.0)) * sc, 0.20 * fade)
 
 	# Narrow passage floor rune markers (reacts to player size for instant tactical clarity!)

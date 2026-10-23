@@ -28,14 +28,21 @@ void fragment() {
 		COLOR = vec4(0.0);
 	} else {
 		float edge = smoothstep(0.95, 0.84, r);
-		float rim = smoothstep(0.62, 0.90, r);
+		// Two separate bands. A bright rim *inside* the silhouette and a thin dark
+		// contour at the very edge: the glass-bead read. The old code mixed straight
+		// toward rim_color up to r=0.90, which at stages 13-15 (near-white rim, pale
+		// gold body) meant the slime had no outline at all and dissolved into the
+		// moss. Measured on reports/growth-ladder before this change.
+		float rim = smoothstep(0.52, 0.72, r) * smoothstep(0.835, 0.775, r);
+		float contour = smoothstep(0.795, 0.858, r) * smoothstep(0.928, 0.882, r);
 		float core_pulse = 0.34 + 0.05 * sin(TIME * 3.8 + pulse_phase);
 		float core_mask = smoothstep(core_pulse + 0.22, 0.04, length(centered - vec2(0.0, 0.05)));
 
 		// Top-left glossy jelly highlight
 		float spec = smoothstep(0.28, 0.08, length(centered - vec2(-0.28, -0.32))) * 0.42;
 
-		vec3 col = mix(body_color.rgb, rim_color.rgb, rim * 0.55);
+		vec3 col = mix(body_color.rgb, rim_color.rgb, rim * 0.60);
+		col = mix(col, body_color.rgb * 0.40, contour * 0.62);
 		col = mix(col, core_color.rgb, core_mask * 0.72);
 		col += vec3(spec);
 		col = mix(col, vec3(1.0, 0.32, 0.38), hurt_flash * 0.75);
