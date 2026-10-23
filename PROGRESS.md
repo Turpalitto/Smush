@@ -355,16 +355,16 @@
 
 ## Последние зафиксированные проверки и артефакты
 
-- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **1163 assertions, 0 failures**, `exit 0`
+- `./scripts/run_qa.sh` (Godot `4.5.stable.official.876b29033`): **1165 assertions, 0 failures**, `exit 0`
   (рост по итерациям: 464 → 495 → 522 — звук/удар/вибрация, 522 → 551 — арт мира,
   551 → 592 — бесконечный лес и чанки, 592 → 597 — дымка на реквизите,
-  597 → 1163 — набор на лестницу роста).
+  597 → 1163 — набор на лестницу роста, 1163 → 1165 — полная шкала на вершине).
 - Автономный запуск `PCK` из изолированного `/tmp`: **324 assertions, 0 failures** (`reports/gameplay-packed-qa-2026-10-22.log`).
 - Автоматизированное прохождение на чистом профиле + одновременный замер шины `Master` до/после лимитера:
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json`.
-- **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка** (коммит `d876685`):
-  - QA → **1163 assertions, 0 failures**, `exit 0`;
-  - автоматизированное прохождение **`VICTORY` за 307.5 с** (wall 311.9), пиковая масса **111.5**
+- **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка** (коммит `a03342c`):
+  - QA → **1165 assertions, 0 failures**, `exit 0`;
+  - автоматизированное прохождение **`VICTORY` за 308.8 с** (wall 312.5), пиковая масса **111.5**
     (пятнадцатая ступень), 14 событий урона, `cheats_or_direct_stat_edits: false`
     (`reports/macos-automated-playthrough-growth-2026-10-23.json`);
   - собранный `.app` проверен не по логу сборки, а запуском: `--headless --quit-after 90` →
