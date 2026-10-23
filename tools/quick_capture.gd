@@ -12,12 +12,16 @@ extends Node
 ##   QUICK_CAPTURE_SECONDS  arena time before the shot (default: 4)
 ##   QUICK_CAPTURE_SIZE     WxH, e.g. 720x1280 (default: keep project window)
 ##   QUICK_CAPTURE_SEED     world seed for the arena (default: 0 = random)
+##   QUICK_CAPTURE_FLOOR    override floor layers, e.g. "relief=0,occlusion=0.4"
+##   QUICK_CAPTURE_ZOOM     camera zoom override, to judge texture detail up close
 
 const STAGE_ENV := "QUICK_CAPTURE_STAGE"
 const OUT_ENV := "QUICK_CAPTURE_OUT"
 const SECONDS_ENV := "QUICK_CAPTURE_SECONDS"
 const SIZE_ENV := "QUICK_CAPTURE_SIZE"
 const SEED_ENV := "QUICK_CAPTURE_SEED"
+const FLOOR_ENV := "QUICK_CAPTURE_FLOOR"
+const ZOOM_ENV := "QUICK_CAPTURE_ZOOM"
 
 var main: MainRoot
 
@@ -64,11 +68,14 @@ func _boot() -> void:
 		DisplayServer.window_move_to_foreground()
 		if App.state == App.State.PAUSED:
 			App.change_state(App.State.PLAYING)
+		_apply_floor_overrides()
 		var seconds := 4.0
 		var sec_env := OS.get_environment(SECONDS_ENV)
 		if not sec_env.is_empty():
 			seconds = float(sec_env)
 		await get_tree().create_timer(maxf(0.2, seconds)).timeout
+		# After the wait, because the camera lerps its zoom every frame.
+		_apply_zoom_override()
 
 	# A couple of extra frames so the last shader/filter pass is definitely on screen.
 	for _i in range(4):
@@ -101,6 +108,27 @@ func _enter_arena() -> void:
 		await _tap(start_btn)
 	for _i in range(3):
 		await get_tree().process_frame
+
+
+func _apply_floor_overrides() -> void:
+	## Art-tuning hook: lets one capture vary the floor layers without editing the
+	## constants in ArenaController, so variants can be compared side by side.
+	var spec := OS.get_environment(FLOOR_ENV)
+	if spec.is_empty() or main.arena == null or main.arena.canopy_mat == null:
+		return
+	for pair in spec.split(","):
+		var kv := pair.split("=")
+		if kv.size() != 2:
+			continue
+		main.arena.canopy_mat.set_shader_parameter(kv[0].strip_edges(), float(kv[1]))
+		print("QUICK_CAPTURE floor %s=%s" % [kv[0].strip_edges(), kv[1]])
+
+
+func _apply_zoom_override() -> void:
+	var spec := OS.get_environment(ZOOM_ENV)
+	if spec.is_empty() or main.arena == null or main.arena.camera == null:
+		return
+	main.arena.camera.zoom = Vector2.ONE * float(spec)
 
 
 func _find_button(root_node: Node, match_text: String) -> Button:

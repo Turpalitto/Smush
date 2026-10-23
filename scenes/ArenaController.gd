@@ -12,7 +12,15 @@ const MAX_ACTIVE_HAZARDS: int = 48
 ## The mean is baked into the material so the shader can normalise the tile's
 ## luminance into a shading modulation instead of a brightness offset.
 const FLOOR_TEXTURE_PATH: String = "res://resources/art/environment/forest_floor.png"
-const FLOOR_TEXTURE_MEAN: float = 0.0931
+const FLOOR_TEXTURE_MEAN: float = 0.0916
+## Relief and occlusion come from the same height field: the normal map is
+## derived from it by the generator, the AO map is ray-traced from it in Blender
+## (tools/bake_floor_ao.py). Both are optional — the floor still renders without.
+const FLOOR_NORMAL_PATH: String = "res://resources/art/environment/forest_floor_normal.png"
+const FLOOR_AO_PATH: String = "res://resources/art/environment/forest_floor_ao.png"
+const FLOOR_AO_MEAN: float = 0.6977
+const FLOOR_RELIEF: float = 3.0
+const FLOOR_OCCLUSION: float = 0.55
 
 var world: WorldGenerator
 var player: PlayerSlime
@@ -265,6 +273,19 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 	mat.set_shader_parameter("floor_tex", tex)
 	mat.set_shader_parameter("floor_mean", FLOOR_TEXTURE_MEAN)
 	mat.set_shader_parameter("floor_strength", clampf(strength, 0.0, 1.5))
+
+	# Relief and occlusion are set independently: losing one of the two maps
+	# should cost that layer only, not the whole painted floor.
+	var normal_tex := load(FLOOR_NORMAL_PATH) as Texture2D
+	if normal_tex != null:
+		mat.set_shader_parameter("floor_normal", normal_tex)
+		mat.set_shader_parameter("floor_relief", FLOOR_RELIEF)
+
+	var ao_tex := load(FLOOR_AO_PATH) as Texture2D
+	if ao_tex != null:
+		mat.set_shader_parameter("floor_ao", ao_tex)
+		mat.set_shader_parameter("floor_ao_mean", FLOOR_AO_MEAN)
+		mat.set_shader_parameter("floor_occlusion", FLOOR_OCCLUSION)
 	return true
 
 

@@ -162,6 +162,60 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_strength")), 0.5,
 			"Floor tile actually modulates the arena background")
 
+	# Relief and occlusion: both are separate maps derived from the same height
+	# field, both are optional in the shader, so a silent loss of either would go
+	# unnoticed until someone looked at the floor.
+	var normal_tex := load(ArenaController.FLOOR_NORMAL_PATH) as Texture2D
+	assert_true(normal_tex != null, "Floor normal map loads")
+	if normal_tex != null:
+		assert_eq(normal_tex.get_width(), 1024, "Floor normal map is 1024 px")
+		var nimg := normal_tex.get_image()
+		# A tangent-space normal map of a mostly-flat surface sits near (0.5, 0.5, 1):
+		# blue close to 1 and the red/green centred on 0.5 with a little spread.
+		var bsum := 0.0
+		var xyspread := 0.0
+		var ncount := 0
+		for ny in range(0, nimg.get_height(), 8):
+			for nx in range(0, nimg.get_width(), 8):
+				var c := nimg.get_pixel(nx, ny)
+				bsum += c.b
+				xyspread += absf(c.r - 0.5) + absf(c.g - 0.5)
+				ncount += 1
+		var bmean := bsum / float(maxi(1, ncount))
+		var xymean := xyspread / float(maxi(1, ncount))
+		assert_gt(bmean, 0.80, "Normal map blue channel is mostly up (%.2f)" % bmean)
+		assert_gt(xymean, 0.02, "Normal map has real slopes (%.3f)" % xymean)
+	var ao_tex := load(ArenaController.FLOOR_AO_PATH) as Texture2D
+	assert_true(ao_tex != null, "Floor AO map loads")
+	if ao_tex != null:
+		assert_eq(ao_tex.get_width(), 1024, "Floor AO map is 1024 px")
+		var aimg := ao_tex.get_image()
+		# A failed bake would come back flat; real occlusion always has spread.
+		var amin := 1.0
+		var amax := 0.0
+		var asum := 0.0
+		var acount := 0
+		for ay in range(0, aimg.get_height(), 8):
+			for ax in range(0, aimg.get_width(), 8):
+				var v := aimg.get_pixel(ax, ay).r
+				amin = minf(amin, v)
+				amax = maxf(amax, v)
+				asum += v
+				acount += 1
+		var amean := asum / float(maxi(1, acount))
+		assert_gt(amax - amin, 0.35, "AO map has real contrast (%.2f)" % (amax - amin))
+		assert_true(amean > 0.45 and amean < 0.90,
+			"AO map mean is in a sane range (%.2f)" % amean)
+	if arena.canopy_mat != null:
+		assert_true(arena.canopy_mat.get_shader_parameter("floor_normal") != null,
+			"Arena background received the normal map")
+		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_relief")), 0.5,
+			"Relief is switched on")
+		assert_true(arena.canopy_mat.get_shader_parameter("floor_ao") != null,
+			"Arena background received the AO map")
+		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_occlusion")), 0.1,
+			"Occlusion is switched on")
+
 	# Verify all 8 creature types spawn and run their FSM without error
 	var spawned_enemies: Array[EnemyEntity] = []
 	var idx: int = 0
