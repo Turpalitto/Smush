@@ -32,6 +32,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_verified_controls_visual_combat_and_audio_polish(tree, main_inst)
 	await _test_difficulty_multipliers(tree, main_inst)
 	await _test_miniboss_dismissed_by_boss(tree, main_inst)
+	await _test_endless_and_zen_modes(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -820,9 +821,9 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 	AudioServer.remove_bus_effect(master_idx, rec_idx)
 	assert_true(bool(SaveData.get_setting("music_enabled", false)), "Music is ON by default (the game ships a soundtrack)")
 
-	# 6b. Soundtrack: three composed loops load, loop, and the director switches between them
-	assert_eq(Audio.MUSIC_TRACKS.size(), 3, "Soundtrack ships three tracks (menu / run / boss)")
-	var expected_lengths := {"menu": 26.7, "run": 38.4, "boss": 30.5}
+	# 6b. Soundtrack: four composed loops load, loop, and the director switches between them
+	assert_eq(Audio.MUSIC_TRACKS.size(), 4, "Soundtrack ships four tracks (menu / run / boss / zen)")
+	var expected_lengths := {"menu": 26.7, "run": 38.4, "boss": 30.5, "zen": 32.0}
 	var seen_streams: Array[AudioStream] = []
 	for track_id in Audio.MUSIC_TRACKS.keys():
 		var path := str(Audio.MUSIC_TRACKS[track_id])
@@ -982,3 +983,105 @@ func _test_miniboss_dismissed_by_boss(tree: SceneTree, main: MainRoot) -> void:
 	main._return_to_main_menu()
 	await tree.process_frame
 	assert_eq(App.state, App.State.MAIN_MENU, "Returned to menu after the miniboss dismissal check")
+
+
+func _test_endless_and_zen_modes(tree: SceneTree, main: MainRoot) -> void:
+	## Runtime behaviour of the two new modes. The unit suite checks the rule table;
+	## this checks that a live arena actually obeys it, because the failure mode here
+	## is a rule that exists but is never read.
+	var arena := main.arena
+
+	# --- endless: the Guardian falls, the grove wakes, the run goes on -------------
+	main._start_run("endless")
+	await tree.process_frame
+	assert_eq(arena.mode_id, "endless", "Endless run started")
+	assert_eq(arena.ascension_loop, 0, "A fresh endless run starts at loop 0")
+	assert_eq(App.state, App.State.PLAYING, "Endless run is playing")
+
+	arena.player.hp = arena.player.max_hp * 0.30
+	# Essence from an awakening goes into the run's pool, not straight into the save:
+	# it is committed with the rest of the run, so the pool is what must grow here.
+	var run_essence_before := arena.run_essence_earned
+	var boss1 := arena.spawn_ancient_guardian_boss()
+	assert_true(boss1 != null, "Guardian spawns in endless mode")
+	boss1.take_damage(boss1.max_hp * 1.5, 1.0)
+	await tree.process_frame
+
+	assert_eq(App.state, App.State.PLAYING,
+		"Defeating the Guardian in endless mode does NOT end the run")
+	assert_eq(arena.ascension_loop, 1, "Ascension loop incremented to 1")
+	assert_gt(float(arena.run_essence_earned), float(run_essence_before),
+		"Awakening grants essence to the run pool")
+	assert_gt(arena.player.hp, arena.player.max_hp * 0.30, "Awakening heals the player")
+	assert_false(arena.boss_spawned, "The next Guardian is scheduled, not left spawned")
+	assert_approx(arena.boss_spawn_time, arena.run_elapsed + 270.0, 1.0,
+		"Next Guardian is 270 s after the awakening")
+
+	# The next loop must actually be able to spawn a boss again.
+	var boss2 := arena.spawn_ancient_guardian_boss()
+	assert_true(boss2 != null, "A second Guardian can spawn in the next loop")
+	boss2.take_damage(boss2.max_hp * 1.5, 1.0)
+	await tree.process_frame
+	assert_eq(arena.ascension_loop, 2, "Second Guardian takes the loop to 2")
+	assert_eq(App.state, App.State.PLAYING, "Run still continues after the second Guardian")
+
+	# --- zen: no boss, no death, no dash cost --------------------------------------
+	main._start_run("zen")
+	await tree.process_frame
+	assert_true(arena.is_zen(), "Zen run reports itself as zen")
+	assert_eq(App.state, App.State.PLAYING, "Zen run is playing")
+
+	# Time passes far beyond the boss timer and nothing hostile arrives.
+	arena.run_elapsed = 600.0
+	arena._process_spawning_and_waves(0.1)
+	assert_true(arena.active_boss == null, "No Guardian appears in zen, ever")
+	assert_true(arena.boss_spawned, "The boss flag starts set so the timer branch is inert")
+
+	# Damage is reduced and can never kill.
+	arena.player.hp = arena.player.max_hp
+	arena.player.invulnerable_timer = 0.0
+	arena.player.shield_ready = false
+	arena.player.take_damage(arena.player.max_hp * 10.0, "shadow_slime")
+	assert_false(arena.player.is_dead, "Zen damage cannot kill the player")
+	assert_approx(arena.player.hp, arena.player.max_hp * 0.15, 0.5,
+		"Zen damage floors HP at 15%")
+	assert_eq(App.state, App.State.PLAYING, "Zen stays in PLAYING after a huge hit")
+
+	# The low-HP vignette must stay off: it would be an alarm the mode can never honour.
+	arena._update_game_feel(0.5)
+	assert_approx(arena._vignette_alpha, 0.0, 0.02, "Zen shows no red low-HP vignette")
+
+	# Dashing costs no mass in zen.
+	arena.player.mutations.apply_mutation("dash")
+	arena.player.mass = 40.0
+	arena.player.dash_cooldown = 0.0
+	arena.player.is_dashing = false
+	var mass_before := arena.player.mass
+	arena.player.trigger_dash()
+	assert_approx(arena.player.mass, mass_before, 0.001, "Zen dash burns no mass")
+
+	# ...while the same dash still burns mass in standard, so the rule is a mode rule
+	# and not a change to dashing itself.
+	main._start_run("standard")
+	await tree.process_frame
+	arena.player.mutations.apply_mutation("dash")
+	arena.player.mass = 40.0
+	arena.player.dash_cooldown = 0.0
+	arena.player.is_dashing = false
+	var std_before := arena.player.mass
+	arena.player.trigger_dash()
+	assert_lt(arena.player.mass, std_before, "Standard dash still burns mass")
+
+	# --- zen walk ending -----------------------------------------------------------
+	main._start_run("zen")
+	await tree.process_frame
+	arena.add_run_essence(50)
+	var ess_pre_walk := SaveData.get_essence()
+	arena.end_zen_walk()
+	await tree.process_frame
+	assert_eq(App.state, App.State.VICTORY, "Finishing a zen walk shows the result screen")
+	assert_false(bool(App.last_run_summary.get("victory", true)),
+		"A finished walk is not recorded as a victory")
+	assert_eq(str(App.last_run_summary.get("outcome", "")), "walk", "Outcome is reported as a walk")
+	assert_gt(float(SaveData.get_essence()), float(ess_pre_walk),
+		"Finishing a walk commits everything collected")

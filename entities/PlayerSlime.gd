@@ -165,9 +165,14 @@ func trigger_dash() -> bool:
 	if _dash_dir.length_squared() < 0.01:
 		_dash_dir = Vector2.UP
 
-	# Subtle tactical mass burn above MIN_MASS lets players trim excess bulk if desired
-	if mass > MassSystem.MIN_MASS + 1.5:
-		mass = MassSystem.clamp_mass(mass * 0.985)
+	# Subtle tactical mass burn above MIN_MASS lets players trim excess bulk if desired.
+	# Zen sets the burn to zero: a meditative mode must not punish the one movement
+	# verb the player uses to enjoy the scenery.
+	var burn := 0.015
+	if arena_ref != null and arena_ref.has_method("mode_dash_burn"):
+		burn = float(arena_ref.call("mode_dash_burn"))
+	if burn > 0.0 and mass > MassSystem.MIN_MASS + 1.5:
+		mass = MassSystem.clamp_mass(mass * (1.0 - burn))
 		_sync_mass_metrics()
 
 	Audio.play_sfx("attack", 1.15)
@@ -434,7 +439,13 @@ func complete_absorption(entity_id: String, mass_gain: float, xp_gain: float, es
 		mimicry_ambush_ready = false
 
 	# 4 & 5. Sound & Evolution XP
-	Audio.play_sfx("absorb", randf_range(0.92, 1.18))
+	# Orbs get the pentatonic collection ladder instead of the generic absorb blip:
+	# sweeping a spore field should sound like an instrument, and the blip is also
+	# what a creature absorption plays, so keeping both would be ambiguous.
+	if entity_id == "spore_orb":
+		Audio.play_orb_chime()
+	else:
+		Audio.play_sfx("absorb", randf_range(0.92, 1.18))
 	var evo_mult := 1.0 + SaveData.get_upgrade_bonus("evolution_rate")
 	add_evolution_xp(xp_gain * evo_mult)
 
@@ -501,7 +512,17 @@ func take_damage(raw_amount: float, source_id: String, is_aoe_hazard: bool = fal
 		if source_id == "poison_pool" and slipstream_active:
 			final_dmg *= 0.50
 
-	hp = maxf(0.0, hp - final_dmg)
+	# Zen: the mode's "80% less damage" multiplier and its HP floor are applied here,
+	# in the one place every source of damage funnels through, so a new enemy or
+	# hazard cannot bypass the promise that this mode never kills the player.
+	var floor_hp := 0.0
+	if arena_ref != null:
+		if arena_ref.has_method("mode_damage_mult"):
+			final_dmg *= maxf(0.0, float(arena_ref.call("mode_damage_mult")))
+		if arena_ref.has_method("mode_hp_floor_frac"):
+			floor_hp = max_hp * clampf(float(arena_ref.call("mode_hp_floor_frac")), 0.0, 1.0)
+
+	hp = maxf(floor_hp, hp - final_dmg)
 	invulnerable_timer = 0.32
 	if visual != null:
 		visual.trigger_hurt()

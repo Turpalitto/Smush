@@ -9,11 +9,13 @@ extends Node2D
 ##
 ##   AURA_OUT    output PNG (required)
 ##   AURA_STAGE  stage 1..15 (default 15)
+##   AURA_STARS  ascension companion stars 0..7 (default 0)
 ##   AURA_SIZE   WxH (default 720x720)
 
 const OUT_ENV := "AURA_OUT"
 const STAGE_ENV := "AURA_STAGE"
 const SIZE_ENV := "AURA_SIZE"
+const STARS_ENV := "AURA_STARS"
 const RADIUS := 132.0
 
 
@@ -24,6 +26,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var stage := int(OS.get_environment(STAGE_ENV)) if not OS.get_environment(STAGE_ENV).is_empty() else 15
+	var stars := int(OS.get_environment(STARS_ENV)) if not OS.get_environment(STARS_ENV).is_empty() else 0
+	stars = clampi(stars, 0, EvolutionStages.MAX_ASCENSION_STARS)
 	stage = clampi(stage, 1, EvolutionStages.COUNT)
 	var size_spec := OS.get_environment(SIZE_ENV)
 	var w := 720
@@ -53,6 +57,8 @@ func _ready() -> void:
 	add_child(front)
 
 	position = Vector2(w * 0.5, h * 0.5 + 20.0)
+	back.set_ascension_stars(stars)
+	front.set_ascension_stars(stars)
 	back.set_look(look, RADIUS, 1.7, 1.0)
 	front.set_look(look, RADIUS, 1.7, 1.0)
 
@@ -65,7 +71,7 @@ func _ready() -> void:
 		get_tree().quit(4)
 		return
 	var err := img.save_png(out_path)
-	print("AURA_PREVIEW %s stage=%d err=%d" % [out_path, stage, err])
+	print("AURA_PREVIEW %s stage=%d stars=%d err=%d" % [out_path, stage, stars, err])
 	get_tree().quit(0 if err == OK else 5)
 
 

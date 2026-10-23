@@ -287,11 +287,7 @@ func _build_mode_select_page() -> void:
 	diff_desc.text = desc_text
 	vb.add_child(diff_desc)
 
-	for mode_info in [
-		["standard", "mode.standard.name", "mode.standard.desc"],
-		["quick", "mode.quick.name", "mode.quick.desc"]
-	]:
-		var mid: String = mode_info[0]
+	for mid in GameModes.ORDER:
 		var card := PanelContainer.new()
 		vb.add_child(card)
 		var cv := VBoxContainer.new()
@@ -299,13 +295,13 @@ func _build_mode_select_page() -> void:
 		card.add_child(cv)
 
 		var mtitle := Label.new()
-		mtitle.text = Loc.t(mode_info[1])
+		mtitle.text = Loc.t(GameModes.name_key(mid))
 		mtitle.add_theme_font_size_override("font_size", 22)
 		mtitle.add_theme_color_override("font_color", Color(0.62, 1.0, 0.86))
 		cv.add_child(mtitle)
 
 		var mdesc := Label.new()
-		mdesc.text = Loc.t(mode_info[2])
+		mdesc.text = Loc.t(GameModes.desc_key(mid))
 		mdesc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		mdesc.add_theme_font_size_override("font_size", 16)
 		cv.add_child(mdesc)

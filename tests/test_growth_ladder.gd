@@ -22,6 +22,7 @@ func run() -> void:
 	_test_environment_follows_growth()
 	_test_names_are_localised()
 	_test_each_stage_has_its_own_bell()
+	_test_ascension_stars()
 
 
 func _test_ladder_shape() -> void:
@@ -195,3 +196,43 @@ func _load_strings(path: String) -> Dictionary:
 		return {}
 	var out: Dictionary = parsed.get("strings", {})
 	return out
+
+
+func _test_ascension_stars() -> void:
+	## The spiral above stage 15. The ladder stops at fifteen named stages, and without
+	## this an endless run would look finished for its whole duration - mass keeps
+	## rising, the look does not. Each extra 25 t lights one companion star.
+	var top := EvolutionStages.MASS_KEYS[EvolutionStages.COUNT - 1]
+	assert_eq(EvolutionStages.ascension_stars_for_mass(10.0), 0, "No stars at spawn mass")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top - 0.1), 0,
+		"No star before the top threshold")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top), 1,
+		"The first star arrives with the crown")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top + 24.9), 1,
+		"A star does not arrive early")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top + 25.0), 2, "Second star at +25 t")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top + 25.0 * 6.0), 7, "Seventh star at +150 t")
+	assert_eq(EvolutionStages.ascension_stars_for_mass(top + 25.0 * 40.0),
+		EvolutionStages.MAX_ASCENSION_STARS, "Stars are capped at seven")
+
+	# Monotonic and bounded across a wide sweep: the count must never go down as the
+	# slime grows, and must never exceed the cap.
+	var prev := 0
+	var monotonic := true
+	for step in range(0, 400):
+		var m := 10.0 + float(step) * 0.75
+		var n := EvolutionStages.ascension_stars_for_mass(m)
+		if n < prev:
+			monotonic = false
+		if n > EvolutionStages.MAX_ASCENSION_STARS:
+			monotonic = false
+		prev = n
+	assert_true(monotonic, "Star count rises monotonically and never exceeds seven")
+
+	# The inverse helper must agree with the forward one at every step, or the HUD hint
+	# and the drawn stars would disagree about when the next one arrives.
+	var consistent := true
+	for i in range(1, EvolutionStages.MAX_ASCENSION_STARS + 1):
+		if EvolutionStages.ascension_stars_for_mass(EvolutionStages.mass_for_ascension_star(i)) != i:
+			consistent = false
+	assert_true(consistent, "mass_for_ascension_star() is the inverse of the star count")

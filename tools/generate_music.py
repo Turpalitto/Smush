@@ -460,6 +460,71 @@ def track_boss() -> tuple[np.ndarray, np.ndarray]:
 # ---------------------------------------------------------------------------- output
 
 
+def track_zen() -> tuple[np.ndarray, np.ndarray]:
+    """Beatless contemplative bed for the zen mode: 8 bars @ 60 BPM (~32 s).
+
+    No drums, no bass pulse, and no voice that lands on a beat. Everything is either
+    a pad that is already sounding or a bell placed off the bar line, so the loop has
+    no "one" for the ear to count from - which is what separates ambient from merely
+    slow music.
+
+    The harmony is Cmaj7 - Am7 - Fmaj7 - G6, two bars each. Every chord is a plain
+    diatonic seventh with no leading tone, so any voice can be held indefinitely
+    without needing to resolve. That is also why it sits under the run soundtrack's
+    Am-F-C-G: it is the same key, so a crossfade between the two never clashes.
+    """
+    rng = np.random.default_rng(23)
+    loop = Loop(bars=8, bpm=60)
+    bar = loop.bar
+
+    chords = [
+        [-12, 0, 4, 7, 11],   # Cmaj7
+        [-15, 0, 3, 7, 10],   # Am7
+        [-17, -1, 4, 7, 9],   # Fmaj7
+        [-14, 2, 7, 11, 14],  # G6
+    ]
+    for ci, notes in enumerate(chords):
+        start = ci * 2 * bar
+        # Longer than the chord's two bars on purpose: the pads overlap, so there is
+        # never a moment where the bed is silent and the loop point could be heard.
+        dur = int(bar * 2.35)
+        for k, semi in enumerate(notes):
+            v = pad_voice(dur, hz(semi), detune_cents=9.0)
+            env = adsr(dur, 1.8, 0.9, 0.74, 2.4)
+            loop.add(v * env, start, 0.060 + 0.010 * (k % 2), pan=(-0.45 + 0.22 * k))
+
+    # Sparse bells, all pentatonic, deliberately off the bar line so nothing marks a
+    # beat. Nine across 32 s is roughly one every 3.5 s - present, but never a melody
+    # the player has to follow.
+    pent = [0, 2, 4, 7, 9, 12, 14, 16, 19]
+    for i in range(9):
+        semi = pent[int(rng.integers(0, len(pent)))] + 12
+        pos = int((i + float(rng.uniform(0.15, 0.85))) * (loop.length / 9.0))
+        v = bell_voice(int(SR * 1.6), hz(semi), index=1.1)
+        loop.add(v * adsr(len(v), 0.01, 0.30, 0.25, 1.10), pos, 0.075,
+                 pan=float(rng.uniform(-0.6, 0.6)))
+
+    # Forest leaves. The noise is generated at exactly one loop length and then
+    # tiled, so the buffer is periodic and the loop point stays inaudible; a random
+    # buffer cut to length would step at the seam. The breathing envelope uses an
+    # integer number of cycles per loop for the same reason.
+    n = loop.length + loop.tail
+    for ch, seed_shift in (("left", 0), ("right", 977)):
+        sub = np.random.default_rng(23 + seed_shift)
+        base = lowpass(sub.standard_normal(loop.length), 2600.0)
+        tiled = np.tile(base, 3)[:n]
+        cycles = 3.0
+        phase = np.arange(n, dtype=np.float64) / float(loop.length)
+        breathe = 0.5 + 0.5 * np.sin(2.0 * math.pi * cycles * phase)
+        shaped = tiled * breathe * 0.020
+        if ch == "left":
+            loop.left += shaped
+        else:
+            loop.right += shaped
+
+    return loop.finish(-3.0, -24.0)
+
+
 def write_wav(path: Path, left: np.ndarray, right: np.ndarray) -> None:
     import wave
 
@@ -571,20 +636,24 @@ def main() -> int:
         print("ffmpeg not found — writing WAV only")
         ffmpeg = ""
 
+    # Per-track loudness targets. Zen sits 2.5 LU under the rest: it is a background
+    # bed for a mode with no combat, and matching the run theme would make a
+    # contemplative mode as loud as a fight.
     tracks = {
-        "theme_menu": track_menu,
-        "theme_run": track_run,
-        "theme_boss": track_boss,
+        "theme_menu": (track_menu, -20.0),
+        "theme_run": (track_run, -20.0),
+        "theme_boss": (track_boss, -20.0),
+        "theme_zen": (track_zen, -22.5),
     }
     with tempfile.TemporaryDirectory() as tmp:
-        for name, fn in tracks.items():
+        for name, (fn, target_lufs) in tracks.items():
             left, right = fn()
             wav = Path(tmp) / f"{name}.wav"
             write_wav(wav, left, right)
             report(name, left, right)
             if ffmpeg:
                 ogg = out_dir / f"{name}.ogg"
-                lufs, dbtp = encode_ogg(ffmpeg, wav, ogg)
+                lufs, dbtp = encode_ogg(ffmpeg, wav, ogg, target_lufs=target_lufs)
                 print(f"  -> {ogg}  {ogg.stat().st_size // 1024} KB  "
                       f"{lufs:.1f} LUFS  true peak {dbtp:+.1f} dBTP")
             else:

@@ -27,6 +27,10 @@
     "mode.standard.desc": "Core 5–8 min run: absorb prey, combine mutations, and defeat the Ancient Forest Guardian.",
     "mode.quick.name": "Quick Hunt (Blitz)",
     "mode.quick.desc": "Focused ~3 min session: accelerated evolution and earlier boss awakening.",
+    "mode.endless.name": "Endless Journey",
+    "mode.endless.desc": "The forest never ends: after every Guardian the grove awakens, the ascension loop rises, and the run goes on.",
+    "mode.zen.name": "Zen Grove",
+    "mode.zen.desc": "A walk without pressure: dashing costs no mass, damage barely registers, and you cannot die. Finish whenever you like.",
     "mode.start_btn": "Start Run",
     "mode.select_form": "Slime Form:",
 
@@ -56,6 +60,8 @@
     "hud.miniboss_incoming": "Umbral Grove Alpha has appeared!",
     "hud.synergy_unlocked": "SYNERGY:",
     "hud.narrow_hint": "Too massive to squeeze through this narrow gap!",
+    "hud.grove_awakened": "THE GROVE AWAKENS! Ascension loop {n}",
+    "hud.ascension_loop": "Ascension {n}",
 
     "draft.title": "EVOLUTION! Choose a Mutation",
     "draft.synergy_ready": "Unlocks Synergy:",
@@ -70,9 +76,11 @@
     "pause.restart": "Restart Run",
     "pause.quit": "Main Menu",
     "pause.active_build": "Active Mutations & Synergies",
+    "pause.finish_walk": "Finish the walk",
 
     "result.victory": "VICTORY! Forest Mastered!",
     "result.defeat": "Slime Dispersed...",
+    "result.walk": "Walk complete",
     "result.stats": "Time: {time}  |  Peak Mass: {mass}\nAbsorbed: {absorbed}  |  Mutations: {mutations}",
     "result.essence_earned": "Essence Earned: +{essence}",
     "result.difficulty": "Difficulty: {name}",

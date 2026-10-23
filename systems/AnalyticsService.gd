@@ -12,6 +12,7 @@ const VALID_EVENTS: PackedStringArray = [
 	"mutation_selected",
 	"boss_encountered",
 	"boss_defeated",
+	"grove_awakened",
 	"rewarded_ad_offered",
 	"rewarded_ad_completed",
 	"purchase_started",

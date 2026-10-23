@@ -12,6 +12,7 @@ var _pause_card: PanelContainer
 var _pause_title: Label
 var _pause_build_lbl: Label
 var _pause_resume_btn: Button
+var _pause_walk_btn: Button
 var _pause_joy_btn: Button
 var _pause_restart_btn: Button
 var _pause_quit_btn: Button
@@ -107,6 +108,17 @@ func _build_pause_panel() -> void:
 		App.change_state(App.State.PLAYING)
 	)
 	vb.add_child(_pause_resume_btn)
+
+	# Zen has no Guardian, so the player needs a way to end the walk on their own
+	# terms. Hidden in every other mode, where the run has a natural ending.
+	_pause_walk_btn = Button.new()
+	_pause_walk_btn.custom_minimum_size = Vector2(0, 56)
+	_pause_walk_btn.pressed.connect(func() -> void:
+		Audio.play_sfx("button_click")
+		if arena != null:
+			arena.end_zen_walk()
+	)
+	vb.add_child(_pause_walk_btn)
 
 	_pause_joy_btn = Button.new()
 	_pause_joy_btn.custom_minimum_size = Vector2(0, 52)
@@ -268,6 +280,8 @@ func _refresh_pause_texts() -> void:
 	_pause_joy_btn.text = "%s: %s" % [Loc.t("settings.joystick"), Loc.t("settings.joystick." + jmode)]
 	_pause_restart_btn.text = Loc.t("pause.restart")
 	_pause_quit_btn.text = Loc.t("pause.quit")
+	_pause_walk_btn.text = Loc.t("pause.finish_walk")
+	_pause_walk_btn.visible = (arena != null and arena.is_zen())
 
 	if arena != null and arena.player != null:
 		var parts: Array[String] = []
@@ -283,8 +297,17 @@ func _refresh_pause_texts() -> void:
 func _refresh_result_panel() -> void:
 	var sum: Dictionary = App.last_run_summary
 	var victory: bool = (App.state == App.State.VICTORY)
-	_result_title.text = Loc.t("result.victory" if victory else "result.defeat")
-	_result_title.add_theme_color_override("font_color", Color(0.55, 1.0, 0.78) if victory else Color(1.0, 0.52, 0.56))
+	var outcome := str(sum.get("outcome", "victory" if victory else "defeat"))
+	# Three outcomes now: a Guardian kill, a defeat, and a zen walk the player chose
+	# to end. The walk is neither a win nor a loss, so it gets its own wording and a
+	# calm colour - showing "DEFEAT" for a deliberate end would be a lie.
+	var title_key := "result.victory" if victory else "result.defeat"
+	var title_col := Color(0.55, 1.0, 0.78) if victory else Color(1.0, 0.52, 0.56)
+	if outcome == "walk":
+		title_key = "result.walk"
+		title_col = Color(0.72, 0.94, 1.0)
+	_result_title.text = Loc.t(title_key)
+	_result_title.add_theme_color_override("font_color", title_col)
 
 	var sec: int = int(sum.get("duration_sec", 0.0))
 	var t_str := "%02d:%02d" % [sec / 60, sec % 60]
@@ -294,6 +317,11 @@ func _refresh_result_panel() -> void:
 		"absorbed": str(sum.get("absorbed", 0)),
 		"mutations": str(sum.get("mutations_count", 0))
 	})
+	# The ascension loop is the whole point of the endless mode; a run that reached
+	# loop 3 must not look identical to one that never left loop 0.
+	var loop_idx := int(sum.get("ascension_loop", 0))
+	if loop_idx > 0:
+		_result_stats.text += "\n" + Loc.t("hud.ascension_loop", {"n": str(loop_idx)})
 	_result_essence.text = Loc.t("result.essence_earned", {"essence": str(sum.get("final_essence", 0))})
 	_refresh_result_record(sum)
 

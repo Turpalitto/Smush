@@ -50,6 +50,13 @@ var _veil: Color = Color.WHITE
 ## light on a dark body and as near-solid dark silhouettes on a light one, because
 ## a 54%-opaque mid-tone over a mid-tone world measured as "no wings at all".
 var _darken: float = 0.0
+## Companion stars earned by growing past the top of the ladder. They are the only
+## regalia that is not driven by the stage look, because they exist precisely to
+## show growth AFTER the ladder has run out.
+var _stars: int = 0
+## Golden angle: spreads any number of stars evenly around the orbit without a
+## table, and keeps the pattern stable when one more star is added mid-run.
+const STAR_GOLDEN_ANGLE: float = 2.3999632
 
 
 func _ready() -> void:
@@ -62,6 +69,16 @@ func set_look(look: Dictionary, radius: float, time: float, alpha: float) -> voi
 	_radius = radius
 	_time = time
 	_alpha = alpha
+	queue_redraw()
+
+
+func set_ascension_stars(count: int) -> void:
+	## Separate from `set_look` because the count is a function of MASS, not of the
+	## ladder position: past stage 15 the look is constant while mass keeps climbing.
+	var c := clampi(count, 0, EvolutionStages.MAX_ASCENSION_STARS)
+	if c == _stars:
+		return
+	_stars = c
 	queue_redraw()
 
 
@@ -104,6 +121,7 @@ func _draw() -> void:
 	_veil.s = clampf(lerpf(rim.s * 0.55, 0.70, darken), 0.0, 1.0)
 	_veil.v = lerpf(maxf(rim.v, 0.94), 0.16, darken)
 	if front:
+		_draw_ascension_stars(false)
 		_draw_crown()
 		_draw_motes()
 	else:
@@ -113,6 +131,7 @@ func _draw() -> void:
 		_draw_petals()
 		_draw_antlers()
 		_draw_halo()
+		_draw_ascension_stars(true)
 
 
 # --- primitives ----------------------------------------------------------
@@ -438,3 +457,68 @@ func _draw_motes() -> void:
 		draw_circle(p, rad, Color(core.r, core.g, core.b, 0.88 * m * _alpha * tw))
 		draw_circle(p - Vector2(rad * 0.3, rad * 0.3), rad * 0.42,
 			Color(_lit.r, _lit.g, _lit.b, 0.70 * m * _alpha * tw))
+
+
+## One star's hue. The orbit is a colour wheel in miniature: neighbouring stars sit
+## 0.09 apart in hue, so a full set of seven spans a rainbow arc around the slime
+## instead of seven identical dots.
+func _star_color(index: int) -> Color:
+	var h := fposmod(_glow.h + 0.09 * float(index), 1.0)
+	# Saturation drops a little per star so the seventh is a soft pearl rather than
+	# a seventh competing colour on an already busy silhouette.
+	var s := clampf(0.62 - 0.05 * float(index), 0.18, 1.0)
+	return Color.from_hsv(h, s, 1.0)
+
+
+func _star_pts(centre: Vector2, outer: float, inner: float) -> PackedVector2Array:
+	## A four-point sparkle: long axis at 0/90 degrees, short axis on the diagonals.
+	## A plain circle at this size (4-8 px on a phone) reads as dust; the four points
+	## are what makes the eye call it a star even when it is only a few pixels across.
+	var pts := PackedVector2Array()
+	for i in range(8):
+		var a := float(i) * TAU / 8.0 - PI * 0.5
+		var r := outer if (i % 2) == 0 else inner
+		pts.append(centre + Vector2(cos(a), sin(a)) * r)
+	return pts
+
+
+func _draw_ascension_stars(behind: bool) -> void:
+	## Companion stars for endless growth. Split across the two aura instances by
+	## whether the star is currently above or below the body's centre, so the body
+	## occludes the far half of the orbit instead of the stars floating on top of it.
+	if _stars <= 0 or _alpha <= 0.01:
+		return
+	var centre := Vector2(0.0, -_radius * 0.30)
+	for i in range(_stars):
+		var phase := float(i) * STAR_GOLDEN_ANGLE
+		# Alternating direction: two stars never sit on the same bearing, and the
+		# whole set reads as orbiting rather than as a rotating rigid ring.
+		var dir := 1.0 if (i % 2) == 0 else -1.0
+		var speed := 0.62 + 0.07 * float(i)
+		var a := phase + _time * speed * dir
+		var orbit := _radius * (1.58 + 0.085 * float(i))
+		var p := centre + Vector2(cos(a) * orbit, sin(a) * orbit * 0.52)
+		if (p.y < centre.y) != behind:
+			continue
+		var tw := 0.72 + 0.28 * sin(_time * 2.6 + phase)
+		# Size floor: below ~4 px a sparkle stops being a shape and becomes a smudge,
+		# and the early stages have a radius of only 25-35 px.
+		var outer := maxf(_radius * 0.135, 4.2) * (0.85 + 0.20 * tw)
+		var col := _star_color(i)
+		# Trail: three shrinking ghosts of the same star, behind it along the orbit.
+		for k in range(1, 4):
+			var ta := a - dir * 0.15 * float(k)
+			var tp := centre + Vector2(cos(ta) * orbit, sin(ta) * orbit * 0.52)
+			var fade := (1.0 - float(k) / 4.0) * 0.34 * tw
+			var tr := outer * (1.0 - 0.16 * float(k))
+			draw_colored_polygon(_star_pts(tp, tr * 0.62, tr * 0.18),
+				Color(col.r, col.g, col.b, fade * _alpha))
+		# Halo, contour, body, core - the same four layers as every other form here,
+		# for the same reason: on the cream stages a bare bright shape has nothing to
+		# sit against, and the contour is what keeps it legible.
+		draw_circle(p, outer * 1.85, Color(col.r, col.g, col.b, 0.11 * tw * _alpha))
+		draw_colored_polygon(_star_pts(p, outer * 1.16, outer * 0.34),
+			Color(_edge.r, _edge.g, _edge.b, 0.42 * tw * _alpha))
+		draw_colored_polygon(_star_pts(p, outer, outer * 0.30),
+			Color(col.r, col.g, col.b, 0.95 * tw * _alpha))
+		draw_circle(p, outer * 0.26, Color(1.0, 1.0, 1.0, 0.88 * tw * _alpha))

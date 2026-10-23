@@ -44,6 +44,11 @@ var _trail_color: Color = Color("#5ef5c8")
 ## current position. The body colour is the stage colour pulled toward the chosen
 ## cosmetic form, so skins still read while the body evolves.
 var growth_t: float = 1.0
+## Current mass, kept only so the ascension stars can count past stage 15. `growth_t`
+## clamps at 15 by design, so it cannot express "another 25 tonnes".
+var mass: float = 10.0
+## Companion stars lit by growth above the top of the ladder (0..7).
+var ascension_stars: int = 0
 var stage: int = 1
 var _look: Dictionary = {}
 var _form_body: Color = Color("#22d0a8")
@@ -100,11 +105,13 @@ func apply_cosmetics() -> void:
 	_recompute_look()
 
 
-func set_growth(mass: float) -> void:
+func set_growth(p_mass: float) -> void:
 	## Called by the player whenever mass changes. Cheap enough to run on every
 	## absorption: it only does arithmetic and touches the shader when the palette
 	## actually moved.
-	growth_t = EvolutionStages.t_for_mass(mass)
+	mass = p_mass
+	growth_t = EvolutionStages.t_for_mass(p_mass)
+	ascension_stars = EvolutionStages.ascension_stars_for_mass(p_mass)
 	var new_stage := clampi(int(floorf(growth_t)), 1, EvolutionStages.COUNT)
 	_recompute_look()
 	if new_stage != stage:
@@ -217,8 +224,10 @@ func _process(delta: float) -> void:
 		_shader_mat.set_shader_parameter("evolution_glow", evolution_flash)
 
 	if _back_aura != null:
+		_back_aura.set_ascension_stars(ascension_stars)
 		_back_aura.set_look(_look, eff_r, _anim_time, alpha_mult)
 	if _front_aura != null:
+		_front_aura.set_ascension_stars(ascension_stars)
 		_front_aura.set_look(_look, eff_r, _anim_time, alpha_mult)
 
 	queue_redraw()

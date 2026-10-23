@@ -170,3 +170,27 @@ static func env_for_mass(m: float) -> float:
 static func name_key_for_stage(stage: int) -> String:
 	var s := clampi(stage, 1, COUNT)
 	return str(_table()[s - 1]["name_key"])
+
+
+## --- the spiral above the ladder ------------------------------------------------
+## Stage 15 is the last *named* stage, but growth must not stop being visible there,
+## or an endless run turns into a finished character drifting through the forest.
+## Every ASCENSION_STAR_MASS tonnes past the top threshold lights one more small
+## companion star, up to MAX_ASCENSION_STARS. The first star therefore appears
+## exactly when the crown does, which is the moment the player has "arrived".
+const ASCENSION_STAR_MASS: float = 25.0
+const MAX_ASCENSION_STARS: int = 7
+
+
+static func ascension_stars_for_mass(m: float) -> int:
+	var top := MASS_KEYS[COUNT - 1]
+	if m < top:
+		return 0
+	var n := 1 + int(floorf((m - top) / ASCENSION_STAR_MASS))
+	return clampi(n, 0, MAX_ASCENSION_STARS)
+
+
+static func mass_for_ascension_star(index: int) -> float:
+	## Inverse of the above, used by tests and by the HUD hint.
+	var i := clampi(index, 1, MAX_ASCENSION_STARS)
+	return MASS_KEYS[COUNT - 1] + ASCENSION_STAR_MASS * float(i - 1)

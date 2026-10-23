@@ -273,7 +273,9 @@ func _sanitize_records(raw: Variant) -> Dictionary:
 	var out: Dictionary = {}
 	if typeof(raw) != TYPE_DICTIONARY:
 		return out
-	var allowed_modes: Array = ["standard", "quick"]
+	# Read from the mode table rather than a second literal list: a mode added there
+	# but forgotten here would silently lose its records on the next load.
+	var allowed_modes: Array = GameModes.ORDER.duplicate()
 	for mode_key in raw:
 		var mode_id := str(mode_key)
 		if not allowed_modes.has(mode_id):

@@ -64,6 +64,15 @@ var miniboss_spawn_time: float = 165.0
 var miniboss_spawned: bool = false
 var boss_spawned: bool = false
 var run_ended: bool = false
+## How many Guardians have already been defeated in this run. Only `endless` moves it
+## past 0, and it is what makes the growth spiral (and the run) keep going.
+var ascension_loop: int = 0
+## Set when the player ends a `zen` walk on purpose, so the result screen can say
+## "walk finished" instead of "defeat".
+var walk_finished: bool = false
+## Cached copy of the active mode's row. `GameModes.get_mode()` duplicates the
+## dictionary, and the spawn loop runs every physics frame, so it is read once per run.
+var _mode_cfg: Dictionary = {}
 
 var run_essence_earned: int = 0
 var reward_doubled: bool = false
@@ -231,7 +240,9 @@ func _update_game_feel(delta: float) -> void:
 	if _vignette_rect != null and player != null:
 		var hp_ratio := clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
 		var target := 0.0
-		if hp_ratio < 0.35:
+		# Zen can never fall below its HP floor, so a "you are about to die" alarm would
+		# be a lie as well as a mood-breaker: the vignette stays off in that mode.
+		if hp_ratio < 0.35 and not GameModes.is_zen(mode_id):
 			# Pulse faster the closer the slime is to death.
 			var urgency := 1.0 - hp_ratio / 0.35
 			var pulse := 0.55 + 0.45 * sin(run_elapsed * lerpf(4.0, 9.0, urgency))
@@ -372,7 +383,9 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 
 
 func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
-	mode_id = p_mode
+	# Unknown ids fall back to standard inside GameModes, so a stale save or a test
+	# typo cannot leave the arena in a mode with no rules attached.
+	mode_id = GameModes.normalize(p_mode)
 	_reset_game_feel()
 	# Difficulty is snapshotted at run start: changing it mid-run must not alter a live run.
 	difficulty_cfg = ConfigDB.get_difficulty(SaveData.get_difficulty_id())
@@ -384,18 +397,24 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	_tracked_miniboss = null
 	current_draft_choices.clear()
 	run_ended = false
+	ascension_loop = 0
+	walk_finished = false
 	miniboss_spawned = false
 	boss_spawned = false
 	run_essence_earned = 0
 	reward_doubled = false
 	free_rerolls_left = 1 if SaveData.has_no_ads() else 0
 
-	if mode_id == "quick":
-		miniboss_spawn_time = 80.0
-		boss_spawn_time = 145.0
-	else:
-		miniboss_spawn_time = 165.0
-		boss_spawn_time = 270.0
+	var mcfg := GameModes.get_mode(mode_id)
+	_mode_cfg = mcfg
+	miniboss_spawn_time = float(mcfg["miniboss_time"])
+	boss_spawn_time = float(mcfg["boss_time"])
+	# A mode without a boss must not leave a stale spawn pending: the timer branch
+	# below would fire the Guardian on the first frame.
+	if not bool(mcfg["has_miniboss"]):
+		miniboss_spawned = true
+	if not bool(mcfg["has_boss"]):
+		boss_spawned = true
 
 	Ads.reset_run_limits()
 	enemy_pool.release_all()
@@ -508,6 +527,11 @@ func _rebuild_spatial_grids() -> void:
 
 
 func _process_spawning_and_waves(delta: float) -> void:
+	if _mode_cfg.is_empty():
+		_mode_cfg = GameModes.get_mode(mode_id)
+	var enemy_period_mult := float(_mode_cfg.get("enemy_period_mult", 1.0))
+	var orb_period_mult := float(_mode_cfg.get("orb_period_mult", 1.0))
+
 	if not miniboss_spawned and run_elapsed >= miniboss_spawn_time:
 		miniboss_spawned = true
 		var mb_cfg: Dictionary = ConfigDB.special_encounters.get("umbral_alpha", {})
@@ -525,7 +549,7 @@ func _process_spawning_and_waves(delta: float) -> void:
 
 	_orb_spawn_timer -= delta
 	if _orb_spawn_timer <= 0.0:
-		_orb_spawn_timer = 0.72
+		_orb_spawn_timer = 0.72 * orb_period_mult
 		if orb_pool.active_count() < MAX_ACTIVE_ORBS - 6:
 			var opos := world.pick_valid_spawn_point(player.global_position, 155.0, 640.0)
 			var is_ess := randf() < (0.11 + SaveData.get_upgrade_bonus("essence_chance") * 0.25)
@@ -533,7 +557,11 @@ func _process_spawning_and_waves(delta: float) -> void:
 
 	_enemy_spawn_timer -= delta
 	if _enemy_spawn_timer <= 0.0:
-		var pace := 1.28 if not boss_spawned else 3.2
+		# Keyed on whether the Guardian is actually alive rather than on the
+		# "has spawned" flag: in a mode with no boss that flag starts true, and the
+		# old test would have thinned the whole run as if a boss were on screen.
+		var boss_alive := active_boss != null and is_instance_valid(active_boss)
+		var pace := (1.28 if not boss_alive else 3.2) * enemy_period_mult
 		pace /= maxf(0.5, float(difficulty_cfg.get("spawn_rate_mult", 1.0)))
 		_enemy_spawn_timer = pace
 		if enemy_pool.active_count() < MAX_ACTIVE_ENEMIES - 4:
@@ -543,7 +571,7 @@ func _process_spawning_and_waves(delta: float) -> void:
 
 
 func _pick_weighted_enemy_for_time(t_sec: float) -> String:
-	var time_equiv := t_sec * (1.85 if mode_id == "quick" else 1.0)
+	var time_equiv := t_sec * GameModes.time_scale(mode_id)
 	var eligible: Array[Dictionary] = []
 	var total_w: int = 0
 	for eid in ConfigDB.enemy_order:
@@ -569,7 +597,7 @@ func spawn_enemy_by_id(enemy_id: String, pos: Vector2) -> EnemyEntity:
 	var en := enemy_pool.acquire() as EnemyEntity
 	if en == null:
 		return null
-	var t_equiv := run_elapsed * (1.85 if mode_id == "quick" else 1.0)
+	var t_equiv := run_elapsed * GameModes.time_scale(mode_id)
 	var diff_scale := 1.0 + clampf(t_equiv / 300.0, 0.0, 0.65)
 	var mass_scale := 1.0 + clampf((t_equiv - 45.0) / 185.0, 0.0, 1.02)
 	en.setup_from_config(cfg, pos, self, diff_scale, mass_scale)
@@ -1255,8 +1283,74 @@ func on_boss_defeated(_boss: AncientGuardianBoss) -> void:
 	SaveData.increment_stat("victories", 1.0)
 	add_run_essence(45)
 	Analytics.track("boss_defeated", {"boss": "ancient_guardian", "elapsed_sec": int(run_elapsed)})
+	if GameModes.is_endless(mode_id):
+		_awaken_grove()
+		return
 	Audio.play_sfx("victory", 1.0)
 	_finish_run(true)
+
+
+func _awaken_grove() -> void:
+	## Endless-mode replacement for the victory screen: the grove wakes, the run
+	## continues, and the next Guardian is scheduled a full standard interval later
+	## so the loop keeps the pacing the boss was tuned against.
+	ascension_loop += 1
+	add_run_essence(60 + 25 * ascension_loop)
+	# Healing is a fraction of max HP rather than a flat number, so a late loop with
+	# a large vitality upgrade is not a token top-up.
+	if player != null:
+		player.heal(player.max_hp * 0.45)
+	if mood != null:
+		# Wide, warm and slow: the brief calls it a wave of golden light, and it has to
+		# read as a reward rather than as the red damage flash.
+		mood.flash(Color(1.0, 0.88, 0.52), 1.4)
+	Audio.play_evolution(EvolutionStages.COUNT)
+	Events.toast_requested.emit(Loc.t("hud.grove_awakened", {"n": str(ascension_loop)}),
+		Color(1.0, 0.88, 0.52))
+	Events.boss_awakening.emit(ascension_loop)
+	Analytics.track("grove_awakened", {"loop": ascension_loop, "elapsed_sec": int(run_elapsed)})
+
+	active_boss = null
+	boss_spawned = false
+	boss_spawn_time = run_elapsed + float(_mode_cfg.get("boss_time", 270.0))
+	# The miniboss of the next loop arrives on its own interval as well; without this
+	# the flag would stay set from loop 1 and no miniboss would ever appear again.
+	if bool(_mode_cfg.get("has_miniboss", true)):
+		miniboss_spawned = false
+		miniboss_spawn_time = run_elapsed + float(_mode_cfg.get("miniboss_time", 165.0))
+
+
+func end_zen_walk() -> void:
+	## The zen mode has no Guardian, so the player decides when the walk is over.
+	## Everything collected is committed exactly as a finished run would commit it.
+	if run_ended:
+		return
+	walk_finished = true
+	Audio.play_sfx("victory", 0.9)
+	_finish_run(false, "walk")
+
+
+func is_zen() -> bool:
+	return GameModes.is_zen(mode_id)
+
+
+func is_endless() -> bool:
+	return GameModes.is_endless(mode_id)
+
+
+## Mode rules the player entity asks for by name. They are small accessors rather
+## than the whole dictionary so `PlayerSlime` stays independent of the mode table's
+## shape, and so a missing rule degrades to the standard value instead of erroring.
+func mode_dash_burn() -> float:
+	return GameModes.dash_mass_burn(mode_id)
+
+
+func mode_damage_mult() -> float:
+	return GameModes.damage_mult(mode_id)
+
+
+func mode_hp_floor_frac() -> float:
+	return GameModes.hp_floor_frac(mode_id)
 
 
 func on_player_died() -> void:
@@ -1268,10 +1362,13 @@ func on_player_died() -> void:
 	_finish_run(false)
 
 
-func _finish_run(victory: bool) -> void:
+func _finish_run(victory: bool, outcome: String = "") -> void:
 	# The result overlay is not a place for a frozen world: always release the hit-stop.
 	_reset_game_feel()
 	run_ended = not (not victory and not player.revive_used)
+	var resolved_outcome := outcome
+	if resolved_outcome.is_empty():
+		resolved_outcome = "victory" if victory else "defeat"
 	# Base participation reward guarantees meaningful early progression even on defeat!
 	var time_bonus: int = maxi(8, int(run_elapsed * 0.14))
 	var mass_bonus: int = int(maxf(0.0, player.peak_mass - 10.0) * 0.45)
@@ -1285,6 +1382,7 @@ func _finish_run(victory: bool) -> void:
 
 	App.last_run_summary = {
 		"victory": victory,
+		"outcome": resolved_outcome,
 		"mode": mode_id,
 		"difficulty": str(difficulty_cfg.get("id", ConfigDB.get_default_difficulty_id())),
 		"difficulty_essence_mult": essence_mult,
@@ -1293,13 +1391,17 @@ func _finish_run(victory: bool) -> void:
 		"absorbed": player.absorbed_count,
 		"mutations_count": player.mutations.get_total_picks(),
 		"synergies": player.mutations.active_synergies.keys(),
+		"ascension_loop": ascension_loop,
 		"base_essence": total_essence,
 		"final_essence": total_essence,
 		"can_revive": (not victory) and (not player.revive_used),
 		"essence_committed": false
 	}
 
-	if victory:
+	# A finished walk is a result the player asked for, not a loss: it commits and
+	# shows the result screen, but it must never count as a victory (best time is
+	# only awarded for real Guardian kills).
+	if victory or resolved_outcome == "walk":
 		commit_run_rewards()
 		Ads.notify_offered(Ads.PLACEMENT_DOUBLE_REWARD)
 		App.change_state(App.State.VICTORY)

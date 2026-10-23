@@ -31,6 +31,9 @@ signal miniboss_spawned(enemy_id: String)
 signal boss_spawned(boss_id: String, max_hp: float)
 signal boss_updated(current_hp: float, max_hp: float, phase: int)
 signal boss_defeated(boss_id: String)
+## Emitted in endless mode instead of `run_finished` when a Guardian falls: the grove
+## wakes, the loop counter goes up and the run continues.
+signal boss_awakening(loop_index: int)
 signal run_finished(victory: bool, summary: Dictionary)
 
 # Progression, Monetization & Tutorial

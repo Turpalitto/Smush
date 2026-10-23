@@ -19,6 +19,7 @@ const SFX_PATHS: Dictionary = {
 const EVENT_DB_OFFSETS: Dictionary = {
 	"move": -14.5,
 	"absorb": -4.2,
+	"orb_chime": -9.5,
 	"attack": -2.2,
 	"button_click": -1.5,
 	"mutation_pick": 0.0,
@@ -43,10 +44,20 @@ const PRIORITY_EVENTS: Dictionary = {
 const MUSIC_TRACKS: Dictionary = {
 	"menu": "res://audio/music/theme_menu.ogg",
 	"run": "res://audio/music/theme_run.ogg",
-	"boss": "res://audio/music/theme_boss.ogg"
+	"boss": "res://audio/music/theme_boss.ogg",
+	"zen": "res://audio/music/theme_zen.ogg"
 }
 const MUSIC_FADE_SEC: float = 1.6
 const MUSIC_SILENT_DB: float = -60.0
+
+## Collection chimes (audio/sfx/orb_chime_01..08.wav, built by
+## tools/generate_orb_chimes.py). Notes are played as a rising pentatonic line while
+## the player keeps collecting: consecutive pickups inside the window step up the
+## scale, a pause of longer than the window restarts it at the bottom. That turns a
+## fast sweep over a spore field into a phrase instead of the same blip forty times.
+const ORB_CHIME_COUNT: int = 8
+const ORB_CHIME_PATH: String = "res://audio/sfx/orb_chime_%02d.wav"
+const ORB_CHIME_WINDOW_SEC: float = 1.8
 
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _player_events: Array[String] = []
@@ -58,6 +69,13 @@ var _next_idx: int = 0
 var _move_cooldown: float = 0.0
 var _event_cooldowns: Dictionary = {}
 var last_played_event: String = ""
+## Position in the chime ladder and the time left in the window that keeps it going.
+var _chime_step: int = 0
+## Mode of the live run, so a PLAYING state change picks the same track the run
+## started with. Without it the zen bed would be replaced by the run theme on the
+## first pause/resume, because `run_started` fires before the state change.
+var _run_mode: String = "standard"
+var _chime_window: float = 0.0
 
 
 func _ready() -> void:
@@ -93,6 +111,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _move_cooldown > 0.0:
 		_move_cooldown -= delta
+	if _chime_window > 0.0:
+		_chime_window = maxf(0.0, _chime_window - delta)
 	for k in _event_cooldowns.keys():
 		var rem := float(_event_cooldowns[k]) - delta
 		if rem <= 0.0:
@@ -190,13 +210,15 @@ func _on_game_state_changed(_old_state: int, new_state: int) -> void:
 		App.State.PLAYING:
 			# The boss keeps its own theme until the run ends.
 			if _music_id != "boss":
-				play_music("run")
+				play_music(GameModes.music_for(_run_mode))
 		_:
 			pass
 
 
-func _on_run_started(_mode_id: String) -> void:
-	play_music("run")
+func _on_run_started(mode_id: String) -> void:
+	# Zen gets its own beatless ambient bed; every other mode keeps the run theme.
+	_run_mode = GameModes.normalize(mode_id)
+	play_music(GameModes.music_for(_run_mode))
 
 
 func _on_run_finished(_victory: bool, _summary: Dictionary) -> void:
@@ -372,3 +394,29 @@ func _emit(event_name: String, path: String, pitch_scale: float) -> void:
 	var jitter := randf_range(0.94, 1.07) if event_name in ["move", "absorb", "attack"] else 1.0
 	player.pitch_scale = clampf(pitch_scale * jitter, 0.55, 1.75)
 	player.play()
+
+
+## One note of the collection ladder. Called for every orb the slime swallows.
+##
+## The ladder advances only while the player keeps collecting: a gap longer than
+## ORB_CHIME_WINDOW_SEC restarts it at the bottom of the scale. Stepping up on every
+## single pickup regardless of timing would climb to the top of the scale in eight
+## orbs and then sit there, which is exactly the "same blip forever" it replaces.
+func play_orb_chime() -> void:
+	if _chime_window <= 0.0:
+		_chime_step = 0
+	else:
+		_chime_step = (_chime_step + 1) % ORB_CHIME_COUNT
+	_chime_window = ORB_CHIME_WINDOW_SEC
+	var path := ORB_CHIME_PATH % (_chime_step + 1)
+	if not FileAccess.file_exists(path):
+		# A partial asset set must not make collection silent: fall back to the
+		# generic absorb blip the game shipped with.
+		_emit("absorb", str(SFX_PATHS["absorb"]), 1.1)
+		return
+	_emit("orb_chime", path, 1.0)
+
+
+## Test seam: where the ladder currently stands (0-based).
+func chime_step() -> int:
+	return _chime_step
