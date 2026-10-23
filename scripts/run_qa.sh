@@ -8,6 +8,17 @@ python3 tools/sync_godot_cache.py
 QA_LOG="$(mktemp)"
 trap 'rm -f "$QA_LOG"' EXIT
 
+# A fresh clone has no .godot/imported cache: .godot/ is gitignored and the .ctex
+# files are generated, so the test scene cannot load a single PNG and the run dies
+# with "Failed loading resource: res://.godot/imported/root_cluster.png-....ctex".
+# That is why CI was red for days while QA was green on a developer machine, where
+# the cache already existed. Import first, then test.
+"$GODOT_BIN" --headless --path "$TASK_ROOT" --import >/dev/null 2>&1 || true
+if [ ! -d "$TASK_ROOT/.godot/imported" ]; then
+  echo "Asset import produced no .godot/imported directory; textures would fail to load." >&2
+  exit 1
+fi
+
 # Prefer ripgrep, fall back to grep: macOS/CI images often ship without rg.
 if command -v rg >/dev/null 2>&1; then
   log_matches() { rg -q "$1" "$QA_LOG"; }
