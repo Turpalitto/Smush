@@ -42,6 +42,12 @@ void fragment() {
 
 	// Multiply toward the stage hue. A plain mix toward a flat colour would grey
 	// out the blacks, so the tint scales the image instead of replacing it.
+	//
+	// A luminance-weighted split-tone (warm the lights, cool the shadows) was tried
+	// here and reverted: measured on mass-104 captures, the shadow bucket already
+	// had G-R = +0.067 before the change and +0.067 after, and every channel mean
+	// moved by about 0.01. The flat multiply was never washing the moss out, so the
+	// extra code bought nothing measurable.
 	c = mix(c, c * tint * 1.55, tint_amount);
 
 	// Radial light around the slime. The 1.78 vertical factor turns the ellipse
