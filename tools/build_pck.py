@@ -12,7 +12,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-INCLUDE_EXTS = {".gd", ".tscn", ".tres", ".gdshader", ".json", ".png", ".wav", ".cfg", ".ttf"}
+# .ogg is not optional: the three music loops are the only audio in the pack that
+# is not a .wav, and leaving the extension out of this set built packs that
+# shipped with no music at all - silently, because nothing crashed. The packaged
+# QA step caught it as "Music file exists: res://audio/music/theme_menu.ogg".
+INCLUDE_EXTS = {".gd", ".tscn", ".tres", ".gdshader", ".json", ".png", ".wav", ".ogg", ".cfg", ".ttf"}
 EXCLUDE_DIRS = {".git", "builds", "deliverables", "reports", "node_modules", "__pycache__", "tools", "src", "web", "android"}
 EXCLUDE_FILES = {"project.godot", "export_presets.cfg", "package.json", "package-lock.json", "tsconfig.json", "drizzle.config.json"}
 

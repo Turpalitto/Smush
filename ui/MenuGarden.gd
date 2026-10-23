@@ -47,7 +47,11 @@ func _ready() -> void:
 	var spots := [Vector2(0.13, 0.20), Vector2(0.87, 0.31), Vector2(0.20, 0.44),
 		Vector2(0.82, 0.90), Vector2(0.12, 0.93)]
 	for i in range(spots.size()):
-		var tex := load(BLOOM_FILES[i % BLOOM_FILES.size()]) as Texture2D
+		# AssetRegistry, not load(): the menu garden is the first screen a player
+		# sees, and load() returns null for a PNG in a pack without the editor
+		# import cache, so the blooms vanished and the title screen fell back to
+		# bare vines. AssetRegistry decodes the raw PNG in that case.
+		var tex := AssetRegistry.get_texture(BLOOM_FILES[i % BLOOM_FILES.size()])
 		if tex == null:
 			continue
 		_blooms.append({
