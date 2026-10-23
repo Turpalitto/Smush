@@ -85,6 +85,15 @@ const PROP_TEXTURES: Dictionary = {
 	"bloom_pod": PROP_DIR + "bloom_pod.png",
 	"bloom_flower": PROP_DIR + "bloom_flower.png",
 	"bloom_bells": PROP_DIR + "bloom_bells.png",
+	# Wonders, generated with FLUX and keyed with process_creature_art.py. They are
+	# not props: they are placed on their own lattice (see _wonder_in_cell), they do
+	# not collide, and they wake once. They live in this table only so that
+	# _prop_texture's AssetRegistry path (which works inside a raw .pck) serves them
+	# too — a Wonder whose art failed to load in a packaged build would be an
+	# invisible landmark that still heals.
+	"singing_crystal": PROP_DIR + "singing_crystal.png",
+	"dew_fountain": PROP_DIR + "dew_fountain.png",
+	"ancient_lantern": PROP_DIR + "ancient_lantern.png",
 }
 ## Decor kinds. `px` is the drawn width at scale 1.0, `shadow` the radius of the
 ## contact shadow, `sway` the rotation amplitude (0 for anything lying flat — a
@@ -113,10 +122,126 @@ const PROP_WIDTH_PER_RADIUS: float = 2.45
 ## Props sit a little below the creatures in value so they never outshine them.
 const PROP_TINT: Color = Color(0.82, 0.88, 0.85, 1.0)
 
+# --- Macro-biomes ---------------------------------------------------------------
+## The forest is not the same forest everywhere. Four regions are blended by a
+## low-frequency field, so walking a few thousand pixels changes the palette of the
+## floor, the props and the undergrowth without a single chunk boundary showing: the
+## field is sampled in *world pixels*, not per chunk.
+##
+## The field lives in one RGBA texture rather than in a noise function written twice.
+## The floor is a shader and the props are sprites, and the two have to agree — a
+## Moon Mycelium grove standing on an Emerald floor reads as a bug. One map, one
+## channel per biome with the four weights summing to 1: the shader samples it
+## directly and `biome_weights_at` reads the same texels back on the CPU, so there is
+## exactly one answer to "which biome is here" and no drift between them.
+const BIOME_COUNT: int = 4
+const BIOME_NAMES: Array[String] = ["Emerald Cradle", "Moon Mycelium", "Amber Grove", "Starlit Pool"]
+## Palette multipliers, centred near 1.0 so most of the forest keeps the tint it was
+## painted with and only the regions that differ visibly move.
+const BIOME_TINTS: Array[Color] = [
+	Color(0.92, 1.10, 0.94), # Emerald Cradle — the baseline, a shade greener
+	Color(0.78, 0.80, 1.24), # Moon Mycelium  — cold violet, the mycelium's own light
+	Color(1.24, 0.96, 0.62), # Amber Grove    — sunlit gold through old resin
+	Color(0.60, 0.86, 1.08), # Starlit Pool   — deep teal-indigo, water in the dark
+]
+## Brightness per biome, applied to the floor only. A pool in the dark is darker; an
+## amber grove is the one region that is brighter than the baseline.
+const BIOME_LIFTS: Array[float] = [1.00, 1.04, 1.10, 0.86]
+## Side of the biome tile in world pixels. 20480 px is 40 screens across: the palette
+## pattern repeats, but a player would have to walk forty screens in one direction to
+## meet the same palette twice, and the props on top of it never repeat at all.
+const BIOME_TILE_PX: float = 20480.0
+## Noise cells per tile side. 7 cells over 20480 px is a 2925 px cell — about six
+## chunks of one biome and a two-chunk transition, which is what makes a region
+## something you travel through rather than something you notice in one screen.
+const BIOME_LATTICE: int = 7
+## Texels per tile side. The field is smooth by construction, so 64 is plenty: one
+## texel is 320 px and the shader's bilinear filter does the rest. It also has to be
+## small, because generate_world rebuilds it for every run and this is CPU work.
+const BIOME_MAP_RES: int = 64
+## Contrast applied to each noise channel before the four weights are formed. Raw
+## value noise clusters around 0.5, which puts all four weights near 0.25 and makes
+## the whole world one average blend; this pushes each channel toward 0 or 1 so that
+## recognisable regions exist and the transitions between them stay smooth.
+const BIOME_CONTRAST_LO: float = 0.32
+const BIOME_CONTRAST_HI: float = 0.68
+## How hard the floor leans toward its biome colour, and how far the biome's own
+## brightness moves it. The tint is normalised to unit luminance in the shader, so
+## this is a pure hue shift; 0.95 is close to "the region owns the floor's colour".
+## Measured: at 0.46 the Emerald-to-Amber swing in mean red-minus-blue was 0.02, which
+## is invisible on a phone; at 0.95 it is 0.056.
+const BIOME_FLOOR_TINT: float = 0.95
+const BIOME_FLOOR_LIFT: float = 0.55
+
+# --- Wonders --------------------------------------------------------------------
+## Three landmarks. Each is placed on its own lattice, wakes exactly once, and is
+## the only thing in the forest that is allowed to be a destination rather than
+## decoration: it is visible from a screen away as a soft halo, it chimes a bell
+## chord, it heals, and it releases a cloud of spores.
+const WONDER_KINDS: Array[String] = ["singing_crystal", "dew_fountain", "ancient_lantern"]
+## Halo colour per wonder, used for the light it throws when it wakes.
+const WONDER_GLOW: Dictionary = {
+	"singing_crystal": Color(0.62, 1.00, 0.86),
+	"dew_fountain": Color(0.52, 1.00, 0.72),
+	"ancient_lantern": Color(1.00, 0.82, 0.46),
+}
+## The lattice a wonder may occupy, in chunks. Cells are 9 chunks across and a wonder
+## sits within 10 % of its cell centre, so two wonders can never be closer than
+## 9 - 2*0.9 = 7.2 chunks. That is the brief's "no more often than one per 7-9
+## chunks", guaranteed by construction instead of by a rejection loop.
+const WONDER_CELL_CHUNKS: int = 9
+const WONDER_JITTER: float = 0.10
+## Chance a cell holds one at all. Measured over 2601 cells: 0.623 filled, the mean
+## nearest neighbour is 4382 px (8.6 chunks) and the closest pair is 7.3 chunks. That
+## is the brief's "no more often than one per 7-9 chunks" as a measurement, not as an
+## estimate — the first draft of this comment guessed 11 chunks and was wrong.
+const WONDER_CHANCE: float = 0.62
+## Radius at which a wonder wakes. Generous, because the player is looking at the
+## halo from a screen away and drifting toward it rather than hunting for it.
+const WONDER_TRIGGER_RADIUS: float = 150.0
+## No prop grows this close to a wonder, so the landmark never stands in a bush.
+const WONDER_CLEAR_RADIUS: float = 190.0
+## Drawn width. A prop is 64-108 px, so this is roughly twice the biggest one: a
+## wonder has to dwarf the rune stones it is supposed to outrank. 220 and not 180
+## because the cut-out art carries a lot of empty margin — measured, the fountain's
+## visible body is 145/256 of its tile, so 180 drew a 102 px landmark on a 720 px
+## screen, which read as a prop rather than as a destination.
+const WONDER_PX: float = 220.0
+## Asleep the sprite is dim and desaturated; awake it is brighter than any prop.
+const WONDER_DORMANT_K: float = 0.66
+const WONDER_LIT_K: float = 1.06
+const WONDER_WAKE_SEC: float = 0.85
+## Heal on waking, as a fraction of max HP. 14 % is a real reprieve without turning
+## the run into a healing circuit: at eleven chunks of average spacing a player
+## crossing the whole map meets a handful.
+const WONDER_HEAL_FRACTION: float = 0.14
+const WONDER_SPORES: int = 26
+
+# --- Undergrowth response -------------------------------------------------------
+## The slime has weight. Undergrowth within this radius leans away from it and then
+## springs back, which is the cheapest way to make the forest feel like it is made of
+## plants rather than of sprites.
+const BEND_RANGE: float = 210.0
+const BEND_MAX: float = 0.42
+## Spring constants: omega = sqrt(26) ~ 5.1 rad/s, zeta = 5.2 / (2*sqrt(26)) ~ 0.51.
+## Underdamped on purpose — the overshoot and settle is the whole effect. Critically
+## damped would just track the slime like a lever.
+const BEND_STIFFNESS: float = 26.0
+const BEND_DAMPING: float = 5.2
+## How far a plant has to be leaning before it counts as brushed and sheds dust.
+const DUST_TRIGGER: float = 0.10
+const DUST_COOLDOWN: float = 1.6
+const DUST_MAX: int = 260
+
 const SPORE_COUNT: int = 52
 ## Spores wrap around the player inside this box, which is wider than the fog, so
 ## the wrap happens where nothing can be seen.
 const SPORE_RADIUS: float = 1300.0
+
+## Fires the first time the slime comes within WONDER_TRIGGER_RADIUS of a landmark.
+## The generator does the healing, the chime and the spores itself; this is for the
+## arena, which owns the particle pool and wants to add a burst of its own.
+signal wonder_awakened(pos: Vector2, kind: String)
 
 ## Everything currently streamed. Kept flat because the spawn logic and the shadow
 ## pass both want to iterate it, and 60-90 entries do not need a spatial index.
@@ -144,6 +269,24 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _anim_time: float = 0.0
 var _chunk_root: Node2D
 var _gate_root: Node2D
+## The biome field. The image is kept as well as the texture because the CPU reads
+## the same texels back for the prop and decor tints — see BIOME_COUNT above.
+var _biome_image: Image = null
+var _biome_texture: ImageTexture = null
+## Lattice cell -> {pos, kind, cell} for the cells that hold a wonder, {} otherwise.
+## Cached because _is_reserved asks for it for every prop candidate in every chunk and
+## the answer cannot change within a run.
+var _wonder_cells: Dictionary = {}
+## Lattice cell -> true once that wonder has woken. Keyed by cell, not by node, so it
+## survives the chunk being streamed out and back: a wonder heals once per run.
+var _wonder_seen: Dictionary = {}
+## Live wonder sprites: {pos, kind, sprite, cell, lit, wake, entry, chunk}.
+var _wonder_nodes: Array[Dictionary] = []
+## Brushed-off undergrowth motes: {pos, vel, age, life, size, color}.
+var _dust: Array[Dictionary] = []
+## Runtime-only randomness (dust). Deliberately separate from _rng, which is seeded
+## from the world seed and therefore has to stay deterministic for chunk layout.
+var _dust_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## Vector2i chunk coordinate -> {root, obstacles, decor, sprites}
 var _chunks: Dictionary = {}
 ## Chunks waiting for a free frame, drained CHUNKS_PER_FRAME at a time.
@@ -165,7 +308,7 @@ var _fog_tick: int = 0
 ## pays for the measurement. They exist because the endless world draws ~600
 ## sprites and "it feels fine on my laptop" is not a number.
 var profile_enabled: bool = OS.is_debug_build()
-var perf_us: Dictionary = {"process": 0, "stream": 0, "drain": 0, "fog": 0, "sway": 0, "spores": 0}
+var perf_us: Dictionary = {"process": 0, "stream": 0, "drain": 0, "fog": 0, "sway": 0, "spores": 0, "dust": 0}
 var perf_frames: int = 0
 var perf_chunks_built: int = 0
 var perf_build_us_max: int = 0
@@ -194,11 +337,9 @@ func _prop_texture(kind: String) -> Texture2D:
 func generate_world(seed_val: int = 0) -> void:
 	## Rebuilds the whole forest around the origin. The streamer takes over from
 	## there: `generate_world` is only ever called at the start of a run.
-	if seed_val != 0:
-		_world_seed = seed_val
-	else:
-		_world_seed = int(Time.get_ticks_usec() & 0x7FFFFFFF)
+	_world_seed = seed_val if seed_val != 0 else int(Time.get_ticks_usec() & 0x7FFFFFFF)
 	_rng.seed = _world_seed
+	_dust_rng.seed = _world_seed ^ 0x9E3779B9
 
 	obstacles.clear()
 	narrow_gates.clear()
@@ -213,8 +354,16 @@ func generate_world(seed_val: int = 0) -> void:
 	_swayers.clear()
 	_chunks.clear()
 	_pending.clear()
+	_wonder_cells.clear()
+	_wonder_seen.clear()
+	_wonder_nodes.clear()
+	_dust.clear()
 	_last_cx = 0x7FFFFFFF
 	_last_cy = 0x7FFFFFFF
+
+	# The biome field is a function of the world seed, so it is rebuilt here and not
+	# once at startup: two runs with different seeds are two different forests.
+	_build_biome_map()
 
 	# remove_child before queue_free: freeing is deferred, so a same-named node
 	# added in this frame would otherwise be renamed to "@Node2D@2" and the QA
@@ -353,6 +502,227 @@ func _apply_bloom(entry: Dictionary, base: Color, v: float) -> void:
 		node.visible = a > 0.02
 
 
+func _hash01(x: int, y: int, salt: int) -> float:
+	## Deterministic 0..1 from two integers. The same mixer as _chunk_seed, salted so
+	## the biome lattice, the wonder lattice and the chunk layout never correlate: an
+	## unsalted hash would put every wonder in the middle of a biome core.
+	var h: int = _world_seed * 374761393 + x * 668265263 + y * 1274126177 + salt * 15485863
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(h & 0xFFFFFF) / 16777215.0
+
+
+static func _bilerp(grid: PackedFloat32Array, row0: int, row1: int,
+		c0: int, c1: int, tx: float, ty: float) -> float:
+	var top := lerpf(grid[row0 + c0], grid[row0 + c1], tx)
+	var bot := lerpf(grid[row1 + c0], grid[row1 + c1], tx)
+	return lerpf(top, bot, ty)
+
+
+func _build_biome_map() -> void:
+	## Two independent low-frequency fields, crossed into four weights.
+	##
+	## Crossing is bilinear — w0 = (1-a)(1-b), w1 = a(1-b), w2 = (1-a)b, w3 = ab — so
+	## the four weights sum to exactly 1 everywhere and the field is C1-smooth across
+	## the whole map. A Voronoi or a nearest-biome pick would be cheaper and would show
+	## a hard line between regions, which is the one thing a palette must not do.
+	##
+	## The lattice wraps at BIOME_LATTICE: the last row and column are copies of the
+	## first, so `repeat_enable` closes the join with no seam.
+	var res := BIOME_MAP_RES
+	var lat := BIOME_LATTICE
+	var span := lat + 1
+	var fa := PackedFloat32Array()
+	var fb := PackedFloat32Array()
+	fa.resize(span * span)
+	fb.resize(span * span)
+	for gy in range(span):
+		for gx in range(span):
+			fa[gy * span + gx] = _hash01(gx % lat, gy % lat, 101)
+			fb[gy * span + gx] = _hash01(gx % lat, gy % lat, 202)
+
+	var img := Image.create(res, res, false, Image.FORMAT_RGBA8)
+	var inv := float(lat) / float(res)
+	for y in range(res):
+		var fy := (float(y) + 0.5) * inv
+		var iy := int(fy)
+		var ty := fy - float(iy)
+		ty = ty * ty * (3.0 - 2.0 * ty)
+		var row0 := (iy % lat) * span
+		var row1 := ((iy + 1) % lat) * span
+		for x in range(res):
+			var fx := (float(x) + 0.5) * inv
+			var ix := int(fx)
+			var tx := fx - float(ix)
+			tx = tx * tx * (3.0 - 2.0 * tx)
+			var c0 := ix % lat
+			var c1 := (ix + 1) % lat
+			var a := smoothstep(BIOME_CONTRAST_LO, BIOME_CONTRAST_HI,
+				_bilerp(fa, row0, row1, c0, c1, tx, ty))
+			var b := smoothstep(BIOME_CONTRAST_LO, BIOME_CONTRAST_HI,
+				_bilerp(fb, row0, row1, c0, c1, tx, ty))
+			img.set_pixel(x, y, Color(
+				(1.0 - a) * (1.0 - b),
+				a * (1.0 - b),
+				(1.0 - a) * b,
+				a * b))
+
+	_biome_image = img
+	# One texture reused across runs: creating a new ImageTexture per run leaves the
+	# old one for the renderer to collect mid-frame, which shows up as a hitch on the
+	# first frame of a run rather than as anything visible.
+	if _biome_texture == null:
+		_biome_texture = ImageTexture.create_from_image(img)
+	else:
+		_biome_texture.update(img)
+
+
+func biome_texture() -> Texture2D:
+	return _biome_texture
+
+
+func biome_weights_at(pos: Vector2) -> PackedFloat32Array:
+	## The four biome weights at a world position, read back out of the map the floor
+	## shader samples. Nearest texel: the field is smooth over hundreds of pixels, so
+	## the difference from the shader's bilinear lookup is invisible, and it keeps this
+	## to one lookup per call — _is_reserved and every sprite creation go through it.
+	var out := PackedFloat32Array([1.0, 0.0, 0.0, 0.0])
+	if _biome_image == null:
+		return out
+	var res := _biome_image.get_width()
+	var x := clampi(int(fposmod(pos.x / BIOME_TILE_PX, 1.0) * float(res)), 0, res - 1)
+	var y := clampi(int(fposmod(pos.y / BIOME_TILE_PX, 1.0) * float(res)), 0, res - 1)
+	var c := _biome_image.get_pixel(x, y)
+	out[0] = c.r
+	out[1] = c.g
+	out[2] = c.b
+	out[3] = c.a
+	return out
+
+
+func biome_tint_at(pos: Vector2) -> Color:
+	## The blended palette multiplier for anything standing at `pos`.
+	var w := biome_weights_at(pos)
+	var r := 0.0
+	var g := 0.0
+	var b := 0.0
+	for i in range(BIOME_COUNT):
+		var t: Color = BIOME_TINTS[i]
+		r += t.r * w[i]
+		g += t.g * w[i]
+		b += t.b * w[i]
+	return Color(r, g, b, 1.0)
+
+
+func dominant_biome(pos: Vector2) -> int:
+	var w := biome_weights_at(pos)
+	var best := 0
+	for i in range(1, BIOME_COUNT):
+		if w[i] > w[best]:
+			best = i
+	return best
+
+
+func biome_name_at(pos: Vector2) -> String:
+	return BIOME_NAMES[dominant_biome(pos)]
+
+
+# --- Wonders --------------------------------------------------------------------
+
+func _wonder_in_cell(cx: int, cy: int) -> Dictionary:
+	## Pure function of a lattice cell: {pos, kind, cell}, or {} for a cell that has
+	## none. Cached, because _is_reserved asks this for every prop candidate in every
+	## chunk and the answer cannot change within a run.
+	##
+	## Note that this uses `_is_reserved_static` and not `_is_reserved`: the latter
+	## asks where the wonders are, and a wonder asking where the wonders are would
+	## recurse forever.
+	var key := Vector2i(cx, cy)
+	if _wonder_cells.has(key):
+		return _wonder_cells[key]
+	var out: Dictionary = {}
+	if _hash01(cx, cy, 303) <= WONDER_CHANCE:
+		var cell_px := float(WONDER_CELL_CHUNKS) * CHUNK_SIZE
+		var jx := (_hash01(cx, cy, 304) * 2.0 - 1.0) * WONDER_JITTER
+		var jy := (_hash01(cx, cy, 305) * 2.0 - 1.0) * WONDER_JITTER
+		var pos := Vector2(
+			(float(cx) + 0.5 + jx) * cell_px,
+			(float(cy) + 0.5 + jy) * cell_px)
+		var pick := int(_hash01(cx, cy, 306) * float(WONDER_KINDS.size()))
+		if not _is_reserved_static(pos, WONDER_CLEAR_RADIUS):
+			out = {
+				"pos": pos,
+				"kind": WONDER_KINDS[mini(pick, WONDER_KINDS.size() - 1)],
+				"cell": key,
+			}
+	_wonder_cells[key] = out
+	return out
+
+
+func wonder_near(pos: Vector2, radius: float = WONDER_CLEAR_RADIUS) -> Dictionary:
+	## The wonder closest to `pos` within `radius`, or {}. Checks the 3x3
+	## neighbourhood of cells, because a position near a cell border is closer to a
+	## neighbour's wonder than to its own.
+	var cell_px := float(WONDER_CELL_CHUNKS) * CHUNK_SIZE
+	var cx := int(floor(pos.x / cell_px))
+	var cy := int(floor(pos.y / cell_px))
+	var best: Dictionary = {}
+	var best_d := radius
+	for oy in range(-1, 2):
+		for ox in range(-1, 2):
+			var w := _wonder_in_cell(cx + ox, cy + oy)
+			if w.is_empty():
+				continue
+			var d := pos.distance_to(w["pos"])
+			if d < best_d:
+				best_d = d
+				best = w
+	return best
+
+
+func _wonders_in_chunk(key: Vector2i) -> Array[Dictionary]:
+	## The wonders whose *position* falls inside this chunk. A wonder belongs to a
+	## 9-chunk lattice cell, so the chunk that has to draw it is usually not the chunk
+	## its cell starts in; checking the 3x3 cells around the chunk is what makes this
+	## exact without a global registry of built landmarks.
+	var out: Array[Dictionary] = []
+	var ccx := int(floor(float(key.x) / float(WONDER_CELL_CHUNKS)))
+	var ccy := int(floor(float(key.y) / float(WONDER_CELL_CHUNKS)))
+	for oy in range(-1, 2):
+		for ox in range(-1, 2):
+			var w := _wonder_in_cell(ccx + ox, ccy + oy)
+			if w.is_empty():
+				continue
+			var wp: Vector2 = w["pos"]
+			if int(floor(wp.x / CHUNK_SIZE)) == key.x and int(floor(wp.y / CHUNK_SIZE)) == key.y:
+				out.append(w)
+	return out
+
+
+func wonder_count() -> int:
+	## Test seam: how many landmarks are currently streamed.
+	return _wonder_nodes.size()
+
+
+func wonder_state() -> Array[Dictionary]:
+	## Test seam: a copy of the live wonder records, so a test can read positions,
+	## kinds and wake values without touching the internal dictionaries.
+	var out: Array[Dictionary] = []
+	for wn: Dictionary in _wonder_nodes:
+		out.append({
+			"pos": wn["pos"],
+			"kind": wn["kind"],
+			"cell": wn["cell"],
+			"lit": wn["lit"],
+			"wake": wn["wake"],
+		})
+	return out
+
+
+func wonder_is_seen(cell: Vector2i) -> bool:
+	return _wonder_seen.has(cell)
+
+
 func _chunk_seed(cx: int, cy: int) -> int:
 	## Integer hash of the chunk coordinate. The forest is a pure function of
 	## (chunk, world seed), which is what makes walking away and back idempotent.
@@ -367,6 +737,11 @@ func _chunk_content(cx: int, cy: int) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _chunk_seed(cx, cy)
 	var origin := Vector2(float(cx) * CHUNK_SIZE, float(cy) * CHUNK_SIZE)
+	# Biome at the chunk's centre. This only decides which *extra* species the chunk
+	# grows; the per-sprite palette is sampled at each sprite's own position in
+	# _add_decor_sprite, so the colour crosses a chunk boundary smoothly instead of
+	# switching on it.
+	var biome := dominant_biome(origin + Vector2(CHUNK_SIZE * 0.5, CHUNK_SIZE * 0.5))
 
 	var props: Array[Dictionary] = []
 	var want_props: int = 1 + (1 if rng.randf() < PROPS_PER_CHUNK - 1.0 else 0)
@@ -472,6 +847,37 @@ func _chunk_content(cx: int, cy: int) -> Dictionary:
 				"hue": rng.randf_range(0.09, 0.16),
 			})
 
+	# The signature of a biome: one extra patch of the thing that grows there. This is
+	# what makes walking from one region into the next feel like a different place and
+	# not just a different colour filter. Emerald Cradle keeps the plain mix.
+	var sig_centre := origin + Vector2(
+		rng.randf_range(60.0, CHUNK_SIZE - 60.0),
+		rng.randf_range(60.0, CHUNK_SIZE - 60.0)
+	)
+	var sig_kind := -1
+	var sig_count := 0
+	if biome == 1:
+		sig_kind = 6 # Moon Mycelium: caps that glow in their own light
+		sig_count = 2
+	elif biome == 2:
+		sig_kind = BLOOM_KIND_MIN + 1 # Amber Grove: flowers that open with growth
+		sig_count = 2
+	elif biome == 3:
+		sig_kind = 1 # Starlit Pool: flat moss, the drawn kind
+		sig_count = 3
+	if sig_kind >= 0 and sig_centre.length() >= 170.0:
+		for _i in range(sig_count):
+			var gpos2 := sig_centre + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(12.0, 78.0)
+			if gpos2.length() < 120.0:
+				continue
+			decor.append({
+				"pos": gpos2,
+				"scale": rng.randf_range(0.60, 1.45),
+				"kind": sig_kind,
+				"phase": rng.randf() * TAU,
+				"hue": rng.randf_range(0.36, 0.56),
+			})
+
 	return {"props": props, "decor": decor}
 
 
@@ -488,9 +894,11 @@ func _make_prop(pos: Vector2, r: float, kind: String, rng: RandomNumberGenerator
 	}
 
 
-func _is_reserved(pos: Vector2, r: float) -> bool:
-	## Places the forest must not grow into: the starting glade, the shrine, and the
-	## four root gates. Position-based, so it holds in every chunk.
+func _is_reserved_static(pos: Vector2, r: float) -> bool:
+	## Places the forest must not grow into, regardless of what is standing there:
+	## the starting glade, the shrine, and the four root gates. Position-based, so it
+	## holds in every chunk. Split out from `_is_reserved` because the wonder lattice
+	## needs this half and must not ask where the wonders are.
 	if pos.length() < SAFE_SPAWN_RADIUS + r:
 		return true
 	if pos.distance_to(SHRINE_POS) < SHRINE_CLEAR_RADIUS + r:
@@ -499,6 +907,15 @@ func _is_reserved(pos: Vector2, r: float) -> bool:
 		if pos.distance_to(gdir * GATE_RING_RADIUS) < 190.0:
 			return true
 	return false
+
+
+func _is_reserved(pos: Vector2, r: float) -> bool:
+	if _is_reserved_static(pos, r):
+		return true
+	# A wonder keeps a clearing around itself. Without this a rune stone spawns on the
+	# crystal's base and the landmark reads as a prop cluster instead of as a thing
+	# that was put there.
+	return not wonder_near(pos, WONDER_CLEAR_RADIUS + r).is_empty()
 
 
 func _build_chunk(key: Vector2i) -> void:
@@ -525,6 +942,11 @@ func _build_chunk(key: Vector2i) -> void:
 		"obstacles": ob_list,
 		"decor": decor_list,
 	}
+
+	# Wonders last, so they draw over the undergrowth that surrounds them rather than
+	# under it: a landmark that a fern can hide is not a landmark.
+	for w: Dictionary in _wonders_in_chunk(key):
+		_add_wonder(w, root, key)
 
 
 func _free_chunk(key: Vector2i) -> void:
@@ -577,6 +999,12 @@ func _free_chunk(key: Vector2i) -> void:
 			kept_bloom.append(b)
 	_bloom_entries = kept_bloom
 
+	var kept_wonder: Array[Dictionary] = []
+	for wn: Dictionary in _wonder_nodes:
+		if wn.get("chunk") != key:
+			kept_wonder.append(wn)
+	_wonder_nodes = kept_wonder
+
 
 func _add_static_pillar(d: Dictionary, root: Node2D, key: Vector2i = GATE_CHUNK) -> Dictionary:
 	var pos: Vector2 = d["pos"]
@@ -600,7 +1028,12 @@ func _add_static_pillar(d: Dictionary, root: Node2D, key: Vector2i = GATE_CHUNK)
 	var sp := Sprite2D.new()
 	sp.texture = tex
 	sp.position = pos
-	sp.modulate = PROP_TINT
+	# The palette of the region this prop happens to stand in. Sampled per sprite
+	# rather than per chunk, so a prop near a chunk border already has the colour of
+	# the ground it is standing on instead of the colour of the chunk that built it.
+	var bcol := biome_tint_at(pos)
+	var base_col := PROP_TINT * bcol
+	sp.modulate = base_col
 	# Width follows the collision radius, with a little hand-placed variance so a
 	# row of pillars never looks stamped.
 	var width := r * PROP_WIDTH_PER_RADIUS * float(d.get("wobble", 1.0))
@@ -613,7 +1046,7 @@ func _add_static_pillar(d: Dictionary, root: Node2D, key: Vector2i = GATE_CHUNK)
 	# the big silhouettes stay at full brightness while the floor beneath them greys
 	# into the mist, which reads as objects floating in front of the haze instead of
 	# standing in it. Gate pillars use a sentinel key so _free_chunk never drops them.
-	_fogged.append({"node": sp, "base": PROP_TINT, "chunk": key})
+	_fogged.append({"node": sp, "base": base_col, "chunk": key, "biome": bcol})
 	return d
 
 
@@ -637,7 +1070,8 @@ func _add_decor_sprite(d: Dictionary, root: Node2D, key: Vector2i) -> void:
 	# Every plant sits below the creatures in value. With ten points per chunk there
 	# would otherwise be more bright caps on screen than enemies, and the player would
 	# stop trusting the silhouette.
-	var base_col: Color = spec["tint"]
+	var bcol := biome_tint_at(d["pos"])
+	var base_col: Color = spec["tint"] * bcol
 	sp.modulate = base_col
 	var base_rot := float(d["phase"]) * 0.02 - 0.06
 	sp.rotation = base_rot
@@ -651,8 +1085,14 @@ func _add_decor_sprite(d: Dictionary, root: Node2D, key: Vector2i) -> void:
 			"base_rotation": base_rot,
 			"amount": sway,
 			"chunk": key,
+			# Spring state, integrated in _process. Only plants that already sway get
+			# it: a fallen branch lying flat must not bend, because a branch that
+			# leans away from the slime reads as a branch standing on end.
+			"bend": 0.0,
+			"bend_vel": 0.0,
+			"dust_cd": 0.0,
 		})
-	_fogged.append({"node": sp, "base": base_col, "chunk": key})
+	_fogged.append({"node": sp, "base": base_col, "chunk": key, "biome": bcol})
 	if kind == 6:
 		# Glow mushrooms are the one piece of flora that reacts to growth: their
 		# base tint is lifted in set_growth(), and because _apply_fog rewrites
@@ -666,6 +1106,105 @@ func _add_decor_sprite(d: Dictionary, root: Node2D, key: Vector2i) -> void:
 		var entry: Dictionary = _fogged[_fogged.size() - 1]
 		_bloom_entries.append({"entry": entry, "base": base_col})
 		_apply_bloom(entry, base_col, growth)
+
+
+# --- Wonders --------------------------------------------------------------------
+
+func _add_wonder(w: Dictionary, root: Node2D, key: Vector2i) -> void:
+	## A landmark sprite. No StaticBody2D: a flow game must never put a wall where the
+	## player is being drawn to, and a slime that slides over a crystal base reads as
+	## a slime. The clearing around it comes from _is_reserved, not from collision.
+	var pos: Vector2 = w["pos"]
+	var kind: String = w["kind"]
+	var cell: Vector2i = w["cell"]
+	var tex := _prop_texture(kind)
+	if tex == null:
+		return
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.position = pos
+	var s := WONDER_PX / float(tex.get_width())
+	sp.scale = Vector2(s, s)
+	sp.flip_h = _hash01(cell.x, cell.y, 307) < 0.5
+	var lit := _wonder_seen.has(cell)
+	var bcol := biome_tint_at(pos)
+	var k := WONDER_LIT_K if lit else WONDER_DORMANT_K
+	var base_col := Color(
+		PROP_TINT.r * bcol.r * k,
+		PROP_TINT.g * bcol.g * k,
+		PROP_TINT.b * bcol.b * k, 1.0)
+	sp.modulate = base_col
+	root.add_child(sp)
+	var entry := {"node": sp, "base": base_col, "chunk": key, "biome": bcol}
+	_fogged.append(entry)
+	_wonder_nodes.append({
+		"pos": pos,
+		"kind": kind,
+		"cell": cell,
+		"sprite": sp,
+		"entry": entry,
+		"lit": lit,
+		"wake": 1.0 if lit else 0.0,
+		"chunk": key,
+	})
+
+
+func _check_wonders(p: Vector2) -> void:
+	## Wakes at most one landmark per frame, and only ever once per run: `_wonder_seen`
+	## is keyed by lattice cell and is not cleared when the chunk streams out, so
+	## walking away and back does not re-heal or re-chime.
+	var w := wonder_near(p, WONDER_TRIGGER_RADIUS)
+	if w.is_empty():
+		return
+	var cell: Vector2i = w["cell"]
+	if _wonder_seen.has(cell):
+		return
+	_wonder_seen[cell] = true
+	_wake_wonder(w)
+
+
+func _wake_wonder(w: Dictionary) -> void:
+	var pos: Vector2 = w["pos"]
+	var kind: String = w["kind"]
+	var cell: Vector2i = w["cell"]
+
+	for wn: Dictionary in _wonder_nodes:
+		if wn["cell"] == cell:
+			wn["lit"] = true
+
+	# One voice per landmark: the crystal is A minor, the fountain F major, the
+	# lantern C major (tools/generate_wonder_chord.py). Index, not pitch: a bell's
+	# partials are inharmonic, so transposing it changes what it is.
+	var voice := WONDER_KINDS.find(kind)
+	if Audio != null and Audio.has_method("play_wonder_chime"):
+		Audio.play_wonder_chime(voice)
+
+	# Heal. The slime is the only entity that has an HP pool to give back, and the
+	# amount follows its own maximum rather than a constant, so a run that has grown
+	# into a bigger body still feels the reprieve.
+	var pl := _player_node()
+	if pl != null and pl.has_method("heal"):
+		var mx: Variant = pl.get("max_hp")
+		var amount := 100.0 * WONDER_HEAL_FRACTION
+		if mx is float or mx is int:
+			amount = float(mx) * WONDER_HEAL_FRACTION
+		pl.call("heal", amount)
+
+	# The spore cloud. A wider, slower burst than a brushed fern: this one has to
+	# read as the landmark breathing out, so it spreads three times as far.
+	_emit_dust(pos + Vector2(0.0, -20.0), WONDER_SPORES, 3.2)
+	wonder_awakened.emit(pos, kind)
+
+
+func _player_node() -> Node2D:
+	if _player != null and is_instance_valid(_player):
+		return _player
+	var parent := get_parent()
+	if parent != null:
+		var pl: Variant = parent.get("player")
+		if pl is Node2D:
+			_player = pl as Node2D
+	return _player
 
 
 # --- Spawn helpers ---
@@ -712,6 +1251,13 @@ func _process(delta: float) -> void:
 	if profile_enabled:
 		perf_us["spores"] += Time.get_ticks_usec() - t_part
 
+	t_part = Time.get_ticks_usec()
+	_update_dust(delta, p)
+	_check_wonders(p)
+	_advance_wonder_wakes(delta)
+	if profile_enabled:
+		perf_us["dust"] += Time.get_ticks_usec() - t_part
+
 	# Distance haze changes slowly; every third frame is indistinguishable from
 	# every frame and saves ~200 modulate writes.
 	_fog_tick += 1
@@ -727,9 +1273,13 @@ func _process(delta: float) -> void:
 		if node == null or not is_instance_valid(node):
 			continue
 		# Far plants are already fading into the haze; animating them is wasted work.
-		if node.position.distance_squared_to(p) > DECOR_RADIUS * DECOR_RADIUS:
+		var rel := node.position - p
+		var dist2 := rel.length_squared()
+		if dist2 > DECOR_RADIUS * DECOR_RADIUS:
 			continue
-		node.rotation = float(swayer["base_rotation"]) + sin(_anim_time * 1.6 + float(swayer["phase"])) * float(swayer["amount"])
+		node.rotation = float(swayer["base_rotation"]) \
+			+ sin(_anim_time * 1.6 + float(swayer["phase"])) * float(swayer["amount"]) \
+			+ _step_bend(swayer, rel, dist2, delta)
 	if profile_enabled:
 		perf_us["sway"] += Time.get_ticks_usec() - t_part
 		perf_us["process"] += Time.get_ticks_usec() - t_all
@@ -750,6 +1300,58 @@ func _player_pos() -> Vector2:
 	return Vector2.ZERO
 
 
+func _step_bend(swayer: Dictionary, rel: Vector2, dist2: float, delta: float) -> float:
+	## The plant leans away from the slime and springs back when it passes.
+	##
+	## Only the *horizontal* part of the away vector produces a lean. A rotation can
+	## only move a plant's tip sideways, so a slime standing directly below a fern has
+	## to leave it upright — that is `rel.x / dist`, not the distance itself. Using the
+	## distance instead made every plant in range bow toward the same side, which read
+	## as wind rather than as the slime's weight.
+	var lean := 0.0
+	var dist := sqrt(dist2)
+	if dist > 1.0 and dist < BEND_RANGE:
+		var fall := 1.0 - dist / BEND_RANGE
+		lean = BEND_MAX * (rel.x / dist) * fall * fall
+
+	# A real spring, integrated. Underdamped, so the plant overshoots and settles
+	# instead of tracking the slime like a lever — the overshoot is the whole effect.
+	var b: float = swayer["bend"]
+	var bv: float = swayer["bend_vel"]
+	bv += (-BEND_STIFFNESS * (b - lean) - BEND_DAMPING * bv) * delta
+	b += bv * delta
+	swayer["bend"] = b
+	swayer["bend_vel"] = bv
+
+	# Dust when it is actually pushed, not while it is merely trembling.
+	var cd: float = float(swayer["dust_cd"]) - delta
+	if cd <= 0.0 and absf(b) > DUST_TRIGGER:
+		_emit_dust((swayer["node"] as Sprite2D).position, _dust_rng.randi_range(2, 3))
+		cd = DUST_COOLDOWN
+	swayer["dust_cd"] = cd
+	return b
+
+
+func _advance_wonder_wakes(delta: float) -> void:
+	## Drives the awake value, and pushes the resulting brightness into the sprite's
+	## fog entry rather than straight onto the sprite: _apply_fog rewrites modulate
+	## from `base` every third frame and would otherwise undo the wake within 50 ms.
+	for wn: Dictionary in _wonder_nodes:
+		var wake: float = wn["wake"]
+		if wake >= 1.0:
+			continue
+		if not bool(wn["lit"]):
+			continue
+		wake = minf(1.0, wake + delta / WONDER_WAKE_SEC)
+		wn["wake"] = wake
+		var k := lerpf(WONDER_DORMANT_K, WONDER_LIT_K, wake * wake * (3.0 - 2.0 * wake))
+		var bcol: Color = (wn["entry"] as Dictionary)["biome"]
+		(wn["entry"] as Dictionary)["base"] = Color(
+			PROP_TINT.r * bcol.r * k,
+			PROP_TINT.g * bcol.g * k,
+			PROP_TINT.b * bcol.b * k, 1.0)
+
+
 func _update_spores(delta: float, p: Vector2) -> void:
 	for sp: Dictionary in ambient_spores:
 		var pos: Vector2 = sp["pos"] + (sp["vel"] as Vector2) * delta
@@ -759,6 +1361,60 @@ func _update_spores(delta: float, p: Vector2) -> void:
 		rel.x = wrapf(rel.x, -SPORE_RADIUS, SPORE_RADIUS)
 		rel.y = wrapf(rel.y, -SPORE_RADIUS, SPORE_RADIUS)
 		sp["pos"] = p + rel
+
+
+func _emit_dust(at: Vector2, count: int, spread: float = 1.0) -> void:
+	## Motes knocked off the undergrowth. Two or three per brushed clump, and a much
+	## bigger cloud when a wonder opens. Tinted with the local biome, so dust from a
+	## Moon Mycelium thicket is violet instead of the same green everywhere.
+	if _dust.size() >= DUST_MAX:
+		return
+	var tint := biome_tint_at(at)
+	# Lifted toward warm white: pure biome tint over a dark floor reads as coloured
+	# smoke, and a mote has to look like a lit particle.
+	var col := Color(tint.r * 0.92, tint.g * 1.05, tint.b * 0.95).lerp(Color(1.0, 0.98, 0.88), 0.38)
+	for _i in range(clampi(count, 1, 64)):
+		_dust.append({
+			"pos": at + Vector2(
+				_dust_rng.randf_range(-13.0, 13.0) * spread,
+				_dust_rng.randf_range(-20.0, 6.0) * spread),
+			"vel": Vector2(
+				_dust_rng.randf_range(-26.0, 26.0),
+				_dust_rng.randf_range(-62.0, -18.0)) * spread,
+			"age": 0.0,
+			"life": _dust_rng.randf_range(0.75, 1.6),
+			"size": _dust_rng.randf_range(1.2, 2.8),
+			"color": col,
+		})
+
+
+func _update_dust(delta: float, p: Vector2) -> void:
+	if _dust.is_empty():
+		return
+	var keep: Array[Dictionary] = []
+	var cull := DECOR_RADIUS * 1.2
+	var cull2 := cull * cull
+	for d: Dictionary in _dust:
+		var age: float = float(d["age"]) + delta
+		if age >= float(d["life"]):
+			continue
+		d["age"] = age
+		# Buoyant: these are spores, not gravel. Drag removes the launch speed within
+		# half a second and a slow rise replaces it, which is what makes them hang.
+		var vel: Vector2 = (d["vel"] as Vector2) * (1.0 - minf(0.9, 3.4 * delta))
+		vel.y -= 26.0 * delta
+		d["vel"] = vel
+		var np: Vector2 = d["pos"] + vel * delta
+		d["pos"] = np
+		if np.distance_squared_to(p) > cull2:
+			continue
+		keep.append(d)
+	_dust = keep
+
+
+func dust_count() -> int:
+	## Test seam: how many motes are alive.
+	return _dust.size()
 
 
 func _fog_fade(d: float) -> float:
@@ -789,7 +1445,15 @@ func _apply_fog(p: Vector2) -> void:
 			continue
 		var f := (d - FOG_START) / (FOG_END - FOG_START)
 		f = f * f * (3.0 - 2.0 * f)
-		var m := base.lerp(fog_tint, f)
+		# The haze is not one colour. A violet grove dissolving into a green mist
+		# leaves a green ghost of itself in the far field; a quarter of the local
+		# biome tint in the haze keeps each region hazing into its own air.
+		var bcol: Color = entry.get("biome", Color.WHITE)
+		var haze := Color(
+			fog_tint.r * (0.75 + 0.25 * bcol.r),
+			fog_tint.g * (0.75 + 0.25 * bcol.g),
+			fog_tint.b * (0.75 + 0.25 * bcol.b), 1.0)
+		var m := base.lerp(haze, f)
 		m.a = base.a * (1.0 - f)
 		sp.modulate = m
 
@@ -819,6 +1483,34 @@ func _draw() -> void:
 		draw_circle(SHRINE_POS, 145.0, Color(0.16, 0.30, 0.28, 0.24))
 		draw_arc(SHRINE_POS, 145.0, 0.0, TAU, 40, Color(0.52, 0.92, 0.74, 0.22), 3.0)
 		draw_arc(SHRINE_POS, 92.0, _anim_time * 0.15, _anim_time * 0.15 + PI * 1.5, 28, Color(0.88, 0.78, 0.42, 0.20), 2.5)
+
+	# Wonders. The halo is drawn even while a landmark is asleep, and that is the
+	# whole reason it can be found: from a screen away it is a soft light in the fog,
+	# which is what a player in a flow game follows. Asleep it is small and cold,
+	# awake it is wide and warm, and the change is what sells "it noticed you".
+	for wn: Dictionary in _wonder_nodes:
+		var wpos: Vector2 = wn["pos"]
+		var wd := wpos.distance_to(p)
+		if wd > DRAW_RADIUS:
+			continue
+		var wfade := _fog_fade(wd)
+		if wfade <= 0.01:
+			continue
+		var wake: float = wn["wake"]
+		var gcol: Color = WONDER_GLOW.get(wn["kind"], Color(0.80, 1.0, 0.90))
+		var breathe := 0.86 + 0.14 * sin(_anim_time * 1.1 + wpos.x * 0.0043 + wpos.y * 0.0027)
+		var base_r := lerpf(78.0, 124.0, wake)
+		var base_a := lerpf(0.040, 0.082, wake)
+		for gi in range(4):
+			var gr := (base_r + 32.0 * float(gi)) * breathe
+			draw_circle(wpos, gr,
+				Color(gcol.r, gcol.g, gcol.b,
+					base_a * (1.0 - 0.19 * float(gi)) * wfade))
+		_draw_ground_shadow(wpos + Vector2(0.0, 46.0), 58.0, 0.24 * wfade)
+		# A ring on the floor once it has woken: the landmark has claimed its clearing.
+		if wake > 0.02:
+			draw_arc(wpos + Vector2(0.0, 46.0), 96.0, 0.0, TAU, 30,
+				Color(gcol.r, gcol.g, gcol.b, 0.16 * wake * wfade), 2.2)
 
 	# Decorative flora: painted props get a contact shadow only; the moss pad is
 	# still a drawn patch because it is flat on the ground by definition.
@@ -895,6 +1587,25 @@ func _draw() -> void:
 				continue
 			var a := (0.35 + 0.25 * sin(_anim_time * 2.5 + float(sp["phase"]))) * _fog_fade(sd)
 			draw_circle(sp_pos, float(sp["size"]), Color(0.68, 1.0, 0.85, a))
+
+	# Motes knocked off the undergrowth. Two discs each — a wide soft one and a small
+	# bright one — because a single flat dot at this size reads as a pixel, not as a
+	# speck of dust catching the light.
+	for d: Dictionary in _dust:
+		var dpos: Vector2 = d["pos"]
+		var dd := dpos.distance_to(p)
+		if dd > DECOR_RADIUS:
+			continue
+		var t := float(d["age"]) / maxf(0.01, float(d["life"]))
+		# Fade in over the first 15 % and out over the last 45 %: a mote that pops into
+		# existence reads as a particle system, one that blooms reads as dust.
+		var da := minf(1.0, t / 0.15) * (1.0 - smoothstep(0.55, 1.0, t)) * _fog_fade(dd)
+		if da <= 0.01:
+			continue
+		var dc: Color = d["color"]
+		var sz: float = float(d["size"])
+		draw_circle(dpos, sz * 2.6, Color(dc.r, dc.g, dc.b, 0.10 * da))
+		draw_circle(dpos, sz, Color(dc.r, dc.g, dc.b, 0.62 * da))
 
 	if growth > 0.02:
 		_draw_growth_life(p)

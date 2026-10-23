@@ -34,6 +34,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_miniboss_dismissed_by_boss(tree, main_inst)
 	await _test_endless_and_zen_modes(tree, main_inst)
 	await _test_moss_trail_and_caustics(tree, main_inst)
+	await _test_biomes_undergrowth_and_wonders(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -147,8 +148,11 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		painted_plants += 1
 		if float(WorldGenerator.DECOR_KINDS[dk].get("sway", 0.0)) > 0.0:
 			swaying_plants += 1
-	assert_eq(prop_sprites, arena.world.obstacles.size() + painted_plants,
-		"Every prop and every painted plant is a real sprite")
+	# Wonders are sprites in the chunk tree too, and they have no collision body on
+	# purpose (a landmark must never be a wall in a flow game), so they are added to
+	# the sprite side of the count and not to the body side.
+	assert_eq(prop_sprites, arena.world.obstacles.size() + painted_plants + arena.world.wonder_count(),
+		"Every prop, every painted plant and every wonder is a real sprite")
 	assert_eq(arena.world._swayers.size(), swaying_plants,
 		"Every plant that should move with the spores does (and only those)")
 	# The floor shader hazes out with distance, and ArenaController says in so many
@@ -169,20 +173,31 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 
 	# ...and the fade actually runs. Pixel diffs cannot show this: two runs differ by
 	# more from random entities than from the haze, so the check is on the sprite.
+	#
+	# The target is found by *position* against the obstacle list, not by matching
+	# `base` against WorldGenerator.PROP_TINT. Since the macro-biomes landed, a prop's
+	# base tint is PROP_TINT multiplied by the palette of the region it stands in, so
+	# an equality test on the constant finds nothing — which is exactly how this test
+	# failed the first time the biomes went in.
+	var prop_positions := {}
+	for ob in arena.world.obstacles:
+		prop_positions[ob["pos"]] = true
 	var fog_target: Dictionary = {}
 	for f in arena.world._fogged:
-		if f["base"] == WorldGenerator.PROP_TINT:
+		var candidate := f["node"] as Sprite2D
+		if candidate != null and prop_positions.has(candidate.position):
 			fog_target = f
 			break
 	assert_false(fog_target.is_empty(), "Props are registered for the distance haze")
 	if not fog_target.is_empty():
 		var fog_sp := fog_target["node"] as Sprite2D
 		var fog_pos := fog_sp.position
+		var fog_base: Color = fog_target["base"]
 		arena.world._apply_fog(fog_pos + Vector2(WorldGenerator.FOG_END + 200.0, 0.0))
 		assert_eq(fog_sp.modulate.a, 0.0, "A prop past the haze end is fully dissolved")
 		arena.world._apply_fog(fog_pos)
 		assert_eq(fog_sp.modulate.a, 1.0, "A prop at the player is fully opaque again")
-		assert_eq(fog_sp.modulate, WorldGenerator.PROP_TINT, "And it is back to its own tint")
+		assert_eq(fog_sp.modulate, fog_base, "And it is back to its own tint")
 
 	# The undergrowth set is what stops one fern sprite from repeating hundreds of
 	# times per screen. If any of these goes missing the world quietly falls back to
@@ -1237,5 +1252,460 @@ func _test_moss_trail_and_caustics(tree: SceneTree, main: MainRoot) -> void:
 	assert_eq(orb.spark_count(), 0, "Sparks expire after their life")
 	orb.queue_free()
 	await tree.process_frame
+
+	main._return_to_main_menu()
+
+
+func _test_biomes_undergrowth_and_wonders(tree: SceneTree, main: MainRoot) -> void:
+	## Block 3 of the flow pass: four macro-biomes, undergrowth that bends away from
+	## the slime and springs back, and three Wonders that wake once.
+	##
+	## Everything here is the kind of feature that fails silently. A biome field that
+	## only ever produces one region still renders. A spring that never returns still
+	## leans. A wonder that re-heals every time you walk past still looks fine in a
+	## screenshot and quietly turns the run into a healing circuit. So the assertions
+	## are on the numbers, not on "it looks right".
+
+	await tree.process_frame
+	main._start_run("standard", 424242)
+	await tree.process_frame
+	await tree.process_frame
+	var arena: ArenaController = main.arena
+	var player: PlayerSlime = arena.player
+	var world: WorldGenerator = arena.world
+	assert_true(world != null, "The world exists for the biome pass")
+	if world == null:
+		main._return_to_main_menu()
+		return
+
+	# --- the four landmarks are real art -------------------------------------------
+	# Same rule as every other texture in the game: real, with alpha, and the right
+	# size. A wonder that silently failed to key would be an invisible landmark that
+	# still healed, which is worse than no landmark at all.
+	for wonder_id in WorldGenerator.WONDER_KINDS:
+		var tex := AssetRegistry.get_texture("res://resources/art/props/%s.png" % wonder_id)
+		assert_true(tex != null, "Wonder art loads: %s" % wonder_id)
+		if tex == null:
+			continue
+		var img := tex.get_image()
+		assert_true(img != null and not img.is_empty(), "Wonder art decodes: %s" % wonder_id)
+		if img == null or img.is_empty():
+			continue
+		if img.is_compressed():
+			img.decompress()
+		assert_eq(img.get_width(), 256, "Wonder art is 256 px wide: %s" % wonder_id)
+		assert_eq(img.get_height(), 256, "Wonder art is square: %s" % wonder_id)
+		# Alpha is sampled from the pixels, every second one on each axis: Image has no
+		# per-channel histogram in 4.5, and a 128x128 sample of a 256x256 cut-out is
+		# well inside the tolerance these thresholds use.
+		var total := 0.0
+		var opaque := 0.0
+		var transparent := 0.0
+		for ay in range(0, img.get_height(), 2):
+			for ax in range(0, img.get_width(), 2):
+				var a := img.get_pixel(ax, ay).a
+				total += 1.0
+				if a >= 0.78:
+					opaque += 1.0
+				elif a < 0.03:
+					transparent += 1.0
+		opaque /= total
+		transparent /= total
+		# The backdrop has to be gone and the silhouette has to survive the key.
+		assert_gt(transparent, 0.25, "Wonder art has a real alpha cut-out: %s" % wonder_id)
+		assert_gt(opaque, 0.10, "Wonder art keeps its body: %s" % wonder_id)
+		assert_lt(opaque, 0.60, "Wonder art did not keep the backdrop: %s" % wonder_id)
+
+	# --- the biome field ------------------------------------------------------------
+	var btex := world.biome_texture()
+	assert_true(btex != null, "The biome map exists")
+	if btex != null:
+		var bimg := btex.get_image()
+		assert_true(bimg != null and not bimg.is_empty(), "The biome map decodes")
+		if bimg != null and not bimg.is_empty():
+			if bimg.is_compressed():
+				bimg.decompress()
+			var res := bimg.get_width()
+			assert_eq(res, WorldGenerator.BIOME_MAP_RES, "Biome map is the size the CPU reads")
+			assert_eq(bimg.get_height(), res, "Biome map is square")
+			assert_eq(bimg.get_format(), Image.FORMAT_RGBA8,
+				"Biome map is RGBA8, so the CPU and the shader read identical texels")
+
+			# Weights: non-negative and summing to 1. If they do not sum to 1 the
+			# shader's normalisation hides it, but the CPU-side blend would be wrong
+			# and the props would drift away from the floor.
+			var worst_sum := 0.0
+			var negative := 0
+			for y in range(res):
+				for x in range(res):
+					var c := bimg.get_pixel(x, y)
+					var s := c.r + c.g + c.b + c.a
+					worst_sum = maxf(worst_sum, absf(s - 1.0))
+					if c.r < 0.0 or c.g < 0.0 or c.b < 0.0 or c.a < 0.0:
+						negative += 1
+			assert_eq(negative, 0, "No biome weight is negative")
+			# 8-bit quantisation of four channels that sum to 1 costs at most 2/255.
+			assert_lt(worst_sum, 0.012, "Biome weights sum to 1 (worst %.4f)" % worst_sum)
+
+			# Low-frequency, not noise. The maximum texel-to-texel step is NOT the right
+			# instrument here and the first version of this test used it: the contrast
+			# ramp deliberately steepens each channel by 1/(0.68-0.32), so a legitimate
+			# transition between two regions moves most of the weight range in two or
+			# three texels. On screen that is a ramp over ~640 world pixels, which is
+			# exactly the two-chunk transition the design asks for. What has to be true
+			# is that the field is *smooth on average* and that its regions are large.
+			var step_sum := 0.0
+			var step_n := 0
+			var dominant := [0, 0, 0, 0]
+			var dom_map := PackedByteArray()
+			dom_map.resize(res * res)
+			for y in range(res):
+				for x in range(res):
+					var c := bimg.get_pixel(x, y)
+					var vals := [c.r, c.g, c.b, c.a]
+					var best := 0
+					for i in range(1, 4):
+						if vals[i] > vals[best]:
+							best = i
+					dom_map[y * res + x] = best
+					dominant[best] += 1
+					if x + 1 < res:
+						var n := bimg.get_pixel(x + 1, y)
+						step_sum += absf(c.r - n.r) + absf(c.g - n.g) \
+							+ absf(c.b - n.b) + absf(c.a - n.a)
+						step_n += 1
+			var mean_step := step_sum / float(step_n)
+			assert_lt(mean_step, 0.30, "The biome field is smooth on average (mean step %.3f)" % mean_step)
+
+			# Regions, not speckle: a texel whose dominant biome differs from all four
+			# of its neighbours is a pixel of a different region, which is what a noisy
+			# field (or a broken hash) produces.
+			var isolated := 0
+			for y in range(res):
+				for x in range(res):
+					var here := dom_map[y * res + x]
+					var alone := true
+					if x > 0 and dom_map[y * res + x - 1] == here:
+						alone = false
+					if x + 1 < res and dom_map[y * res + x + 1] == here:
+						alone = false
+					if y > 0 and dom_map[(y - 1) * res + x] == here:
+						alone = false
+					if y + 1 < res and dom_map[(y + 1) * res + x] == here:
+						alone = false
+					if alone:
+						isolated += 1
+			assert_lt(float(isolated), float(res * res) * 0.01,
+				"Biome regions are solid, not speckled (%d isolated texels)" % isolated)
+
+			# ...and the regions are large: a row crosses a handful of regions, not
+			# dozens. A field of pure noise would flip on roughly half of all steps.
+			var flips := 0
+			var steps := 0
+			for y in range(res):
+				for x in range(res - 1):
+					steps += 1
+					if dom_map[y * res + x] != dom_map[y * res + x + 1]:
+						flips += 1
+			var flips_per_row := float(flips) / float(res)
+			assert_lt(flips_per_row, 12.0,
+				"Biome regions are wide, not a checkerboard (%.1f flips per row)" % flips_per_row)
+			assert_gt(flips_per_row, 0.5,
+				"Biome regions actually change across the map (%.1f flips per row)" % flips_per_row)
+
+			# All four regions have to actually exist. A field that never crosses its
+			# contrast thresholds would ship one biome and call it four.
+			for i in range(4):
+				assert_gt(float(dominant[i]), float(res * res) * 0.02,
+					"Biome %s owns real ground (%d of %d texels)"
+					% [WorldGenerator.BIOME_NAMES[i], dominant[i], res * res])
+
+			# Seamless: the wrap edge is adjacent ground, not a discontinuity.
+			var seam := 0.0
+			for i in range(res):
+				var a := bimg.get_pixel(0, i)
+				var b := bimg.get_pixel(res - 1, i)
+				seam += absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a)
+			seam /= float(res)
+			assert_lt(seam, 0.16, "The biome field wraps without a seam (%.4f)" % seam)
+
+	# The CPU and the shader must be looking at the same map.
+	assert_eq(world.biome_weights_at(Vector2.ZERO).size(), 4, "Weights are a 4-vector")
+	var w_here := world.biome_weights_at(Vector2(1234.0, -567.0))
+	var sum_here := w_here[0] + w_here[1] + w_here[2] + w_here[3]
+	assert_approx(sum_here, 1.0, 0.02, "Weights sum to 1 at a sample position")
+	# Dominance and the blended tint have to agree with the weights, or a region would
+	# be announced as one biome and painted as another.
+	var dom := world.dominant_biome(Vector2(1234.0, -567.0))
+	var max_w := 0.0
+	for i in range(4):
+		max_w = maxf(max_w, w_here[i])
+	assert_approx(w_here[dom], max_w, 0.0001, "The dominant biome is the heaviest weight")
+	assert_eq(world.biome_name_at(Vector2(1234.0, -567.0)),
+		WorldGenerator.BIOME_NAMES[dom], "The biome name follows the dominant weight")
+	var tint := world.biome_tint_at(Vector2(1234.0, -567.0))
+	var expect_r := 0.0
+	var expect_g := 0.0
+	var expect_b := 0.0
+	for i in range(4):
+		expect_r += WorldGenerator.BIOME_TINTS[i].r * w_here[i]
+		expect_g += WorldGenerator.BIOME_TINTS[i].g * w_here[i]
+		expect_b += WorldGenerator.BIOME_TINTS[i].b * w_here[i]
+	assert_approx(tint.r, expect_r, 0.002, "The blended tint is the weighted palette (r)")
+	assert_approx(tint.g, expect_g, 0.002, "The blended tint is the weighted palette (g)")
+	assert_approx(tint.b, expect_b, 0.002, "The blended tint is the weighted palette (b)")
+
+	# The palette must not step at a chunk boundary: that is the whole reason it is
+	# sampled in world pixels instead of per chunk.
+	var edge_a := world.biome_tint_at(Vector2(WorldGenerator.CHUNK_SIZE * 4.0 - 1.0, 200.0))
+	var edge_b := world.biome_tint_at(Vector2(WorldGenerator.CHUNK_SIZE * 4.0 + 1.0, 200.0))
+	assert_lt(absf(edge_a.r - edge_b.r) + absf(edge_a.g - edge_b.g) + absf(edge_a.b - edge_b.b),
+		0.05, "The palette does not step across a chunk boundary")
+
+	# The floor has to be reading the same map.
+	if arena.canopy_mat != null:
+		var bound: Variant = arena.canopy_mat.get_shader_parameter("biome_map")
+		assert_true(bound is Texture2D, "The floor shader has the biome map bound")
+		assert_approx(float(arena.canopy_mat.get_shader_parameter("biome_strength")), 1.0,
+			0.0001, "The floor shader applies the biome palette")
+		assert_approx(float(arena.canopy_mat.get_shader_parameter("biome_tile_px")),
+			WorldGenerator.BIOME_TILE_PX, 0.5, "The floor shader tiles the map at the world scale")
+		var code: String = arena.canopy_mat.shader.code
+		assert_true(code.contains("biome_map"), "The floor shader samples the biome map")
+		assert_true(code.contains("biome_c3"), "The floor shader blends all four biomes")
+
+	# --- undergrowth: bend away, spring back ---------------------------------------
+	assert_gt(float(world._swayers.size()), 0.0, "There is undergrowth to bend")
+	if not world._swayers.is_empty():
+		var swayer: Dictionary = world._swayers[0]
+		var node := swayer["node"] as Sprite2D
+		assert_true(node != null, "The swayer has a sprite")
+		if node != null:
+			var base_rot := float(swayer["base_rotation"])
+			var sway_amp := float(swayer["amount"])
+			# The slime standing 40 px to the *right* of the plant. Only the horizontal
+			# part of the away vector may produce a lean, so this is the case that has
+			# to bend.
+			var rel := Vector2(40.0, 0.0)
+			var peak := 0.0
+			for _f in range(90):
+				peak = world._step_bend(swayer, rel, rel.length_squared(), 1.0 / 60.0)
+			assert_gt(peak, 0.02, "Undergrowth leans away from the slime")
+			assert_gt(float(swayer["bend"]), 0.02, "The lean is stored, not just returned")
+			# Lean direction: the plant is to the right of the slime, so the top has to
+			# move further right, which is a positive rotation in Godot's y-down frame.
+			assert_gt(float(swayer["bend"]), 0.0, "The lean points away, not toward")
+
+			# A slime directly below the plant produces no lean at all: a rotation can
+			# only move the tip sideways.
+			var below := Vector2(0.0, 90.0)
+			for _f in range(120):
+				world._step_bend(swayer, below, below.length_squared(), 1.0 / 60.0)
+			assert_lt(absf(float(swayer["bend"])), 0.02,
+				"A slime directly below a plant does not tilt it sideways")
+
+			# Spring return: with the slime gone the lean has to come back to zero. A
+			# critically damped or non-returning version would keep the last angle.
+			var far := Vector2(4000.0, 0.0)
+			for _f in range(150):
+				world._step_bend(swayer, far, far.length_squared(), 1.0 / 60.0)
+			assert_lt(absf(float(swayer["bend"])), 0.004,
+				"Undergrowth springs back to upright (%.4f rad)" % float(swayer["bend"]))
+			assert_eq(float(swayer["bend"]), float(swayer["bend"]),
+				"The spring never goes NaN")
+			# And the rotation the draw code applies is the base plus the spring.
+			assert_approx(node.rotation, base_rot + float(swayer["bend"]),
+				2.0 * sway_amp + 0.02, "The sprite rotation carries the spring")
+
+	# --- dust motes ----------------------------------------------------------------
+	# 2-3 motes per brushed clump. Emitted by the spring, not by a timer, so a plant
+	# that is never touched never sheds anything.
+	#
+	# The spring has to be *stepped* until it fires: one frame moves the lean by about
+	# 0.002 rad, and the trigger is 0.10. The first version of this test called
+	# _step_bend once and asserted motes appeared, which measured nothing but the
+	# test's own impatience.
+	var dust_swayer: Dictionary = {}
+	for s: Dictionary in world._swayers:
+		if (s["node"] as Sprite2D) != null:
+			dust_swayer = s
+			break
+	if not dust_swayer.is_empty():
+		dust_swayer["dust_cd"] = 0.0
+		dust_swayer["bend"] = 0.0
+		dust_swayer["bend_vel"] = 0.0
+		var dust_before := world.dust_count()
+		var near := Vector2(45.0, 0.0)
+		var fired_after := 0
+		for f in range(40):
+			world._step_bend(dust_swayer, near, near.length_squared(), 1.0 / 60.0)
+			if world.dust_count() > dust_before:
+				fired_after = f + 1
+				break
+		var emitted := world.dust_count() - dust_before
+		assert_gt(float(fired_after), 0.0, "A brushed clump sheds motes")
+		assert_gte(float(emitted), 2.0, "A brushed clump sheds at least two motes")
+		assert_lte(float(emitted), 3.0, "A brushed clump sheds at most three motes")
+		# The cooldown is what stops a plant the slime is standing next to from
+		# machine-gunning motes for the whole run.
+		var again_before := world.dust_count()
+		for _f in range(30):
+			world._step_bend(dust_swayer, near, near.length_squared(), 1.0 / 60.0)
+		assert_eq(world.dust_count(), again_before,
+			"A second brush inside the cooldown sheds nothing")
+		# And they expire rather than accumulating forever.
+		world._update_dust(3.0, world._player_pos())
+		assert_eq(world.dust_count(), 0, "Dust motes expire")
+
+	# --- the wonder lattice ---------------------------------------------------------
+	# Purity: the same cell twice is the same wonder, because the chunk streamer asks
+	# for it from both _is_reserved and _build_chunk.
+	var sample_cell := Vector2i(3, -2)
+	var w_first := world._wonder_in_cell(sample_cell.x, sample_cell.y)
+	var w_second := world._wonder_in_cell(sample_cell.x, sample_cell.y)
+	assert_eq(w_first.is_empty(), w_second.is_empty(), "The wonder lattice is a pure function")
+	if not w_first.is_empty():
+		assert_eq(w_first["pos"], w_second["pos"], "A wonder does not move between calls")
+
+	# Density and spacing over a wide window. Both are what the brief actually asks
+	# for: at most one per 7-9 chunks.
+	var found: Array[Dictionary] = []
+	var cells_checked := 0
+	for cy in range(-6, 7):
+		for cx in range(-6, 7):
+			cells_checked += 1
+			var w := world._wonder_in_cell(cx, cy)
+			if not w.is_empty():
+				found.append(w)
+	assert_gt(float(found.size()), 20.0,
+		"The lattice places wonders across the world (%d in %d cells)"
+		% [found.size(), cells_checked])
+	var fill := float(found.size()) / float(cells_checked)
+	assert_approx(fill, WorldGenerator.WONDER_CHANCE, 0.14,
+		"The lattice fills cells at the configured rate (%.3f)" % fill)
+	var min_pair := INF
+	for i in range(found.size()):
+		for j in range(i + 1, found.size()):
+			min_pair = minf(min_pair, (found[i]["pos"] as Vector2).distance_to(found[j]["pos"]))
+	# 9 chunks per cell minus two 10 % jitters = 7.2 chunks. This is the guarantee the
+	# brief asks for, and it is a property of the lattice, not of a rejection loop.
+	assert_gte(min_pair, 7.2 * WorldGenerator.CHUNK_SIZE - 1.0,
+		"No two wonders are closer than 7.2 chunks (%.0f px)" % min_pair)
+	# All three kinds are reachable.
+	var kinds_seen := {}
+	for w: Dictionary in found:
+		kinds_seen[w["kind"]] = true
+	assert_eq(kinds_seen.size(), WorldGenerator.WONDER_KINDS.size(),
+		"All three wonder kinds appear in the world")
+
+	# Nothing spawns inside the starting glade or on the shrine.
+	for w: Dictionary in found:
+		var wpos: Vector2 = w["pos"]
+		assert_gt(wpos.length(), WorldGenerator.SAFE_SPAWN_RADIUS,
+			"A wonder never stands in the starting glade")
+		assert_gt(wpos.distance_to(WorldGenerator.SHRINE_POS),
+			WorldGenerator.SHRINE_CLEAR_RADIUS, "A wonder never stands on the shrine")
+
+	# The clearing: a prop may not be placed on a wonder.
+	if not found.is_empty():
+		var clear_test: Dictionary = found[0]
+		var cpos: Vector2 = clear_test["pos"]
+		assert_true(world._is_reserved(cpos, 30.0), "A wonder keeps a clearing around itself")
+		assert_true(world._is_reserved(cpos + Vector2(120.0, 0.0), 30.0),
+			"The clearing is wider than the sprite")
+		assert_false(world._is_reserved(cpos + Vector2(400.0, 0.0), 20.0),
+			"The clearing ends, so the forest is not empty around a wonder")
+
+	# --- waking one ------------------------------------------------------------------
+	# Pick the wonder nearest the origin, walk the player to it, and check every effect
+	# of the wake: lit, seen, healed, chime, spores, and the wake ramp.
+	var target: Dictionary = {}
+	var target_d := INF
+	for w: Dictionary in found:
+		var d := (w["pos"] as Vector2).length()
+		if d < target_d:
+			target_d = d
+			target = w
+	assert_false(target.is_empty(), "There is a wonder to walk to")
+	if not target.is_empty():
+		var tpos: Vector2 = target["pos"]
+		var tcell: Vector2i = target["cell"]
+		assert_false(world.wonder_is_seen(tcell), "A wonder starts asleep")
+		# Damage the slime first, otherwise a heal at full HP is unmeasurable.
+		player.hp = player.max_hp * 0.40
+		var hp_before := player.hp
+		var dust_before_wake := world.dust_count()
+
+		player.global_position = tpos + Vector2(0.0, 70.0)
+		world.stream_around(player.global_position, true)
+		world._check_wonders(player.global_position)
+		await tree.process_frame
+
+		assert_true(world.wonder_is_seen(tcell), "Walking up to a wonder wakes it")
+		assert_gt(player.hp, hp_before, "A wonder heals the slime")
+		assert_approx(player.hp - hp_before, player.max_hp * WorldGenerator.WONDER_HEAL_FRACTION,
+			0.5, "The heal is the configured fraction of max HP")
+		assert_gt(float(world.dust_count()), float(dust_before_wake),
+			"A wonder releases a cloud of spores")
+		assert_eq(Audio.last_played_event, "wonder_chime", "A wonder chimes a bell chord")
+
+		# The sprite is in the chunk tree, and it is awake.
+		assert_gt(float(world.wonder_count()), 0.0, "The wonder is streamed as a node")
+		var live: Array[Dictionary] = world.wonder_state()
+		var lit_one: Dictionary = {}
+		for rec: Dictionary in live:
+			if rec["cell"] == tcell:
+				lit_one = rec
+		assert_false(lit_one.is_empty(), "The live wonder is the one that woke")
+		if not lit_one.is_empty():
+			assert_true(bool(lit_one["lit"]), "The woken wonder is lit")
+			# The ramp: dim at the moment of waking, full after WONDER_WAKE_SEC.
+			assert_lt(float(lit_one["wake"]), 1.0, "The wake ramps instead of snapping")
+			for _f in range(int(WorldGenerator.WONDER_WAKE_SEC * 60.0) + 20):
+				world._advance_wonder_wakes(1.0 / 60.0)
+			var settled := 0.0
+			for rec2: Dictionary in world.wonder_state():
+				if rec2["cell"] == tcell:
+					settled = float(rec2["wake"])
+			assert_approx(settled, 1.0, 0.001, "The wake completes in WONDER_WAKE_SEC")
+
+		# Only once. Walking away and back must not re-heal, re-chime or re-spore.
+		var hp_after := player.hp
+		var dust_after := world.dust_count()
+		var chime_before := Audio.last_played_event
+		player.global_position = tpos + Vector2(600.0, 600.0)
+		world._check_wonders(player.global_position)
+		player.global_position = tpos + Vector2(0.0, 70.0)
+		world._check_wonders(player.global_position)
+		assert_eq(player.hp, hp_after, "A wonder does not heal twice")
+		assert_eq(world.dust_count(), dust_after, "A wonder does not shed spores twice")
+		assert_eq(Audio.last_played_event, chime_before,
+			"A wonder does not chime twice")
+
+		# Chunk streaming must not forget it: the seen-set is keyed by cell, not by node.
+		world.stream_around(Vector2.ZERO, true)
+		await tree.process_frame
+		assert_true(world.wonder_is_seen(tcell), "A woken wonder stays woken after streaming out")
+		var relit := 0
+		for rec3: Dictionary in world.wonder_state():
+			if rec3["cell"] == tcell and bool(rec3["lit"]):
+				relit += 1
+		assert_lte(float(relit), 1.0, "A re-streamed wonder is lit at most once")
+		player.global_position = Vector2.ZERO
+
+	# --- the generator stays a pure function of the chunk coordinate ------------------
+	# The biome signature added a second rng draw per chunk; if the ordering slipped,
+	# a chunk would look different on the second visit.
+	var c_a := world._chunk_content(11, -7)
+	var c_b := world._chunk_content(11, -7)
+	assert_eq((c_a["props"] as Array).size(), (c_b["props"] as Array).size(),
+		"Chunk prop count is stable across calls")
+	assert_eq((c_a["decor"] as Array).size(), (c_b["decor"] as Array).size(),
+		"Chunk decor count is stable across calls")
+	var stable := true
+	for i in range((c_a["props"] as Array).size()):
+		if (c_a["props"][i]["pos"] as Vector2) != (c_b["props"][i]["pos"] as Vector2):
+			stable = false
+	assert_true(stable, "Chunk prop positions are stable across calls")
 
 	main._return_to_main_menu()

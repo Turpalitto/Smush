@@ -14,6 +14,8 @@ extends Node
 ##   QUICK_CAPTURE_SEED     world seed for the arena (default: 0 = random)
 ##   QUICK_CAPTURE_FLOOR    override floor layers, e.g. "relief=0,occlusion=0.4"
 ##   QUICK_CAPTURE_ZOOM     camera zoom override, to judge texture detail up close
+##   QUICK_CAPTURE_BIOME    0..1 biome strength override (0 = the pre-biome floor)
+##   QUICK_CAPTURE_WONDER   walk to the nearest Wonder: "asleep" | "awake"
 
 const STAGE_ENV := "QUICK_CAPTURE_STAGE"
 const OUT_ENV := "QUICK_CAPTURE_OUT"
@@ -90,6 +92,8 @@ func _boot() -> void:
 		if App.state == App.State.PAUSED:
 			App.change_state(App.State.PLAYING)
 		_apply_floor_overrides()
+		_apply_biome_override()
+		_walk_to_wonder()
 		var seconds := 4.0
 		var sec_env := OS.get_environment(SECONDS_ENV)
 		if not sec_env.is_empty():
@@ -230,6 +234,50 @@ func _apply_zoom_override() -> void:
 	if spec.is_empty() or main.arena == null or main.arena.camera == null:
 		return
 	main.arena.camera.zoom = Vector2.ONE * float(spec)
+
+
+func _apply_biome_override() -> void:
+	## `QUICK_CAPTURE_BIOME=0` photographs the floor as it was before the macro-biomes
+	## existed, on the same seed and the same position as `QUICK_CAPTURE_BIOME=1`.
+	## Without this an A/B of the block compares two different forests and reads as
+	## "the palette changed a bit, maybe", which is not a measurement.
+	var spec := OS.get_environment("QUICK_CAPTURE_BIOME")
+	if spec.is_empty() or main.arena == null or main.arena.canopy_mat == null:
+		return
+	var v := float(spec)
+	main.arena.canopy_mat.set_shader_parameter("biome_strength", v)
+	print("QUICK_CAPTURE biome_strength=%s" % spec)
+
+
+func _walk_to_wonder() -> void:
+	## Teleports the slime next to the nearest Wonder and prints where it is. Asking
+	## the world for the position instead of hard-coding one means the capture cannot
+	## silently photograph empty forest because a constant drifted.
+	var spec := OS.get_environment("QUICK_CAPTURE_WONDER")
+	if spec.is_empty() or main.arena == null or main.arena.world == null:
+		return
+	var world: WorldGenerator = main.arena.world
+	var best: Dictionary = {}
+	var best_d := INF
+	for cy in range(-6, 7):
+		for cx in range(-6, 7):
+			var w := world._wonder_in_cell(cx, cy)
+			if w.is_empty():
+				continue
+			var d := (w["pos"] as Vector2).length()
+			if d < best_d:
+				best_d = d
+				best = w
+	if best.is_empty():
+		push_error("QUICK_CAPTURE_WONDER: no wonder found near the origin")
+		return
+	# 220 px away for a dormant landmark (its halo is visible from a screen away, the
+	# sprite is not), 90 px to stand inside the trigger radius and wake it.
+	var offset := Vector2(0.0, 90.0) if spec == "awake" else Vector2(0.0, 220.0)
+	main.arena.player.global_position = (best["pos"] as Vector2) + offset
+	world.stream_around(main.arena.player.global_position, true)
+	print("QUICK_CAPTURE wonder kind=%s pos=%s seen=%s" % [
+		best["kind"], str(best["pos"]), str(world.wonder_is_seen(best["cell"]))])
 
 
 func _find_button(root_node: Node, match_text: String) -> Button:

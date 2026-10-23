@@ -1,0 +1,33 @@
+# FLUX.1-schnell prompts for the three Wonder landmarks in resources/art/props.
+# Regenerate with:
+#   /Users/turpal/.workbuddy-ai/binaries/python/envs/default/bin/python /Users/turpal/Documents/WORK/cf-flux/cf_flux.py --batch-file tools/wonder_prompts.txt --out-dir /tmp/flux_wonders --steps 6
+#   python3 tools/process_creature_art.py /tmp/flux_wonders resources/art/props --size 256 --manifest tools/wonder_manifest.json
+# ...then the lantern on its own, because it needs a different key:
+#   mkdir -p /tmp/flux_lantern && cp /tmp/flux_wonders/flux_003.jpg /tmp/flux_lantern/
+#   python3 tools/process_creature_art.py /tmp/flux_lantern resources/art/props --size 256 --key-mode color --manifest tools/wonder_manifest.json
+# Order: singing_crystal, dew_fountain, ancient_lantern
+#
+# Why these exist: the forest is infinite and beautiful but it has nothing in it that
+# is a *destination*. Every sprite in the other sets is scenery — it repeats, it is
+# never the reason you walked that way. These three are placed on their own lattice
+# (WorldGenerator._wonder_in_cell), they wake once, they chime, they heal and they
+# shed spores, and their halo is visible from a screen away so a player drifting in a
+# flow state has something to drift toward.
+#
+# Three different silhouettes on purpose: a vertical prism, a wide low basin and a
+# tall thin lantern. From a screen away and half in the fog, shape is the only thing
+# that identifies them.
+#
+# The lantern needs --key-mode color, not the default flood fill: its vine handle is a
+# closed loop, so the flood fill cannot reach the backdrop trapped inside it and left a
+# magenta wedge in the hole. That is why the lantern is processed on its own, in its own
+# directory, with --key-mode color (see the commands above).
+#
+# No ground shadow: the game draws its own contact shadow from the sprite's footprint,
+# and a baked one would sit at the wrong angle under the slime's moving light.
+
+a tall enchanted singing crystal, a single clear aquamarine prism rising from a ring of pale stones, faint concentric sound rings glowing inside the glass, tiny golden notes of light drifting around it, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a small enchanted dew fountain, a shallow mossy stone basin with a carved spiral lip, a thin arc of luminous water rising and falling back into it, floating dewdrops and pale green mist, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+an ancient forest lantern on a twisted wooden post, a warm amber glow inside a cage of woven roots and thin brass ribs, drifting firefly sparks around the glass, moss at the base, soft teal rim light, hand-painted 2D game environment prop, muted forest palette, top-down three-quarter view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size

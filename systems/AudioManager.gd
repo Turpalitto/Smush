@@ -20,6 +20,10 @@ const EVENT_DB_OFFSETS: Dictionary = {
 	"move": -14.5,
 	"absorb": -4.2,
 	"orb_chime": -9.5,
+	# A Wonder fires a handful of times per run, not dozens of times a minute, so it
+	# sits well above the collection ladder: this is the loudest non-combat event in
+	# the game and it has to feel like one.
+	"wonder_chime": -6.0,
 	"attack": -2.2,
 	"button_click": -1.5,
 	"mutation_pick": 0.0,
@@ -37,7 +41,9 @@ const PRIORITY_EVENTS: Dictionary = {
 	"shield_break": true,
 	"mutation_pick": true,
 	"victory": true,
-	"defeat": true
+	"defeat": true,
+	# A landmark chord must never be the voice that a passing absorb blip steals.
+	"wonder_chime": true
 }
 ## Three composed loops (see tools/generate_music.py). Menu / exploration / boss, so the
 ## soundtrack reacts to what the player is doing instead of looping one 6-second placeholder.
@@ -58,6 +64,15 @@ const MUSIC_SILENT_DB: float = -60.0
 const ORB_CHIME_COUNT: int = 8
 const ORB_CHIME_PATH: String = "res://audio/sfx/orb_chime_%02d.wav"
 const ORB_CHIME_WINDOW_SEC: float = 1.8
+
+## Wonder chords (audio/sfx/wonder_chime_01..03.wav, built by
+## tools/generate_wonder_chord.py). Three bell triads — A minor, F major, C major —
+## one per landmark. Separate files rather than one chord transposed with
+## `pitch_scale`: a bell's partials are inharmonic, so a pitch shift moves the whole
+## series by the same factor and changes the strike character, and pitch is clamped
+## to [0.55, 1.75] anyway.
+const WONDER_CHIME_COUNT: int = 3
+const WONDER_CHIME_PATH: String = "res://audio/sfx/wonder_chime_%02d.wav"
 
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _player_events: Array[String] = []
@@ -420,3 +435,17 @@ func play_orb_chime() -> void:
 ## Test seam: where the ladder currently stands (0-based).
 func chime_step() -> int:
 	return _chime_step
+
+
+## One chord per Wonder landmark. `index` is the landmark's position in
+## WorldGenerator.WONDER_KINDS; anything out of range is clamped rather than dropped,
+## because a silent landmark is a worse failure than the wrong chord.
+func play_wonder_chime(index: int) -> void:
+	var i := clampi(index, 0, WONDER_CHIME_COUNT - 1)
+	var path := WONDER_CHIME_PATH % (i + 1)
+	if not FileAccess.file_exists(path):
+		# A partial asset set must not make the landmark mute: fall back to the
+		# collection chime, which is at least in the same key.
+		play_orb_chime()
+		return
+	_emit("wonder_chime", path, 1.0)

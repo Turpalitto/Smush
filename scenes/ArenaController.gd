@@ -145,6 +145,7 @@ func _ready() -> void:
 	world = WorldGenerator.new()
 	world.name = "EnchantedForest"
 	add_child(world)
+	world.wonder_awakened.connect(_on_wonder_awakened)
 
 	_hazards_layer = Node2D.new()
 	_hazards_layer.name = "Hazards"
@@ -289,6 +290,38 @@ func _on_player_mass_changed(new_mass: float, _radius: float) -> void:
 	## the body uses, so the character and the forest never disagree about how grown
 	## the player is.
 	_apply_env_growth(EvolutionStages.env_for_mass(new_mass))
+
+
+func _apply_biome_to_floor() -> void:
+	## The floor reads the same biome map the props do, so a region's palette covers
+	## the ground it is standing on. Sent once per run, right after generate_world,
+	## because the map is a function of the world seed and a new run is a new forest.
+	if canopy_mat == null or world == null:
+		return
+	var tex := world.biome_texture()
+	canopy_mat.set_shader_parameter("biome_map", tex)
+	canopy_mat.set_shader_parameter("biome_tile_px", WorldGenerator.BIOME_TILE_PX)
+	# Zero when the map is missing, so an unbound sampler cannot tint the floor: the
+	# shader's black-sampler fallback only covers the weight sum, not the strength.
+	canopy_mat.set_shader_parameter("biome_strength", 1.0 if tex != null else 0.0)
+	canopy_mat.set_shader_parameter("biome_c0", WorldGenerator.BIOME_TINTS[0])
+	canopy_mat.set_shader_parameter("biome_c1", WorldGenerator.BIOME_TINTS[1])
+	canopy_mat.set_shader_parameter("biome_c2", WorldGenerator.BIOME_TINTS[2])
+	canopy_mat.set_shader_parameter("biome_c3", WorldGenerator.BIOME_TINTS[3])
+	canopy_mat.set_shader_parameter("biome_lift", Vector4(
+		WorldGenerator.BIOME_LIFTS[0], WorldGenerator.BIOME_LIFTS[1],
+		WorldGenerator.BIOME_LIFTS[2], WorldGenerator.BIOME_LIFTS[3]))
+	canopy_mat.set_shader_parameter("biome_tint_amount", WorldGenerator.BIOME_FLOOR_TINT)
+	canopy_mat.set_shader_parameter("biome_lift_amount", WorldGenerator.BIOME_FLOOR_LIFT)
+
+
+func _on_wonder_awakened(pos: Vector2, kind: String) -> void:
+	## The generator does the healing, the chime and the spore cloud itself. This is
+	## the arena's half: a burst from the shared pool, so the landmark's first moment
+	## uses the same particle budget as every other impact in the game.
+	var col: Color = WorldGenerator.WONDER_GLOW.get(kind, Color(0.8, 1.0, 0.9))
+	_spawn_burst(pos + Vector2(0.0, -10.0), col, 16, 120.0)
+	Haptics.play("wonder")
 
 
 func _apply_env_growth(env: float) -> void:
@@ -479,6 +512,7 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 		active_boss = null
 
 	world.generate_world(world_seed)
+	_apply_biome_to_floor()
 	player.global_position = Vector2.ZERO
 	player.initialize_for_run(self)
 	_apply_env_growth(0.0)

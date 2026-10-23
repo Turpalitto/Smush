@@ -38,13 +38,20 @@ func _ready() -> void:
 	# Everything at once. 120 events over 1.6 s is far denser than a player can
 	# physically collect, which is the point: this is the worst case, not the average.
 	for i in range(120):
-		match i % 4:
+		# The wonder chord is in the rotation on purpose. It is the loudest non-combat
+		# event in the game (-6 dB, against the chime's -9.5) and it fires a two-second
+		# bell triad, so if anything is going to push the limiter it is this summed with
+		# the boss theme. 24 of them in 1.6 s is absurd — a real run meets a handful —
+		# which is the point: the probe measures the worst case, not the average.
+		match i % 5:
 			0:
 				Audio.play_orb_chime()
 			1:
 				Audio.play_sfx("absorb", 1.35)
 			2:
 				Audio.play_evolution((i % EvolutionStages.COUNT) + 1)
+			3:
+				Audio.play_wonder_chime(i % Audio.WONDER_CHIME_COUNT)
 			_:
 				Audio.play_sfx("hurt", 1.0)
 		await get_tree().create_timer(0.013).timeout

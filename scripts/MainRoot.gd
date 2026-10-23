@@ -55,11 +55,14 @@ func _ready() -> void:
 	App.change_state(App.State.MAIN_MENU)
 
 
-func _start_run(mode_id: String) -> void:
+func _start_run(mode_id: String, world_seed: int = 0) -> void:
+	## `world_seed` exists for the test suite: a run with an explicit seed generates the
+	## same forest every time, which is the only way a test can assert anything about
+	## world layout. A real run passes 0 and gets a time-based seed.
 	menus.visible = false
 	arena.visible = true
 	hud.visible = true
-	arena.start_new_run(mode_id)
+	arena.start_new_run(mode_id, world_seed)
 
 
 func _return_to_main_menu() -> void:

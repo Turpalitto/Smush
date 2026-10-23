@@ -24,6 +24,9 @@ const DURATION_MS: Dictionary = {
 	"boss_down": 110,
 	"miniboss": 55,
 	"evolve": 28,
+	# A Wonder waking is a discovery, not an impact: a short, soft tick that says
+	# "something happened over there" without reading as damage.
+	"wonder": 34,
 	"ui": 12,
 }
 
@@ -34,6 +37,7 @@ const MIN_GAP_MS: Dictionary = {
 	"boss_down": 400,
 	"miniboss": 300,
 	"evolve": 220,
+	"wonder": 500,
 	"ui": 60,
 }
 
