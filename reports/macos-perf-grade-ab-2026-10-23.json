@@ -1,0 +1,229 @@
+{
+  "generated_at": "2026-10-23T09:21:08",
+  "engine": "4.5-stable (official)",
+  "renderer": "mobile",
+  "gpu": "Apple M5 (Apple9)",
+  "os": "macOS 27.0.0",
+  "build": "debug (pessimistic against the export)",
+  "window": [
+    720,
+    1280
+  ],
+  "vsync_reported": 0,
+  "phases": {
+    "idle": {
+      "frames": 1922,
+      "wall_ms": {
+        "avg": 5.2047,
+        "p50": 3.8,
+        "p95": 13.313,
+        "max": 17.526,
+        "fps": 192.1,
+        "over_16_6": 22
+      },
+      "world_ms": {
+        "avg": 0.184,
+        "p50": 0.118,
+        "p95": 0.342,
+        "max": 0.456,
+        "fps": 5435.1,
+        "over_16_6": 0
+      },
+      "stream_ms": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.002,
+        "max": 0.008,
+        "fps": 968750.0,
+        "over_16_6": 0
+      },
+      "draw_calls": {
+        "avg": 416.1,
+        "max": 436
+      },
+      "chunks_built": 0,
+      "build_us_max": 0,
+      "chunks": 49,
+      "props": 81,
+      "decor": 577,
+      "chunk_sprites": 631,
+      "static_bodies": 81,
+      "nodes_total": 1082,
+      "objects_total": 2871,
+      "static_mem_mb": 60.07
+    },
+    "no_detail": {
+      "frames": 1088,
+      "wall_ms": {
+        "avg": 5.517,
+        "p50": 4.054,
+        "p95": 13.61,
+        "max": 17.366,
+        "fps": 181.3,
+        "over_16_6": 7
+      },
+      "world_ms": {
+        "avg": 0.1792,
+        "p50": 0.113,
+        "p95": 0.332,
+        "max": 0.497,
+        "fps": 5579.0,
+        "over_16_6": 0
+      },
+      "stream_ms": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.002,
+        "max": 0.003,
+        "fps": 988192.6,
+        "over_16_6": 0
+      },
+      "draw_calls": {
+        "avg": 441.0,
+        "max": 447
+      },
+      "chunks_built": 0,
+      "build_us_max": 0,
+      "chunks": 49,
+      "props": 81,
+      "decor": 577,
+      "chunk_sprites": 631,
+      "static_bodies": 81,
+      "nodes_total": 1096,
+      "objects_total": 2890,
+      "static_mem_mb": 60.36
+    },
+    "mood_ab": {
+      "on_median_ms": 4.44,
+      "off_median_ms": 4.38,
+      "delta_ms": 0.06,
+      "pinned": false,
+      "samples_on": [
+        4.247,
+        4.31,
+        4.322,
+        4.331,
+        4.436,
+        4.819,
+        4.732,
+        4.594
+      ],
+      "samples_off": [
+        4.267,
+        4.223,
+        4.28,
+        4.38,
+        4.649,
+        4.371,
+        4.459,
+        4.471
+      ]
+    },
+    "draw_ab": {
+      "visible_median": 530.8,
+      "hidden_median": 517.0,
+      "forest_draw_calls": 13.8,
+      "samples_visible": [
+        494.459770114943,
+        510.797687861272,
+        517.792899408284,
+        530.774566473988,
+        546.957317073171,
+        535.642857142857
+      ],
+      "samples_hidden": [
+        484.442424242424,
+        502.548780487805,
+        506.904191616766,
+        516.976744186047,
+        517.648484848485,
+        522.79012345679
+      ]
+    },
+    "walk": {
+      "frames": 3570,
+      "wall_ms": {
+        "avg": 6.7228,
+        "p50": 6.211,
+        "p95": 10.619,
+        "max": 18.307,
+        "fps": 148.7,
+        "over_16_6": 1
+      },
+      "world_ms": {
+        "avg": 0.2868,
+        "p50": 0.217,
+        "p95": 0.506,
+        "max": 0.991,
+        "fps": 3486.9,
+        "over_16_6": 0
+      },
+      "stream_ms": {
+        "avg": 0.0018,
+        "p50": 0.001,
+        "p95": 0.002,
+        "max": 0.572,
+        "fps": 552802.7,
+        "over_16_6": 0
+      },
+      "draw_calls": {
+        "avg": 585.4,
+        "max": 682
+      },
+      "chunks_built": 15,
+      "build_us_max": 133
+    }
+  },
+  "draw_ab": {
+    "visible_median": 530.8,
+    "hidden_median": 517.0,
+    "forest_draw_calls": 13.8,
+    "samples_visible": [
+      494.459770114943,
+      510.797687861272,
+      517.792899408284,
+      530.774566473988,
+      546.957317073171,
+      535.642857142857
+    ],
+    "samples_hidden": [
+      484.442424242424,
+      502.548780487805,
+      506.904191616766,
+      516.976744186047,
+      517.648484848485,
+      522.79012345679
+    ]
+  },
+  "mood_ab": {
+    "on_median_ms": 4.44,
+    "off_median_ms": 4.38,
+    "delta_ms": 0.06,
+    "pinned": false,
+    "samples_on": [
+      4.247,
+      4.31,
+      4.322,
+      4.331,
+      4.436,
+      4.819,
+      4.732,
+      4.594
+    ],
+    "samples_off": [
+      4.267,
+      4.223,
+      4.28,
+      4.38,
+      4.649,
+      4.371,
+      4.459,
+      4.471
+    ]
+  },
+  "chunks_built_total": 15,
+  "build_us_avg": 81.3,
+  "drafts_seen": 3,
+  "idle_world_ms": 0.184,
+  "walk_world_ms": 0.2868
+}

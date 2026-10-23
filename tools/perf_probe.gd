@@ -20,6 +20,7 @@ extends Node
 ## Phases, in this order, because the difference between them is the attribution:
 ##   idle       everything on, player standing still  -> steady state
 ##   no_detail  the art layers of the floor shader off -> cost of relief/AO/dapple
+##   mood_ab    screen grade on vs off, alternating    -> cost of the fullscreen pass
 ##   draw_ab    forest hidden vs shown, alternating    -> draw calls of the forest
 ##   res_scale  window scaled 1x..3x                   -> fill-rate ceiling
 ##   walk       player walks a 700 px circle           -> cost of streaming
@@ -122,6 +123,9 @@ func _boot() -> void:
 	for k: String in saved.keys():
 		mat.set_shader_parameter(k, saved[k])
 	await _wait(0.6)
+
+	# --- screen grade, alternating ---------------------------------------
+	await _ab_mood()
 
 	# --- draw calls, forest visible vs hidden ----------------------------
 	await _ab_draw_calls()
@@ -242,6 +246,58 @@ func _pct(sorted: Array, p: float) -> float:
 	return float(sorted[clampi(idx, 0, sorted.size() - 1)])
 
 
+func _ab_mood() -> void:
+	## Does the fullscreen grade cost anything measurable?
+	##
+	## The first attempt measured `idle` with the grade and then `no_mood` without it
+	## and got 4.87 ms against 5.57 ms — i.e. the grade appeared to make the game
+	## FASTER, which is the ordering and the streaming noise talking, not the grade.
+	## So this alternates on/off eight times and takes medians, the same method that
+	## makes the draw-call A/B usable, and reports the difference with its spread.
+	## If the clock is pinned at 16.67 ms the answer is reported as "pinned" rather
+	## than as a number.
+	var mood := main.arena.mood
+	if mood == null:
+		return
+	var on: Array[float] = []
+	var off: Array[float] = []
+	for _i in range(8):
+		mood.visible = true
+		await _wait(0.30)
+		on.append(await _sample_frame_ms(0.45))
+		mood.visible = false
+		await _wait(0.30)
+		off.append(await _sample_frame_ms(0.45))
+	mood.visible = true
+	await _wait(0.30)
+	var om := _median(on)
+	var fm := _median(off)
+	_results["mood_ab"] = {
+		"on_median_ms": snappedf(om, 0.01),
+		"off_median_ms": snappedf(fm, 0.01),
+		"delta_ms": snappedf(om - fm, 0.01),
+		"pinned": om > 16.0 and fm > 16.0,
+		"samples_on": on,
+		"samples_off": off,
+	}
+
+
+func _sample_frame_ms(seconds: float) -> float:
+	## Median frame-to-frame wall time over a short window.
+	var t0 := Time.get_ticks_usec()
+	var last := t0
+	var deltas: Array[float] = []
+	while (Time.get_ticks_usec() - t0) < int(seconds * 1000000.0):
+		await get_tree().process_frame
+		var now := Time.get_ticks_usec()
+		deltas.append(float(now - last) / 1000.0)
+		last = now
+	if deltas.is_empty():
+		return 0.0
+	deltas.sort()
+	return deltas[deltas.size() / 2]
+
+
 func _ab_draw_calls() -> void:
 	## The undergrowth sprites are children of the chunk roots, so one switch hides
 	## the whole forest. Alternating visible/hidden six times and taking medians
@@ -340,6 +396,7 @@ func _build_summary() -> Dictionary:
 		"vsync_reported": DisplayServer.window_get_vsync_mode(),
 		"phases": _results,
 		"draw_ab": _results.get("draw_ab", {}),
+		"mood_ab": _results.get("mood_ab", {}),
 		"chunks_built_total": world.perf_chunks_built,
 		"build_us_avg": snappedf(float(world.perf_build_us_total) / float(maxi(1, world.perf_chunks_built)), 0.1),
 		"drafts_seen": _drafts_seen,
@@ -350,7 +407,7 @@ func _build_summary() -> Dictionary:
 
 func _print_table(s: Dictionary) -> void:
 	print("")
-	print("wall clock is pinned at 60 Hz on macOS; world/stream columns are the game's own timers")
+	print("wall_avg is only meaningful when it is NOT 16.67 (see PERF clock note); world/stream are the game's own timers")
 	print("%-10s %6s %8s %8s %8s %8s %7s %6s" % [
 		"phase", "frames", "wall_avg", "wall_p95", "world", "world_p95", "draws", "built"])
 	for phase: String in ["idle", "no_detail", "walk"]:
@@ -362,6 +419,14 @@ func _print_table(s: Dictionary) -> void:
 			e["wall_ms"]["avg"], e["wall_ms"]["p95"], e["world_ms"]["avg"],
 			e["world_ms"]["p95"], e["draw_calls"]["avg"], e["chunks_built"]])
 	print("")
+	var mab: Dictionary = s.get("mood_ab", {})
+	if not mab.is_empty():
+		if bool(mab.get("pinned", false)):
+			print("screen grade: wall clock pinned at 60 Hz, cost not resolvable here (on %.2f ms / off %.2f ms)" % [
+				mab["on_median_ms"], mab["off_median_ms"]])
+		else:
+			print("screen grade: on %.2f ms, off %.2f ms -> %.2f ms for the fullscreen pass (medians of 8)" % [
+				mab["on_median_ms"], mab["off_median_ms"], mab["delta_ms"]])
 	var ab: Dictionary = s.get("draw_ab", {})
 	if not ab.is_empty():
 		print("draw calls: forest visible %.1f, hidden %.1f -> forest costs %.1f draw calls" % [
