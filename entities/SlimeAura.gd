@@ -42,6 +42,14 @@ var _lit: Color = Color.WHITE
 ## contrast rule below turned the halo dark magenta on stages 9-12: a crown wants to
 ## be darker than a pale body, a halo never does.
 var _glow: Color = Color.WHITE
+## Fill for the large shapes (wings, petals). Contrasts with the BODY: pale on a
+## dark body, a deep shade of the same hue on a pale one. `_glow` cannot do this
+## job because it is deliberately near-white, which vanishes on the cream stages.
+var _veil: Color = Color.WHITE
+## 0 on a dark body, 1 on the cream stages. The large shapes read as translucent
+## light on a dark body and as near-solid dark silhouettes on a light one, because
+## a 54%-opaque mid-tone over a mid-tone world measured as "no wings at all".
+var _darken: float = 0.0
 
 
 func _ready() -> void:
@@ -77,9 +85,24 @@ func _draw() -> void:
 	_lit = _acc
 	_lit.s = _acc.s * 0.30
 	_lit.v = 1.0
+	# Light-made elements: halo bands, motes. These stay light, because their job is
+	# to look like emission rather than like an object.
 	_glow = rim
 	_glow.s = clampf(rim.s * 0.55, 0.0, 0.45)
 	_glow.v = maxf(rim.v, 0.94)
+	# ...but the LARGE shapes (wings, petals) cannot use that colour on the last
+	# stages. The body there is cream (luminance 0.74 at stage 13, 0.88 at 15) and
+	# the world behind it is warm gold, so white wings measured as "not there" on a
+	# real stage-15 frame - the slime read as a potato with a crown. Big shapes get
+	# their own colour that crosses over as the body brightens: pale on a dark body,
+	# a deep shade of the same hue on a light one, with _lit kept bright so the shape
+	# always has one luminous edge.
+	var body_lum := (_look["body_c"] as Color).get_luminance()
+	var darken := clampf((body_lum - 0.60) / 0.26, 0.0, 1.0)
+	_darken = darken
+	_veil = rim
+	_veil.s = clampf(lerpf(rim.s * 0.55, 0.70, darken), 0.0, 1.0)
+	_veil.v = lerpf(maxf(rim.v, 0.94), 0.16, darken)
 	if front:
 		_draw_crown()
 		_draw_motes()
@@ -284,8 +307,9 @@ func _draw_wings() -> void:
 			var tip := root + Vector2(side * spread, -_radius * (0.54 - t * 0.15))
 			_blade(root, tip, _radius * (0.30 + 0.14 * w),
 				side * _radius * (0.24 - t * 0.04),
-				Color(_glow.r, _glow.g, _glow.b, (0.34 - t * 0.06) * w * _alpha),
-				Color(_lit.r, _lit.g, _lit.b, (0.52 - t * 0.10) * w * _alpha),
+				Color(_veil.r, _veil.g, _veil.b,
+					(lerpf(0.44, 0.92, _darken) - t * 0.09) * w * _alpha),
+				Color(_lit.r, _lit.g, _lit.b, (0.58 - t * 0.10) * w * _alpha),
 				w)
 
 
@@ -293,7 +317,6 @@ func _draw_petals() -> void:
 	var p := float(_look.get("petals", 0.0))
 	if p <= 0.05:
 		return
-	var core: Color = _look["core_c"]
 	var count := 6
 	for i in range(count):
 		var a := (TAU / float(count)) * float(i) - PI * 0.5 + sin(_time * 0.6) * 0.08
@@ -301,8 +324,8 @@ func _draw_petals() -> void:
 		var base := dir * (_radius * 0.86)
 		var tip := dir * (_radius * (1.32 + 0.16 * p)) + dir.orthogonal() * sin(_time * 0.9 + float(i)) * _radius * 0.06
 		_blade(base, tip, _radius * 0.17 * p, _radius * 0.10 * p,
-			Color(core.r, core.g, core.b, 0.30 * p * _alpha),
-			Color(_glow.r, _glow.g, _glow.b, 0.62 * p * _alpha),
+			Color(_veil.r, _veil.g, _veil.b, lerpf(0.44, 0.88, _darken) * p * _alpha),
+			Color(_lit.r, _lit.g, _lit.b, 0.70 * p * _alpha),
 			p)
 
 
@@ -381,6 +404,12 @@ func _draw_halo() -> void:
 	_ring_band(centre, rx, ry, 11.0, Color(_glow.r, _glow.g, _glow.b, 0.10 * ha * _alpha), 44)
 	_ring_band(centre, rx, ry, 6.0, Color(_glow.r, _glow.g, _glow.b, 0.22 * ha * _alpha), 44)
 	_ring_band(centre, rx, ry, 3.4, Color(_glow.r, _glow.g, _glow.b, 0.45 * ha * _alpha), 44)
+	# A contour BETWEEN the glow and the core. Without it the halo is pure light, and
+	# pure light has nothing to define it against the warm gold the world turns at
+	# the top of the ladder - on the stage-15 frame the ring was simply absent. The
+	# dark band is wider than the lit core, so it survives as an outline on both
+	# sides of it while the core stays bright.
+	_ring_band(centre, rx, ry, 4.6, Color(_edge.r, _edge.g, _edge.b, 0.42 * ha * _alpha), 44)
 	_ring_band(centre, rx, ry, 1.9, Color(_lit.r, _lit.g, _lit.b, 0.62 * ha * _alpha), 44)
 	# A tighter inner ring with the contour colour gives the halo depth, so it reads
 	# as a ring with thickness rather than as one drawn ellipse.

@@ -4,9 +4,20 @@ extends RefCounted
 ##
 ## Growth is driven by MASS, not by the mutation level: the player literally gets
 ## bigger as they eat, and the character has to change with the body or the
-## growth is just a number. Mass runs from 10 at spawn to ~125 at the boss, so the
-## thresholds below are spaced so that a normal winning run sees most of the
-## ladder and a greedy run sees all of it.
+## growth is just a number.
+##
+## Where the ladder has to end is a measured fact, not an estimate. Mass is not
+## open-ended in practice: gains taper above MassSystem.SOFT_CAP_MASS (78) and
+## every dash burns 1.5%, so a run that actually plays the game settles in a band
+## rather than climbing forever. Four automated winning runs peaked at 102.4,
+## 108.8, 111.5 and 121.4 - a wide spread, because it depends on how much the
+## player eats versus how much they dash, and a 5 s mass curve showed one run
+## flat from t=150 s onward while another was still climbing at t=130 s.
+##
+## The top threshold therefore has to sit under the LOWEST observed peak, not the
+## average: an earlier value of 104 sat above 102.4 and made stage 15 a lottery.
+## 96 is under all four with margin, and it lands before the boss fight, so the
+## crown is worn while it still matters.
 ##
 ## Everything here is pure data plus two interpolation helpers, so the visuals,
 ## the HUD name and the world's reaction all read from one source. Colours are
@@ -15,10 +26,13 @@ extends RefCounted
 
 const COUNT: int = 15
 
-## Mass at which each stage begins. Stage 1 is the spawn mass.
+## Mass at which each stage begins. Stage 1 is the spawn mass. The spacing widens
+## to the middle of the run and tightens again at the top: the last rungs are
+## cheap on purpose, because mass gain has tapered by then and the final stages
+## would otherwise arrive after the player has already stopped growing.
 const MASS_KEYS: Array[float] = [
 	10.0, 15.0, 20.5, 26.0, 32.0, 38.5, 45.0, 52.0,
-	59.0, 66.0, 73.0, 80.0, 87.0, 95.0, 104.0,
+	59.0, 66.0, 73.0, 79.5, 85.5, 91.0, 96.0,
 ]
 
 ## Per-stage look. The hue walks a full arc from forest teal to pearl, so no two

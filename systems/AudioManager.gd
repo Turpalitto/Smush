@@ -321,6 +321,30 @@ func play_sfx(event_name: String, pitch_scale: float = 1.0) -> void:
 
 	if not SFX_PATHS.has(event_name):
 		return
+	_emit(event_name, str(SFX_PATHS[event_name]), pitch_scale)
+
+
+## The evolution reward, per stage.
+##
+## There are fifteen bells (audio/sfx/evo_01.wav .. evo_15.wav, built by
+## tools/generate_evolution_bells.py) walking the C major pentatonic from C3 to A5,
+## opening up in timbre and tail as the stage rises. The old code played one bell
+## pitched by stage, which silently stopped working halfway up the ladder: play_sfx
+## clamps pitch_scale to 1.75, and (stage-1)*1.5 semitones reaches that clamp at
+## stage 10, so stages 10-15 all sounded identical.
+##
+## Falls back to the shared bell if a stage file is missing, so a partial asset set
+## can never make the reward silent.
+func play_evolution(stage: int) -> void:
+	var s := clampi(stage, 1, EvolutionStages.COUNT)
+	var path := "res://audio/sfx/evo_%02d.wav" % s
+	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
+		_emit("evolution", str(SFX_PATHS["evolution"]), 1.0)
+		return
+	_emit("evolution", path, 1.0)
+
+
+func _emit(event_name: String, path: String, pitch_scale: float) -> void:
 	last_played_event = event_name
 
 	var sfx_vol: float = float(SaveData.get_setting("sfx_volume", 0.85))
@@ -332,7 +356,7 @@ func play_sfx(event_name: String, pitch_scale: float = 1.0) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 
-	var stream := AssetRegistry.get_wav_stream(SFX_PATHS[event_name], false)
+	var stream := AssetRegistry.get_wav_stream(path, false)
 	if stream == null:
 		return
 

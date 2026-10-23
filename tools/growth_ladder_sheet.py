@@ -22,6 +22,7 @@ before/after comparison can reuse the "before" run instead of re-rendering it.
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,11 +32,29 @@ from PIL import Image, ImageDraw, ImageFont
 GODOT = "/Users/turpal/godot45/Godot.app/Contents/MacOS/Godot"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Must match EvolutionStages.MASS_KEYS: the mass at which each stage begins.
-MASS_KEYS = [
-    10.0, 15.0, 20.5, 26.0, 32.0, 38.5, 45.0, 52.0,
-    59.0, 66.0, 73.0, 80.0, 87.0, 95.0, 104.0,
-]
+STAGES_GD = os.path.join(REPO, "systems", "EvolutionStages.gd")
+
+
+def read_mass_keys() -> list:
+    """Parse MASS_KEYS out of EvolutionStages.gd.
+
+    This list used to be copied here by hand with a comment saying it must match.
+    A comment is not a constraint: the moment the ladder is retuned, the sheet
+    keeps capturing the old masses and prints the old numbers on the cells, so the
+    evidence quietly disagrees with the game. Read the real table instead.
+    """
+    with open(STAGES_GD, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    m = re.search(r"const MASS_KEYS[^=]*=\s*\[(.*?)\]", src, re.S)
+    if not m:
+        raise SystemExit("could not find MASS_KEYS in %s" % STAGES_GD)
+    keys = [float(x) for x in re.findall(r"[-+]?\d*\.?\d+", m.group(1))]
+    if len(keys) != 15:
+        raise SystemExit("expected 15 MASS_KEYS, parsed %d" % len(keys))
+    return keys
+
+
+MASS_KEYS = read_mass_keys()
 
 CELL_W, CELL_H = 260, 400
 LABEL_H = 22
@@ -122,8 +141,9 @@ def montage_ab(frames_dir: str, out_path: str) -> None:
     sheet = Image.new("RGB", (cell_w * 2 + 8, cell_h + 26), (16, 22, 20))
     draw = ImageDraw.Draw(sheet)
     f = font(15)
-    for idx, (mass, label) in enumerate(((10.0, "mass 10  (stage 1)"),
-                                         (104.0, "mass 104  (stage 15)"))):
+    top_mass = MASS_KEYS[-1]
+    for idx, (mass, label) in enumerate(((MASS_KEYS[0], "mass %.0f  (stage 1)" % MASS_KEYS[0]),
+                                         (top_mass, "mass %.0f  (stage 15)" % top_mass))):
         path = os.path.join(frames_dir, "ab_%.1f.png" % mass)
         im = Image.open(path).convert("RGB")
         im = im.resize((cell_w, cell_h), Image.LANCZOS)
@@ -148,7 +168,7 @@ def main() -> int:
 
     os.makedirs(args.frames, exist_ok=True)
     if args.ab:
-        for mass in (10.0, 104.0):
+        for mass in (MASS_KEYS[0], MASS_KEYS[-1]):
             path = os.path.join(args.frames, "ab_%.1f.png" % mass)
             print("ab mass=%.1f" % mass)
             if not capture(mass, args.seed, path):

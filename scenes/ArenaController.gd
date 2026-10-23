@@ -279,12 +279,13 @@ func _on_growth_stage_changed(stage_idx: int, name_key: String) -> void:
 	Events.toast_requested.emit(Loc.t(name_key), col)
 	Haptics.play("evolve")
 	# The moment has to be audible and visible across the whole screen, not just at
-	# the slime: a ring of light washes over the forest, and the same evolution bell
-	# plays a step higher on every rung, so the ladder is a melody you climb.
+	# the slime: a ring of light washes over the forest, and each rung has its own
+	# bell (C major pentatonic, C3 up to A5) so the ladder is a melody you climb.
+	# It used to be one bell pitched up per stage, which stopped rising at stage 10
+	# because the voice pitch is clamped at 1.75.
 	if mood != null:
 		mood.flash(col.lerp(Color.WHITE, 0.35), 0.85)
-	var semis := float(stage_idx - 1) * 1.5
-	Audio.play_sfx("evolution", 0.82 * pow(2.0, semis / 12.0))
+	Audio.play_evolution(stage_idx)
 
 
 func _on_boss_updated(_current_hp: float, _max_hp: float, phase: int) -> void:

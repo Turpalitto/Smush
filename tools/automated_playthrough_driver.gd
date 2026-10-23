@@ -64,11 +64,23 @@ var _boss_rec_wall_t0_usec: int = 0
 var _next_heartbeat_sec: float = 30.0
 var _finished: bool = false
 
+## Heartbeat period in seconds. 30 keeps the shipped run log readable; a small
+## value turns the same log into a mass-over-time curve, which is what the growth
+## ladder has to be tuned against. Tuned by guessing, the thresholds were placed
+## above the mass ceiling and the last stage was unreachable.
+var _heartbeat_period: float = 30.0
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_physics_process(false)
 	_wall_t0_usec = Time.get_ticks_usec()
+	var hb_env := OS.get_environment("PLAYTHROUGH_HEARTBEAT_SEC")
+	if hb_env != "":
+		var hb := hb_env.to_float()
+		if hb >= 1.0:
+			_heartbeat_period = hb
+			_next_heartbeat_sec = hb
 	call_deferred("_boot_and_run")
 
 
@@ -627,7 +639,7 @@ func _physics_process(_delta: float) -> void:
 			b_state = str(arena.active_boss.action_state)
 			b_dist = roundf(arena.active_boss.global_position.distance_to(player.global_position))
 		print("HEARTBEAT t=", roundf(arena.run_elapsed), "s hp=", roundf(player.hp), " mass=", roundf(player.mass), " evo=", player.evolution_level, " boss_hp=", b_hp, " boss_state=", b_state, " boss_dist=", b_dist)
-		_next_heartbeat_sec += 30.0
+		_next_heartbeat_sec += _heartbeat_period
 
 	if not _stutter_checked and arena.run_elapsed > 32.0 and player.mutations.has_mutation("dash") and player.dash_cooldown <= 0.0:
 		_run_stutter_step_check()

@@ -38,12 +38,24 @@ void fragment() {
 		float core_pulse = 0.34 + 0.05 * sin(TIME * 3.8 + pulse_phase);
 		float core_mask = smoothstep(core_pulse + 0.22, 0.04, length(centered - vec2(0.0, 0.05)));
 
+		// Body luminance decides which way "detail" goes. On a dark jelly the
+		// interior reads as light, and every term here used to add light. On the
+		// cream stages that meant the spiral bands, the nucleus and the membrane
+		// halo were all white-on-cream: the body measured as a flat disc with two
+		// eyes, which is what the stage-15 gameplay frame showed. So the detail
+		// colour flips to a deeper shade of the body's own hue on light bodies, and
+		// the terms MIX toward it instead of adding to it, so the same code reads as
+		// "currents inside the jelly" at both ends of the ladder.
+		float body_lum = dot(body_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+		float light_body = smoothstep(0.58, 0.82, body_lum);
+		vec3 detail = mix(core_color.rgb, body_color.rgb * 0.52, light_body);
+
 		// Top-left glossy jelly highlight
 		float spec = smoothstep(0.28, 0.08, length(centered - vec2(-0.28, -0.32))) * 0.42;
 
 		vec3 col = mix(body_color.rgb, rim_color.rgb, rim * 0.60);
 		col = mix(col, body_color.rgb * 0.40, contour * 0.62);
-		col = mix(col, core_color.rgb, core_mask * 0.72);
+		col = mix(col, detail, core_mask * 0.72);
 		col += vec3(spec);
 		col = mix(col, vec3(1.0, 0.32, 0.38), hurt_flash * 0.75);
 		col += vec3(0.35, 1.0, 0.82) * evolution_glow * 0.55;
@@ -54,12 +66,14 @@ void fragment() {
 		// one clean silhouette at a glance during a fight.
 		float spiral = sin(angle * 2.0 + dist * 14.0 - TIME * 1.1) * 0.5 + 0.5;
 		float bands = smoothstep(0.35, 0.95, spiral) * smoothstep(0.92, 0.35, r);
-		col += core_color.rgb * bands * stage_glow * 0.16;
+		col = mix(col, detail, bands * stage_glow * 0.26);
 
 		// Outer halo hugging the membrane, so the body glows instead of being
-		// outlined. This is the cheap part of the "magical" read.
+		// outlined. This is the cheap part of the "magical" read. It is additive, so
+		// on a light body it can only brighten something that is already bright;
+		// there it is faded out and the contour does the work instead.
 		float halo = smoothstep(0.95, 0.62, r) * smoothstep(0.55, 0.90, r);
-		col += rim_color.rgb * halo * stage_glow * 0.20;
+		col += rim_color.rgb * halo * stage_glow * 0.20 * (1.0 - 0.9 * light_body);
 
 		float alpha = edge * body_color.a * stealth_alpha;
 		COLOR = vec4(col, alpha);
