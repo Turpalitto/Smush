@@ -41,13 +41,33 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var t := clampf(_elapsed / _duration, 0.0, 1.0)
 	var alpha := 1.0 - t
+	# A soft additive bloom at the origin, wider and fainter than the particles.
+	# Without it a burst is a handful of hard dots that pop and vanish; the halo is
+	# what makes the eye read the event as light rather than as confetti. One extra
+	# draw call for the whole burst, not one per particle, because the pool can hold
+	# forty of these at once.
+	var bloom_r := maxf(18.0, _ring_radius * 0.55)
+	draw_circle(Vector2.ZERO, bloom_r * (0.55 + t * 0.75),
+		Color(_color.r, _color.g, _color.b, alpha * alpha * 0.13), true, -1.0, true)
 	if _ring_radius > 0.0:
-		draw_arc(Vector2.ZERO, _ring_radius * (0.35 + t * 0.85), 0.0, TAU, 32, Color(_color.r, _color.g, _color.b, alpha * 0.85), 3.0)
+		# Three concentric arcs instead of one: a single 3 px stroke has a hard edge
+		# and reads as a drawn circle, while a wide faint band under a thin bright one
+		# reads as a shockwave.
+		var rr := _ring_radius * (0.35 + t * 0.85)
+		draw_arc(Vector2.ZERO, rr, 0.0, TAU, 32,
+			Color(_color.r, _color.g, _color.b, alpha * 0.22), 7.0, true)
+		draw_arc(Vector2.ZERO, rr, 0.0, TAU, 32,
+			Color(_color.r, _color.g, _color.b, alpha * 0.42), 3.5, true)
+		draw_arc(Vector2.ZERO, rr, 0.0, TAU, 32,
+			Color(_color.r, _color.g, _color.b, alpha * 0.85), 1.6, true)
 	for p: Dictionary in _particles:
 		var vel: Vector2 = p["vel"]
 		var pos := vel * (_elapsed * (1.0 - t * 0.35))
 		var sz: float = float(p["size"]) * (1.0 - t * 0.65)
-		draw_circle(pos, sz, Color(_color.r, _color.g, _color.b, alpha))
+		# Squared alpha: each spark dims faster than it shrinks, which is what a
+		# cooling ember does. Linear alpha made every particle look like a small
+		# opaque disc right up to the frame it disappeared.
+		draw_circle(pos, sz, Color(_color.r, _color.g, _color.b, alpha * alpha), true, -1.0, true)
 	if not _callout_text.is_empty():
 		var font := AssetRegistry.get_ui_font()
 		if font != null:

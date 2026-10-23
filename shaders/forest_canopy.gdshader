@@ -59,6 +59,32 @@ uniform float floor_fog_start = 620.0;
 uniform float floor_fog_end = 1500.0;
 uniform vec4 fog_tint : source_color = vec4(0.042, 0.086, 0.098, 1.0);
 
+// --- bioluminescent trail -------------------------------------------------------
+// A ring buffer of the last 16 places the slime has been, written by
+// ArenaController every 0.16 s and faded over 2.5 s. Drawing the trail here rather
+// than spawning sprite decals keeps it on the moss instead of floating above it:
+// the glow is added to the floor colour after the albedo, relief, AO and dapple, so
+// it sits in the same lighting as everything else on the ground.
+//
+// 16 x 0.16 s = 2.56 s of path, which is the fade time: the oldest point is exactly
+// as faded as the buffer is long, so the trail never ends in a visible cut.
+const int TRAIL_COUNT = 16;
+uniform vec2 trail_points[16];
+uniform float trail_weights[16];
+uniform float trail_strength = 0.0;
+uniform float trail_radius = 46.0;
+uniform vec3 trail_cool : source_color = vec3(0.36, 1.0, 0.88);
+uniform vec3 trail_warm : source_color = vec3(1.0, 0.86, 0.48);
+
+// --- caustics -------------------------------------------------------------------
+// Baked in Blender (tools/bake_caustics.py): a seamless net of light, the pattern
+// water throws on the ground. Two layers drift against each other, because one
+// sliding layer reads as the ground moving and two read as the water moving.
+uniform sampler2D floor_caustics : hint_default_white, repeat_enable, filter_linear_mipmap;
+uniform float floor_caustics_amount = 0.0;
+uniform float floor_caustics_scale = 2.6;
+uniform vec3 caustics_tint : source_color = vec3(0.55, 0.86, 0.95);
+
 // Growth, 0..1 from the slime's stage. The floor is where the player spends the
 // whole run looking, so the ground itself has to answer: the moss warms from cold
 // cave green to sunlit gold-green and starts to breathe a faint glow from its own
@@ -186,6 +212,40 @@ void fragment() {
 				col += mist_tint.rgb * shade * floor_mist * floor_strength;
 			}
 		}
+	}
+
+	if (trail_strength > 0.001) {
+		// Sum a soft kernel over the ring buffer. The Gaussian is evaluated in
+		// squared distance, so no sqrt per point; `trail_radius` comes from the
+		// slime's own radius, which keeps the trail proportional to the body.
+		float t = 0.0;
+		for (int i = 0; i < TRAIL_COUNT; i++) {
+			float wgt = trail_weights[i];
+			if (wgt <= 0.002) {
+				continue;
+			}
+			vec2 dp = world_px - trail_points[i];
+			float r2 = dot(dp, dp) / max(1.0, trail_radius * trail_radius);
+			t += wgt * exp(-r2 * 1.6);
+		}
+		t = clamp(t, 0.0, 1.3);
+		// Follow the moss structure instead of floating over it: the glow is
+		// weighted by the same patch mask that drives the floor's tonal variation.
+		vec3 tc = mix(trail_cool, trail_warm, growth);
+		col += tc * t * trail_strength * (0.55 + 0.45 * patch);
+	}
+
+	if (floor_caustics_amount > 0.001) {
+		// `max(0.05, ...)` and not 1.01: the caustic repeat is deliberately smaller
+		// than one floor tile (the net has to be readable at phone scale), so a
+		// floor of 1.0 here would silently clamp the scale and freeze the drift.
+		vec2 cuv = world_px / (floor_tile_px * max(0.05, floor_caustics_scale));
+		float c1 = texture(floor_caustics, cuv + vec2(TIME * 0.012, TIME * 0.007)).r;
+		float c2 = texture(floor_caustics, cuv * 1.37 - vec2(TIME * 0.009, TIME * 0.015)).r;
+		// Multiply the two layers rather than averaging: caustics are where two
+		// wavefronts cross, so their intersection is what should be bright.
+		float caust = clamp(c1 * c2 * 1.9, 0.0, 1.0);
+		col += caustics_tint * caust * floor_caustics_amount;
 	}
 
 	if (floor_fog > 0.001) {

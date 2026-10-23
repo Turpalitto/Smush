@@ -15,6 +15,30 @@ uniform float evolution_glow : hint_range(0.0, 1.0) = 0.0;
 uniform float stage_glow : hint_range(0.0, 1.0) = 0.0;
 uniform float stage_t : hint_range(0.0, 1.0) = 0.0;
 
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+// One layer of stars on a jittered lattice. A lattice, not free noise: free noise
+// clumps, and a clumped field inside a 40 px body reads as dirt rather than as sky.
+// `keep` is the fraction of cells that carry a star.
+float star_layer(vec2 p, float keep) {
+	vec2 cell = floor(p);
+	vec2 f = fract(p) - vec2(0.5);
+	float h = hash21(cell);
+	if (h > keep) {
+		return 0.0;
+	}
+	vec2 jitter = vec2(hash21(cell + vec2(3.7, 1.3)), hash21(cell + vec2(9.1, 5.5))) - vec2(0.5);
+	float d = length(f - jitter * 0.62);
+	// Twinkle at a rate taken from the cell's own hash, so the field does not pulse
+	// in unison.
+	float twinkle = 0.62 + 0.38 * sin(TIME * 1.7 + h * 43.0);
+	return smoothstep(0.24, 0.0, d) * twinkle;
+}
+
 void fragment() {
 	vec2 centered = (UV - vec2(0.5)) * 2.0;
 	float angle = atan(centered.y, centered.x);
@@ -74,6 +98,32 @@ void fragment() {
 		// there it is faded out and the contour does the work instead.
 		float halo = smoothstep(0.95, 0.62, r) * smoothstep(0.55, 0.90, r);
 		col += rim_color.rgb * halo * stage_glow * 0.20 * (1.0 - 0.9 * light_body);
+
+		// --- inner cosmos ---------------------------------------------------------
+		// Two parallax layers of stars inside the jelly. The body is the one thing on
+		// screen the player never stops looking at, so the "magical" read has to come
+		// from inside it and not only from the aura around it. The near layer is
+		// larger, brighter and drifts faster than the far one; that difference is the
+		// whole effect — one scrolling layer reads as a texture, two read as depth.
+		//
+		// Anchored to the body's own frame (centered), so the sky turns with the
+		// slime instead of sliding across it, and faded in with stage_glow: at stage
+		// 1 there is no cosmos, by stage 8 the body is a small window.
+		vec2 sky = centered * 1.55;
+		float near_stars = star_layer(sky * 2.35 + vec2(TIME * 0.055, TIME * 0.021), 0.34);
+		float far_stars = star_layer(sky * 1.05 - vec2(TIME * 0.018, TIME * 0.030), 0.20);
+		float cosmos = (near_stars * 0.85 + far_stars * 0.55)
+			* smoothstep(0.94, 0.50, r) * smoothstep(0.10, 0.42, stage_glow);
+		// Mixed, not added: an additive star is invisible on the cream stages, so the
+		// star colour has to flip to a deep shade of the body's own hue there and the
+		// constellation reads as dark pinpricks instead. The flip is keyed on the
+		// body's luminance and not on `light_body`: that ramp starts at 0.58, and the
+		// stage-11 lavender body measures 0.56 — it fell on the "dark" side and got
+		// white stars, which is why the first version of this block was invisible on
+		// exactly the stages it was written for.
+		float star_dark = smoothstep(0.36, 0.50, body_lum);
+		vec3 star_col = mix(vec3(1.0, 0.99, 0.92), body_color.rgb * 0.18, star_dark);
+		col = mix(col, star_col, cosmos * 0.95);
 
 		float alpha = edge * body_color.a * stealth_alpha;
 		COLOR = vec4(col, alpha);

@@ -94,7 +94,7 @@ func _boot() -> void:
 		var sec_env := OS.get_environment(SECONDS_ENV)
 		if not sec_env.is_empty():
 			seconds = float(sec_env)
-		await get_tree().create_timer(maxf(0.2, seconds)).timeout
+		await _wait_in_arena(maxf(0.2, seconds))
 		# After the wait, because the camera lerps its zoom every frame.
 		_apply_zoom_override()
 
@@ -152,6 +152,63 @@ func _enter_arena() -> void:
 		main.arena.world.decor_flora.size(),
 		main.arena.world.get_node("Chunks").get_child_count() if main.arena.world.get_node_or_null("Chunks") != null else -1,
 	])
+
+
+func _wait_in_arena(seconds: float) -> void:
+	## Waits out the run before the shot. With QUICK_CAPTURE_MOVE=1 the slime is
+	## actually driven around instead of standing still, because a trail, a wake or a
+	## camera lead cannot be photographed on a stationary subject: the previous
+	## captures all showed the slime parked at spawn and any motion-dependent effect
+	## was invisible in them. The path is a slow circle, which is what a player's
+	## thumb produces and what makes a trail curve.
+	var move := OS.get_environment("QUICK_CAPTURE_MOVE") == "1"
+	var start_pos := Vector2.ZERO
+	if main != null and main.arena != null and main.arena.player != null:
+		start_pos = main.arena.player.global_position
+	var elapsed := 0.0
+	var step := 1.0 / 60.0
+	var phase := 0.0
+	while elapsed < seconds:
+		# A capture that lands on the mutation draft photographs the wrong screen,
+		# which is exactly the failure this tool exists to avoid. Pick the first card
+		# and keep playing, the same way the playthrough driver does.
+		if App.state == App.State.MUTATION_DRAFT:
+			_dismiss_draft()
+		if move and main != null and main.arena != null and main.arena.player != null:
+			phase += step * 1.35
+			# Drive the joystick, not the player. GameHUD._process copies
+			# `joystick.output_vector` into `player.move_input` every frame, so writing
+			# move_input directly is a race against the HUD: it won in some captures and
+			# lost in others, and the frames that lost showed a slime parked at spawn
+			# with no trail at all. output_vector is only ever written by the joystick's
+			# own touch handlers, so it is the one input that stays put.
+			var dir := Vector2(cos(phase), sin(phase * 1.7)).normalized()
+			if main.hud != null and main.hud.joystick != null:
+				main.hud.joystick.output_vector = dir
+			main.arena.player.move_input = dir
+		await get_tree().create_timer(step).timeout
+		elapsed += step
+	if move and main != null and main.arena != null and main.arena.player != null:
+		main.arena.player.move_input = Vector2.ZERO
+		if main.hud != null and main.hud.joystick != null:
+			main.hud.joystick.output_vector = Vector2.ZERO
+		print("QUICK_CAPTURE moved %.0f px in a circle over %.1fs (trail lit=%d radius=%s strength=%s)" % [
+			main.arena.player.global_position.distance_to(start_pos), seconds,
+			main.arena.trail_point_count(),
+			str(main.arena.canopy_mat.get_shader_parameter("trail_radius")),
+			str(main.arena.canopy_mat.get_shader_parameter("trail_strength"))])
+
+
+func _dismiss_draft() -> void:
+	if main == null or main.draft_overlay == null:
+		return
+	var box: Node = main.draft_overlay._cards_box
+	if box == null or box.get_child_count() == 0:
+		return
+	var card := box.get_child(0) as Button
+	if card != null:
+		card.pressed.emit()
+		print("QUICK_CAPTURE dismissed a mutation draft")
 
 
 func _apply_floor_overrides() -> void:

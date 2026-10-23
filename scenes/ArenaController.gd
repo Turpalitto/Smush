@@ -28,6 +28,26 @@ const FLOOR_LIGHT_PATH: String = "res://resources/art/environment/forest_canopy_
 const FLOOR_LIGHT_MEAN: float = 0.5140
 const FLOOR_DAPPLE: float = 0.50
 const FLOOR_LIGHT_SCALE: float = 1.45
+## Caustics, baked by tools/bake_caustics.py: the net of light that water throws.
+## It is the one layer of the floor that is not the forest — it is the magic under
+## it — so it drifts on its own clock and warms up with the slime.
+const FLOOR_CAUSTICS_PATH: String = "res://resources/art/environment/forest_caustics.png"
+const FLOOR_CAUSTICS_SCALE: float = 0.35
+const FLOOR_CAUSTICS_COLD: float = 0.08
+const FLOOR_CAUSTICS_WARM: float = 0.17
+
+## --- bioluminescent moss trail ------------------------------------------------
+## The floor shader draws the glow, so this is only a ring of remembered places:
+## 16 world points sampled every 0.16 s and faded to zero over 2.5 s. 16 x 0.16 s
+## is 2.56 s, so the slot being overwritten is always already dark and the trail
+## never shows a cut where the buffer wraps.
+const TRAIL_COUNT: int = 16
+const TRAIL_SAMPLE_SEC: float = 0.16
+const TRAIL_FADE_SEC: float = 2.5
+const TRAIL_STRENGTH: float = 1.0
+## A sample is only written once the slime has actually gone somewhere, so standing
+## still lets the trail fade out instead of stacking sixteen points on one spot.
+const TRAIL_MIN_STEP_PX: float = 6.0
 ## Haze that pools in the canopy's shade, so the gaps read as light and the shade
 ## reads as humid air rather than as dirt. The shade cools down at stage 1 and
 ## warms up with the slime, which is why the pair lives here and not in the shader.
@@ -44,6 +64,14 @@ var canopy_rect: ColorRect
 var canopy_mat: ShaderMaterial
 ## Screen-space grade driven by growth. One fullscreen pass, see ui/WorldMood.gd.
 var mood: WorldMood
+
+## Trail ring buffer. Parallel arrays rather than an Array[Dictionary]: these are
+## uploaded to the shader verbatim, so they are kept in the types the uniform wants.
+var _trail_pts: PackedVector2Array = PackedVector2Array()
+var _trail_w: PackedFloat32Array = PackedFloat32Array()
+var _trail_head: int = 0
+var _trail_cd: float = 0.0
+var _trail_seeded: bool = false
 
 var enemy_grid: SpatialHashGrid = SpatialHashGrid.new(180.0)
 var orb_grid: SpatialHashGrid = SpatialHashGrid.new(160.0)
@@ -277,6 +305,14 @@ func _apply_env_growth(env: float) -> void:
 		canopy_mat.set_shader_parameter("fog_tint",
 			WorldGenerator.FOG_TINT.lerp(WorldGenerator.FOG_TINT_WARM, v))
 		canopy_mat.set_shader_parameter("mist_tint", MIST_TINT_COLD.lerp(MIST_TINT_WARM, v))
+		# The water under the forest gets brighter as the forest wakes, and its tint
+		# slides from moonlight blue to the slime's own gold. The amount is re-sent
+		# here rather than only at setup, because `apply_floor_texture` runs before
+		# the first growth value is known.
+		canopy_mat.set_shader_parameter("floor_caustics_amount",
+			lerpf(FLOOR_CAUSTICS_COLD, FLOOR_CAUSTICS_WARM, v))
+		canopy_mat.set_shader_parameter("caustics_tint",
+			Vector3(0.55, 0.86, 0.95).lerp(Vector3(0.98, 0.90, 0.62), v * 0.85))
 
 
 func _on_growth_stage_changed(stage_idx: int, name_key: String) -> void:
@@ -379,6 +415,14 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 		mat.set_shader_parameter("floor_light_scale", FLOOR_LIGHT_SCALE)
 		mat.set_shader_parameter("floor_dapple", FLOOR_DAPPLE)
 		mat.set_shader_parameter("floor_mist", FLOOR_MIST)
+
+	# Caustics are the last layer and the most optional: they are the magic, not the
+	# ground, so a build without them is still a forest floor.
+	var caustic_tex := AssetRegistry.get_texture(FLOOR_CAUSTICS_PATH)
+	if caustic_tex != null:
+		mat.set_shader_parameter("floor_caustics", caustic_tex)
+		mat.set_shader_parameter("floor_caustics_scale", FLOOR_CAUSTICS_SCALE)
+		mat.set_shader_parameter("floor_caustics_amount", FLOOR_CAUSTICS_COLD)
 	return true
 
 
@@ -423,6 +467,7 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	fx_pool.release_all()
 	enemy_grid.clear()
 	orb_grid.clear()
+	_reset_trail()
 
 	for cl in active_clones:
 		if is_instance_valid(cl):
@@ -477,10 +522,18 @@ func _physics_process(delta: float) -> void:
 		camera.zoom = camera.zoom.lerp(Vector2(target_zoom_f, target_zoom_f), 1.0 - exp(-3.0 * delta))
 
 	if canopy_mat != null:
-		canopy_mat.set_shader_parameter("world_offset", player.global_position)
+		# The world point at the centre of the screen, not the player's position. The
+		# camera smooths and shakes, so the two differ by tens of pixels while moving;
+		# the floor shader rebuilds world coordinates from this value, and with the
+		# player's position the whole floor — and the moss trail stored in real world
+		# coordinates — slid against the world every time the camera caught up.
+		var view_centre := player.global_position
 		if camera != null:
+			view_centre = camera.get_screen_center_position()
 			canopy_mat.set_shader_parameter("camera_zoom", camera.zoom.x)
+		canopy_mat.set_shader_parameter("world_offset", view_centre)
 		canopy_mat.set_shader_parameter("view_size", get_viewport_rect().size)
+		_update_trail(delta)
 
 	# Update diegetic compass chevron toward distant Boss or Miniboss
 	if player.visual != null:
@@ -511,6 +564,71 @@ func _physics_process(delta: float) -> void:
 		return
 	_process_boss_interactions(delta)
 	_cleanup_pools()
+
+
+func _reset_trail() -> void:
+	## Called at run start. The buffer outlives a run (the arena is reused), so
+	## without this a new run would open with the previous one's last 2.5 s of path
+	## still glowing on the moss.
+	_trail_pts.resize(TRAIL_COUNT)
+	_trail_w.resize(TRAIL_COUNT)
+	for i in range(TRAIL_COUNT):
+		_trail_pts[i] = Vector2.ZERO
+		_trail_w[i] = 0.0
+	_trail_head = 0
+	_trail_cd = 0.0
+	_trail_seeded = false
+
+
+func _update_trail(delta: float) -> void:
+	## Two jobs, both cheap: age the buffer, then occasionally remember a new place.
+	## Everything the shader needs is pushed here, so the trail has no node, no
+	## allocation and no draw call of its own.
+	for i in range(TRAIL_COUNT):
+		if _trail_w[i] > 0.0:
+			# Linear in age. A squared falloff reads as a puff that suddenly
+			# vanishes; the fade has to be long and even to feel like moss cooling.
+			_trail_w[i] = maxf(0.0, _trail_w[i] - delta / TRAIL_FADE_SEC)
+
+	_trail_cd -= delta
+	if _trail_cd <= 0.0:
+		# Accumulated rather than reset to zero: a frame that ran long must not
+		# permanently shift the sampling rate, or the buffer's 2.56 s of path would
+		# drift away from the 2.5 s fade.
+		_trail_cd += TRAIL_SAMPLE_SEC
+		var here := player.global_position
+		var moved := _trail_pts[_trail_head].distance_squared_to(here) \
+			> TRAIL_MIN_STEP_PX * TRAIL_MIN_STEP_PX
+		# `_trail_seeded` and not "is anything lit": keying the first write off the
+		# buffer going dark made a stationary slime pulse — the moss cooled for 2.5 s,
+		# the buffer emptied, and the next sample re-lit a spot under a player who had
+		# not moved. One point has to be written per run, and after that only motion
+		# may write.
+		if not _trail_seeded or moved:
+			_trail_seeded = true
+			_trail_head = (_trail_head + 1) % TRAIL_COUNT
+			_trail_pts[_trail_head] = here
+			_trail_w[_trail_head] = 1.0
+
+	canopy_mat.set_shader_parameter("trail_points", _trail_pts)
+	canopy_mat.set_shader_parameter("trail_weights", _trail_w)
+	# Sized from the body, so the glow around a stage-15 slime is not a hairline and
+	# the glow around a stage-1 slime is not a floodlight.
+	canopy_mat.set_shader_parameter("trail_radius", clampf(player.get_radius() * 1.15, 24.0, 74.0))
+	canopy_mat.set_shader_parameter("trail_strength", TRAIL_STRENGTH)
+
+
+func trail_point_count() -> int:
+	## Test seam: how many slots are currently lit.
+	var n := 0
+	for i in range(_trail_w.size()):
+		if _trail_w[i] > 0.0:
+			n += 1
+	return n
+
+
+func trail_head_index() -> int:
+	return _trail_head
 
 
 func _rebuild_spatial_grids() -> void:

@@ -26,6 +26,10 @@ const MOOD_AURA_RADIUS: Array[float] = [0.42, 0.46, 0.52, 0.58]
 const MOOD_SATURATION: Array[float] = [1.00, 1.06, 1.14, 1.20]
 const MOOD_LIFT: Array[float] = [0.000, 0.010, 0.030, 0.046]
 const MOOD_VIGNETTE: Array[float] = [0.34, 0.30, 0.24, 0.18]
+## Dream bloom strength. Non-zero at stage 1 on purpose: the brief asks for a magical
+## forest, not for magic that switches on halfway. It stays low at the bottom (0.14)
+## so the early game still reads as a damp cave, and opens up as the slime grows.
+const MOOD_BLOOM: Array[float] = [0.14, 0.26, 0.44, 0.60]
 
 var _rect: ColorRect
 var _mat: ShaderMaterial
@@ -92,6 +96,7 @@ func set_growth(g: float) -> void:
 	_mat.set_shader_parameter("saturation", lerpf(MOOD_SATURATION[i], MOOD_SATURATION[i + 1], w))
 	_mat.set_shader_parameter("lift", lerpf(MOOD_LIFT[i], MOOD_LIFT[i + 1], w))
 	_mat.set_shader_parameter("vignette", lerpf(MOOD_VIGNETTE[i], MOOD_VIGNETTE[i + 1], w))
+	_mat.set_shader_parameter("dream_bloom", lerpf(MOOD_BLOOM[i], MOOD_BLOOM[i + 1], w))
 
 
 func _process(delta: float) -> void:

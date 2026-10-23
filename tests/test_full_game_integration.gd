@@ -33,6 +33,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_difficulty_multipliers(tree, main_inst)
 	await _test_miniboss_dismissed_by_boss(tree, main_inst)
 	await _test_endless_and_zen_modes(tree, main_inst)
+	await _test_moss_trail_and_caustics(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -1085,3 +1086,156 @@ func _test_endless_and_zen_modes(tree: SceneTree, main: MainRoot) -> void:
 	assert_eq(str(App.last_run_summary.get("outcome", "")), "walk", "Outcome is reported as a walk")
 	assert_gt(float(SaveData.get_essence()), float(ess_pre_walk),
 		"Finishing a walk commits everything collected")
+
+
+func _test_moss_trail_and_caustics(tree: SceneTree, main: MainRoot) -> void:
+	## Block 2 of the flow pass: the baked caustics tile and the bioluminescent moss
+	## trail. Both are "invisible if broken" features — a missing sampler just leaves
+	## the floor a little flatter and a missing ring buffer just leaves no glow — so
+	## every number the shader depends on is asserted here rather than eyeballed.
+
+	# --- the caustics tile ---------------------------------------------------------
+	var caustic_tex := AssetRegistry.get_texture(ArenaController.FLOOR_CAUSTICS_PATH)
+	assert_true(caustic_tex != null, "Caustics tile loads through AssetRegistry")
+	if caustic_tex != null:
+		var img := caustic_tex.get_image()
+		assert_true(img != null and not img.is_empty(), "Caustics tile decodes to an image")
+		if img != null and not img.is_empty():
+			if img.is_compressed():
+				img.decompress()
+			var w := img.get_width()
+			var h := img.get_height()
+			assert_eq(w, h, "Caustics tile is square")
+			assert_gte(float(w), 256.0, "Caustics tile is at least 256 px wide")
+			# Sampled every 3rd texel: the whole image is 262k pixels and this suite
+			# runs in the same frame budget as the boss fight.
+			var min_a := 1.0
+			var lum_sum := 0.0
+			var lum_min := 1.0
+			var lum_max := 0.0
+			var lit := 0
+			var n := 0
+			for y in range(0, h, 3):
+				for x in range(0, w, 3):
+					var c := img.get_pixel(x, y)
+					min_a = minf(min_a, c.a)
+					var l := (c.r + c.g + c.b) / 3.0
+					lum_sum += l
+					lum_min = minf(lum_min, l)
+					lum_max = maxf(lum_max, l)
+					if l > 0.5:
+						lit += 1
+					n += 1
+			var mean_l := lum_sum / float(n)
+			var lit_frac := float(lit) / float(n)
+			# The layer is ADDED by the shader, so a transparent tile would silently
+			# darken the floor wherever the shader assumes it is sampling light.
+			assert_eq(min_a, 1.0, "Caustics tile is fully opaque")
+			assert_gt(mean_l, 0.15, "Caustics tile is a light field, not a black square")
+			assert_lt(mean_l, 0.60, "Caustics tile is not a white square")
+			assert_gt(lum_max - lum_min, 0.50, "Caustics tile carries real contrast")
+			assert_gt(lit_frac, 0.10, "Caustics tile has filaments, not just cells")
+			assert_lt(lit_frac, 0.80, "Caustics tile is a net, not a flood fill")
+			# Seamless: the wrapped edge has to be no worse than a normal interior
+			# step, otherwise the repeat prints a visible grid on the floor.
+			var seam_h := 0.0
+			var seam_v := 0.0
+			for i in range(0, w, 2):
+				seam_h += absf(img.get_pixel(0, i).r - img.get_pixel(w - 1, i).r)
+				seam_v += absf(img.get_pixel(i, 0).r - img.get_pixel(i, h - 1).r)
+			seam_h /= float(range(0, w, 2).size())
+			seam_v /= float(range(0, h, 2).size())
+			assert_lt(seam_h, 0.15, "Caustics tile wraps horizontally (seam %.3f)" % seam_h)
+			assert_lt(seam_v, 0.15, "Caustics tile wraps vertically (seam %.3f)" % seam_v)
+
+	# --- the material actually receives it -----------------------------------------
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/forest_canopy.gdshader") as Shader
+	assert_true(ArenaController.apply_floor_texture(mat, 1.0), "Floor material accepts the art set")
+	assert_true(mat.get_shader_parameter("floor_caustics") != null, "Caustics sampler is bound")
+	assert_approx(float(mat.get_shader_parameter("floor_caustics_amount")),
+		ArenaController.FLOOR_CAUSTICS_COLD, 0.0001, "Caustics start at the cold amount")
+	assert_approx(float(mat.get_shader_parameter("floor_caustics_scale")),
+		ArenaController.FLOOR_CAUSTICS_SCALE, 0.0001, "Caustics use the shipped repeat scale")
+
+	# --- the moss trail ------------------------------------------------------------
+	main._start_run("standard")
+	await tree.process_frame
+	var arena := main.arena
+	var player := arena.player
+	# One sample is expected, not zero: the first physics frame after a run starts
+	# always writes the slime's spawn point, which is the anchor the rest of the path
+	# is measured from. What must not survive is the previous run's path.
+	assert_lte(float(arena.trail_point_count()), 1.0, "A new run starts with at most its first sample")
+	assert_eq(arena._trail_pts.size(), ArenaController.TRAIL_COUNT, "Trail buffer holds 16 points")
+
+	# Driven directly rather than through the input pipeline: the producer is what is
+	# under test, and the frame rate of a headless run is not a clock.
+	var seeded := arena.trail_point_count()
+	var origin := player.global_position
+	for i in range(6):
+		player.global_position = origin + Vector2(26.0 * float(i + 1), 0.0)
+		for _f in range(11):
+			arena._update_trail(1.0 / 60.0)
+	assert_eq(arena.trail_point_count(), seeded + 6, "Six samples of 0.16 s are live on the moss")
+
+	var pts: Variant = arena.canopy_mat.get_shader_parameter("trail_points")
+	var wts: Variant = arena.canopy_mat.get_shader_parameter("trail_weights")
+	assert_true(pts is PackedVector2Array, "Trail points reach the shader as a packed vec2 array")
+	assert_true(wts is PackedFloat32Array, "Trail weights reach the shader as a packed float array")
+	if pts is PackedVector2Array:
+		assert_eq((pts as PackedVector2Array).size(), ArenaController.TRAIL_COUNT,
+			"Shader receives all 16 trail points")
+	if wts is PackedFloat32Array:
+		var weights := wts as PackedFloat32Array
+		assert_eq(weights.size(), ArenaController.TRAIL_COUNT, "Shader receives all 16 weights")
+		var head := arena.trail_head_index()
+		assert_gt(weights[head], 0.90, "The newest trail sample is nearly full weight")
+		# The oldest live sample is a second old at this point, so it must be dimmer
+		# than the newest one and still visible. Found by scan: the ring wraps, so
+		# "head + 1" is the next free slot, not the oldest occupied one.
+		var dimmest := 1.0
+		for v in weights:
+			if v > 0.0:
+				dimmest = minf(dimmest, v)
+		assert_lt(dimmest, weights[head], "Older trail samples are dimmer")
+		assert_gt(dimmest, 0.4, "A one-second-old sample is still visible")
+
+	assert_approx(float(arena.canopy_mat.get_shader_parameter("trail_radius")),
+		clampf(player.get_radius() * 1.15, 24.0, 74.0), 0.5, "Trail radius follows the body")
+	assert_approx(float(arena.canopy_mat.get_shader_parameter("trail_strength")),
+		ArenaController.TRAIL_STRENGTH, 0.0001, "Trail strength is pushed every frame")
+
+	# Standing still must not stack samples on one spot: the moss should cool off.
+	var before_stand := arena.trail_point_count()
+	for _f in range(60):
+		arena._update_trail(1.0 / 60.0)
+	assert_eq(arena.trail_point_count(), before_stand, "Standing still adds no samples")
+	for _f in range(170):
+		arena._update_trail(1.0 / 60.0)
+	# And it stays dark. Keying the first write off "the buffer is empty" made a
+	# stationary slime re-light a spot every 2.5 s; this is the assertion that keeps
+	# that from coming back.
+	assert_eq(arena.trail_point_count(), 0, "The trail fades out and stays out in 2.5 s")
+	for _f in range(60):
+		arena._update_trail(1.0 / 60.0)
+	assert_eq(arena.trail_point_count(), 0, "A stationary slime does not re-ignite the moss")
+
+	# --- orb sparks ----------------------------------------------------------------
+	var orb := CollectibleOrb.new()
+	tree.root.add_child(orb)
+	orb.setup(player.global_position + Vector2(120.0, 0.0), "spore", 0.85, 5.0)
+	assert_eq(orb.spark_count(), 0, "A fresh orb sheds no sparks")
+	orb.start_suction(player)
+	for _f in range(30):
+		orb._process(1.0 / 60.0)
+	assert_gt(float(orb.spark_count()), 0.0, "A pulled orb sheds sparks")
+	assert_lte(float(orb.spark_count()), float(CollectibleOrb.SPARK_MAX), "Sparks stay capped")
+	orb.being_pulled_by = null
+	for _f in range(30):
+		orb._process(1.0 / 60.0)
+	assert_eq(orb.spark_count(), 0, "Sparks expire after their life")
+	orb.queue_free()
+	await tree.process_frame
+
+	main._return_to_main_menu()

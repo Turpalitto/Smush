@@ -37,16 +37,24 @@ func _process(delta: float) -> void:
 		_perf_accum = 0.0
 
 
+static func _is_unattended() -> bool:
+	## True when the game is being driven by a tool rather than a player. Both tools
+	## mark themselves with an environment variable they already require, so there is
+	## no second switch to keep in sync.
+	return OS.has_environment("PLAYTHROUGH_SUMMARY_PATH") or OS.has_environment("QUICK_CAPTURE_OUT")
+
+
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 			# Mobile backgrounding / interruption safety: auto-pause run and flush save immediately.
 			# An unattended automated playthrough must not be frozen by a window that
-			# lost focus to some other app — the driver sets PLAYTHROUGH_SUMMARY_PATH,
-			# and that is the only case where the pause is skipped.
+			# lost focus to some other app — the driver sets PLAYTHROUGH_SUMMARY_PATH
+			# and the capture tool sets QUICK_CAPTURE_OUT, and those are the only cases
+			# where the pause is skipped.
 			Analytics.end_session()
 			SaveData.save_to_disk()
-			if state == State.PLAYING and not OS.has_environment("PLAYTHROUGH_SUMMARY_PATH"):
+			if state == State.PLAYING and not _is_unattended():
 				change_state(State.PAUSED)
 		NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN:
 			Analytics.start_session()

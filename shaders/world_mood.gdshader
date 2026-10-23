@@ -34,6 +34,17 @@ uniform float pulse : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 flash_color : source_color = vec3(1.0, 0.95, 0.75);
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
 
+// Dream bloom: a halo gathered from the mip chain of the screen texture.
+//
+// Cheaper than a second pass and cheaper than a viewport blur: the mip levels of
+// `screen_tex` are already a progressive blur of the frame, so sampling two of them
+// at increasing coarseness gives a wide, soft halo for the price of two texture
+// fetches. The threshold is what keeps it from being fog: only pixels that are
+// already luminous contribute, so the dark moss stays dark and the halo belongs to
+// the crown, the runes, the orbs and the flowers rather than to the whole image.
+uniform float dream_bloom : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 dream_tint : source_color = vec3(1.0, 0.93, 0.78);
+
 void fragment() {
 	vec3 c = textureLod(screen_tex, SCREEN_UV, 0.0).rgb;
 
@@ -71,6 +82,24 @@ void fragment() {
 	// Lift only the shadows: the deep floor keeps its detail while the whole
 	// image gains the milky, dreamlike quality the late stages are going for.
 	c += vec3(lift) * (1.0 - smoothstep(0.0, 0.55, l));
+
+	if (dream_bloom > 0.001) {
+		vec3 b1 = textureLod(screen_tex, SCREEN_UV, 2.2).rgb;
+		vec3 b2 = textureLod(screen_tex, SCREEN_UV, 3.4).rgb;
+		float m1 = smoothstep(0.55, 1.15, dot(b1, vec3(0.2126, 0.7152, 0.0722)));
+		float m2 = smoothstep(0.55, 1.15, dot(b2, vec3(0.2126, 0.7152, 0.0722)));
+		vec3 bloom = b1 * m1 * 0.55 + b2 * m2 * 0.85;
+		// Humid air scatters warm, so the halo is pushed toward the dream tint
+		// rather than left neutral - a neutral halo reads as a lens artefact.
+		bloom = mix(bloom, bloom * dream_tint, 0.55);
+		// Protect the body. On the cream stages the slime is already near white, and
+		// adding bloom on top of it clips the whole body into one flat disc - the
+		// exact failure the regalia work already fixed twice. Where the source pixel
+		// is that bright the halo is suppressed; the glow AROUND the body comes from
+		// the mip bleeding into darker neighbours and is unaffected.
+		float protect = 1.0 - smoothstep(0.86, 1.0, l);
+		c += bloom * dream_bloom * protect;
+	}
 
 	vec2 v = SCREEN_UV - vec2(0.5);
 	float vd = length(v * vec2(1.0, 1.3));
