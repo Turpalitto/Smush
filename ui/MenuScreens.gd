@@ -41,6 +41,11 @@ func _ready() -> void:
 	if sh != null:
 		var mat := ShaderMaterial.new()
 		mat.shader = sh
+		# The menu is the first thing a player sees, so it gets the floor too — a
+		# little stronger and one step closer, since no gameplay has to read on top.
+		if ArenaController.apply_floor_texture(mat, 1.0):
+			mat.set_shader_parameter("floor_tile_px", 1180.0)
+			mat.set_shader_parameter("world_offset", Vector2(240.0, 90.0))
 		bg.material = mat
 	else:
 		bg.color = Color(0.06, 0.14, 0.17)

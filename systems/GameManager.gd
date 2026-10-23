@@ -40,10 +40,13 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-			# Mobile backgrounding / interruption safety: auto-pause run and flush save immediately
+			# Mobile backgrounding / interruption safety: auto-pause run and flush save immediately.
+			# An unattended automated playthrough must not be frozen by a window that
+			# lost focus to some other app — the driver sets PLAYTHROUGH_SUMMARY_PATH,
+			# and that is the only case where the pause is skipped.
 			Analytics.end_session()
 			SaveData.save_to_disk()
-			if state == State.PLAYING:
+			if state == State.PLAYING and not OS.has_environment("PLAYTHROUGH_SUMMARY_PATH"):
 				change_state(State.PAUSED)
 		NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN:
 			Analytics.start_session()

@@ -91,6 +91,77 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	assert_true(arena.world.is_safe_spawn_point(Vector2.ZERO, 30.0), "Central spawn clearing verified safe")
 	assert_eq(arena.world.narrow_gates.size(), 4, "Narrow tactical root gates placed")
 
+	# --- Environment art: painted props + the seamless floor tile -----------------
+	# The props replaced drawn primitives, so the thing worth asserting is that the
+	# sprite actually exists for every obstacle (a missing texture would silently
+	# fall back to a flat circle and the arena would look like placeholder art again).
+	for prop_id in ["root_pillar", "rune_stone", "mana_crystal", "mushroom_cluster", "fern_cluster"]:
+		var prop_path: String = "res://resources/art/props/%s.png" % prop_id
+		assert_true(ResourceLoader.exists(prop_path), "Prop art exists: " + prop_id)
+		var prop_tex := load(prop_path) as Texture2D
+		assert_true(prop_tex != null, "Prop art loads: " + prop_id)
+		if prop_tex != null:
+			assert_eq(prop_tex.get_width(), 256, "Prop art is 256 px wide: " + prop_id)
+
+	var prop_root := arena.world.get_node_or_null("StaticObstacles") as Node2D
+	assert_true(prop_root != null, "Static obstacle root exists")
+	if prop_root != null:
+		var prop_sprites := 0
+		for ch in prop_root.get_children():
+			if ch is Sprite2D:
+				prop_sprites += 1
+		assert_eq(prop_sprites, arena.world.obstacles.size(),
+			"Every obstacle has a painted sprite, not just a collision shape")
+
+	var decor_root := arena.world.get_node_or_null("DecorProps") as Node2D
+	assert_true(decor_root != null, "Decor prop root exists")
+	if decor_root != null:
+		var decor_sprites := 0
+		for ch in decor_root.get_children():
+			if ch is Sprite2D:
+				decor_sprites += 1
+		assert_gt(float(decor_sprites), 10.0, "Decor props are scattered through the arena")
+		assert_true(arena.world._swayers.size() == decor_sprites,
+			"Every decor prop sways with the spores")
+
+	var hedge_root := arena.world.get_node_or_null("BorderHedge") as Node2D
+	assert_true(hedge_root != null, "Border hedge root exists")
+	if hedge_root != null:
+		var hedge_sprites := 0
+		for ch in hedge_root.get_children():
+			if ch is Sprite2D:
+				hedge_sprites += 1
+		# Three staggered rows on four sides of a 2560 px arena at 62 px spacing.
+		assert_gt(float(hedge_sprites), 200.0, "The arena edge is a real treeline, not a circle fence")
+
+	# Floor tile: seamless by construction, but a replaced or re-exported PNG could
+	# still reintroduce a grid, so the wrap step is compared against the interior.
+	var floor_tex := load(ArenaController.FLOOR_TEXTURE_PATH) as Texture2D
+	assert_true(floor_tex != null, "Floor tile loads")
+	if floor_tex != null:
+		assert_eq(floor_tex.get_width(), 1024, "Floor tile is 1024 px")
+		var fimg := floor_tex.get_image()
+		assert_true(fimg != null and not fimg.is_empty(), "Floor tile has readable pixels")
+		if fimg != null and not fimg.is_empty():
+			var fw := fimg.get_width()
+			var seam := 0.0
+			var interior := 0.0
+			for fy in range(fw):
+				seam += absf(fimg.get_pixel(0, fy).get_luminance() - fimg.get_pixel(fw - 1, fy).get_luminance())
+				var mid := fw / 2
+				interior += absf(fimg.get_pixel(mid, fy).get_luminance() - fimg.get_pixel(mid + 1, fy).get_luminance())
+			seam /= float(fw)
+			interior /= float(fw)
+			assert_lte(seam, interior * 3.0 + 0.01,
+				"Floor tile wrap seam (%.4f) is no worse than an interior step (%.4f)" % [seam, interior])
+
+	assert_true(arena.canopy_mat != null, "Canopy material exists")
+	if arena.canopy_mat != null:
+		assert_true(arena.canopy_mat.get_shader_parameter("floor_tex") != null,
+			"Arena background received the floor tile")
+		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_strength")), 0.5,
+			"Floor tile actually modulates the arena background")
+
 	# Verify all 8 creature types spawn and run their FSM without error
 	var spawned_enemies: Array[EnemyEntity] = []
 	var idx: int = 0
