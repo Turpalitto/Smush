@@ -180,9 +180,14 @@ SHA_ZIP="$(shasum -a 256 "$ARCHIVE" | cut -d' ' -f1)"
 # the metadata file unparseable, so the summary is flattened to a single line.
 ARCH_INFO_ONELINE="$(printf '%s' "$ARCH_INFO" | tr '\n\t' '  ' | sed 's/  */ /g; s/ $//')"
 
+# Both lines are repo-relative: the .sha256 sits in deliverables/ while the .app is
+# built into builds/macos/, so any single fixed prefix makes one of the two lines
+# fail for whoever runs `shasum -c` from the repo root.
+ZIP_REL="${ARCHIVE#"$ROOT_DIR/"}"
+BIN_REL="${APP_PATH#"$ROOT_DIR/"}/Contents/MacOS/$BIN_PATH"
 cat > "$OUT_DIR/SlimeRushEvolution_macOS_Universal_Playtest_v$VERSION.sha256" << EOF
-$SHA_ZIP  $(basename "$ARCHIVE")
-$SHA_APP  $APP_NAME/Contents/MacOS/$BIN_PATH
+$SHA_ZIP  $ZIP_REL
+$SHA_APP  $BIN_REL
 EOF
 
 cat > "$OUT_DIR/SlimeRushEvolution_macOS_Universal_Playtest_v$VERSION.build.json" << EOF
