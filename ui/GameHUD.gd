@@ -3,6 +3,19 @@ extends Control
 ## In-game mobile HUD (Screen 3): HP, Mass, Evolution XP, Timer, Essence, Active Mutations,
 ## Boss HP bar, contextual Tutorial/Toast banner, Virtual Joystick, and Dash button.
 
+## Idle time before the secondary readouts start to dim.
+const IDLE_SEC: float = 1.6
+## The dimmest the secondary readouts ever go. The brief names 0.45 as the floor,
+## so the breath rises from 0.45 instead of crossing it.
+const BREATHE_FLOOR: float = 0.45
+## How far above the floor one breath rises.
+const BREATHE_SWING: float = 0.13
+## One breath, in seconds. 4.2 s is a resting human breath, which is what makes
+## the HUD feel alive rather than merely faded.
+const BREATHE_PERIOD: float = 4.2
+## Seconds to fade from fully visible down into the breathing band.
+const BREATHE_FADE_SEC: float = 0.9
+
 var arena: ArenaController = null
 var joystick: VirtualJoystick
 
@@ -22,6 +35,16 @@ var _dash_btn: Button
 var _split_btn: Button
 var _pause_btn: Button
 var _toast_timer: float = 0.0
+
+## The readouts that are allowed to dim while the player is flowing: the clock,
+## the essence counter and the mutation strip. Health and growth never dim — they
+## are the two numbers a player checks under pressure — and neither do the dash /
+## split buttons, the boss bar or the toast, because a control you have to hunt
+## for is a control that costs you the run.
+var _secondary: Array[CanvasItem] = []
+var _secondary_alpha: float = 1.0
+var _idle_sec: float = 0.0
+var _breath_phase: float = 0.0
 
 
 func _ready() -> void:
@@ -221,6 +244,10 @@ func _build_layout() -> void:
 	)
 	add_child(_dash_btn)
 
+	# The breathing set. Built here, after every element exists, so the list cannot
+	# silently lose a member when the layout above is edited.
+	_secondary = [_timer_label, _essence_label, _mut_strip]
+
 
 func _connect_signals() -> void:
 	Events.game_state_changed.connect(func(_old: int, next_state: int) -> void:
@@ -233,6 +260,8 @@ func _connect_signals() -> void:
 			_toast_timer = 0.0
 	)
 	Events.player_hp_changed.connect(func(cur: float, mx: float) -> void:
+		# Taking (or regaining) damage is combat, and combat never gets a dim HUD.
+		wake_hud()
 		_hp_bar.max_value = maxf(1.0, mx)
 		_hp_bar.value = cur
 		_hp_label.text = "%s: %d / %d" % [Loc.t("hud.hp"), int(ceil(cur)), int(round(mx))]
@@ -258,6 +287,7 @@ func _connect_signals() -> void:
 		_essence_label.text = "✦ %d" % total
 	)
 	Events.run_started.connect(func(_mode: String) -> void:
+		wake_hud()
 		_boss_box.visible = false
 		_toast_panel.visible = false
 		_toast_timer = 0.0
@@ -281,6 +311,7 @@ func _connect_signals() -> void:
 		_refresh_evo_label()
 	)
 	Events.mutation_applied.connect(func(_mid: String, _lv: int) -> void:
+		wake_hud()
 		_rebuild_mutation_strip()
 		if arena != null and arena.player != null:
 			_dash_btn.visible = arena.player.mutations.has_mutation("dash")
@@ -290,6 +321,7 @@ func _connect_signals() -> void:
 			joystick._recompute_default_anchor()
 	)
 	Events.synergy_activated.connect(func(sid: String) -> void:
+		wake_hud()
 		_rebuild_mutation_strip()
 		var sname := Loc.t(str(ConfigDB.synergies.get(sid, {}).get("name_key", sid)))
 		show_toast("%s %s!" % [Loc.t("hud.synergy_unlocked"), sname], Color(1.0, 0.90, 0.42), 4.0)
@@ -303,12 +335,14 @@ func _connect_signals() -> void:
 			_split_btn.text = ("%.1fs" % rem) if rem > 0.05 else Loc.t("hud.split")
 	)
 	Events.boss_spawned.connect(func(_bid: String, mx: float) -> void:
+		wake_hud()
 		_boss_box.visible = true
 		_boss_bar.max_value = mx
 		_boss_bar.value = mx
 		_boss_name_lbl.text = "%s (I)" % Loc.t("boss.ancient_guardian.name")
 	)
 	Events.boss_updated.connect(func(cur: float, mx: float, phase: int) -> void:
+		wake_hud()
 		_boss_bar.max_value = maxf(1.0, mx)
 		_boss_bar.value = cur
 		var numerals := ["I", "II", "III"]
@@ -327,12 +361,14 @@ func _connect_signals() -> void:
 		_boss_box.visible = false
 	)
 	Events.tutorial_step_shown.connect(func(_idx: int, tkey: String) -> void:
+		wake_hud()
 		show_toast(Loc.t(tkey), Color(0.68, 1.0, 0.88), 6.0)
 	)
 	Events.tutorial_completed.connect(func() -> void:
 		_toast_panel.visible = false
 	)
 	Events.toast_requested.connect(func(msg: String, col: Color) -> void:
+		wake_hud()
 		show_toast(msg, col, 3.2)
 	)
 
@@ -445,6 +481,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	_update_breathe(delta)
 	if arena != null and arena.player != null and App.state == App.State.PLAYING:
 		arena.player.move_input = joystick.output_vector
 		if Input.is_action_just_pressed("ui_accept"):
@@ -454,3 +491,78 @@ func _process(delta: float) -> void:
 		_toast_timer -= delta
 		if _toast_timer <= 0.0:
 			_toast_panel.visible = false
+
+
+# --- Breathing HUD -----------------------------------------------------------
+
+func secondary_alpha() -> float:
+	## Alpha the secondary readouts are currently drawn at. 1.0 awake, and never
+	## below BREATHE_FLOOR while breathing.
+	return _secondary_alpha
+
+
+func secondary_elements() -> Array[CanvasItem]:
+	return _secondary
+
+
+func is_hud_idle() -> bool:
+	return _idle_sec >= IDLE_SEC
+
+
+func wake_hud() -> void:
+	## Instant restore. No tween: a touch must bring the clock back on the same
+	## frame it lands, otherwise the HUD answers the thumb late.
+	_idle_sec = 0.0
+	_breath_phase = 0.0
+	_set_secondary_alpha(1.0)
+
+
+func _set_secondary_alpha(a: float) -> void:
+	var clamped := clampf(a, BREATHE_FLOOR, 1.0)
+	if is_equal_approx(clamped, _secondary_alpha):
+		return
+	_secondary_alpha = clamped
+	for el in _secondary:
+		if is_instance_valid(el):
+			el.modulate.a = clamped
+
+
+func _update_breathe(delta: float) -> void:
+	# Outside play, and during a boss fight, the readouts stay at full strength.
+	# A boss fight is exactly when the clock matters, so it is exempt by rule
+	# rather than by hoping the player keeps touching the screen.
+	if App.state != App.State.PLAYING or _boss_box.visible:
+		_idle_sec = 0.0
+		_breath_phase = 0.0
+		_set_secondary_alpha(1.0)
+		return
+	_idle_sec += delta
+	if _idle_sec < IDLE_SEC:
+		_set_secondary_alpha(1.0)
+		return
+	_breath_phase = fmod(_breath_phase + delta, BREATHE_PERIOD)
+	var breath := BREATHE_FLOOR + BREATHE_SWING * (0.5 + 0.5 * sin(TAU * _breath_phase / BREATHE_PERIOD))
+	var ramp := clampf((_idle_sec - IDLE_SEC) / BREATHE_FADE_SEC, 0.0, 1.0)
+	_set_secondary_alpha(lerpf(1.0, breath, ramp))
+
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	# Any deliberate contact wakes the HUD: a touch, a drag, a mouse press or a
+	# key. Mouse motion only counts while a button is held, so an idle desktop
+	# cursor cannot keep the HUD awake forever.
+	if event is InputEventScreenTouch:
+		if (event as InputEventScreenTouch).pressed:
+			wake_hud()
+	elif event is InputEventScreenDrag:
+		wake_hud()
+	elif event is InputEventMouseButton:
+		if (event as InputEventMouseButton).pressed:
+			wake_hud()
+	elif event is InputEventMouseMotion:
+		if (event as InputEventMouseMotion).button_mask != 0:
+			wake_hud()
+	elif event is InputEventKey:
+		if (event as InputEventKey).pressed:
+			wake_hud()

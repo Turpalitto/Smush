@@ -349,10 +349,7 @@ func _median(a: Array[float]) -> float:
 func _handle_draft() -> void:
 	## A level-up draft blocks input until a card is taken. Picking the first card
 	## is what a player would do; leaving it open would freeze the walk phase.
-	var box := main.draft_overlay._cards_box
-	if box == null or box.get_child_count() == 0:
-		return
-	var card := box.get_child(0) as Button
+	var card := main.draft_overlay.card_at(0)
 	if card != null:
 		card.pressed.emit()
 

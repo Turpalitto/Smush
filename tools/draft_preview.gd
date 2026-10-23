@@ -41,8 +41,14 @@ func _ready() -> void:
 			"max_level": 5, "completes_synergy": "em_storm"},
 	])
 
-	for i in range(4):
-		await get_tree().process_frame
+	# Long enough for the fly-in to settle (CARD_FLY_SEC plus the stagger), so the
+	# preview shows the cards at rest. DRAFT_T lets a shorter wait photograph the
+	# flight itself.
+	var hold := 0.40
+	var hold_env := OS.get_environment("DRAFT_T")
+	if not hold_env.is_empty():
+		hold = float(hold_env)
+	await get_tree().create_timer(maxf(0.0, hold)).timeout
 	var img := get_viewport().get_texture().get_image()
 	if img == null:
 		push_error("no image")

@@ -16,6 +16,8 @@ extends Node
 ##   QUICK_CAPTURE_ZOOM     camera zoom override, to judge texture detail up close
 ##   QUICK_CAPTURE_BIOME    0..1 biome strength override (0 = the pre-biome floor)
 ##   QUICK_CAPTURE_WONDER   walk to the nearest Wonder: "asleep" | "awake"
+##   QUICK_CAPTURE_DRAFT    1 = hold the mutation draft open instead of dismissing it
+##   QUICK_CAPTURE_DRAFT_T  seconds to wait after the draft opens (default 0.6)
 
 const STAGE_ENV := "QUICK_CAPTURE_STAGE"
 const OUT_ENV := "QUICK_CAPTURE_OUT"
@@ -101,6 +103,7 @@ func _boot() -> void:
 		await _wait_in_arena(maxf(0.2, seconds))
 		# After the wait, because the camera lerps its zoom every frame.
 		_apply_zoom_override()
+		await _open_draft_if_requested()
 
 	# A couple of extra frames so the last shader/filter pass is definitely on screen.
 	for _i in range(4):
@@ -206,13 +209,84 @@ func _wait_in_arena(seconds: float) -> void:
 func _dismiss_draft() -> void:
 	if main == null or main.draft_overlay == null:
 		return
-	var box: Node = main.draft_overlay._cards_box
-	if box == null or box.get_child_count() == 0:
-		return
-	var card := box.get_child(0) as Button
+	# The cards now live inside bare Control wrappers (so the fly-in can animate
+	# the Button without the VBoxContainer resetting it), so the card is asked for
+	# by index instead of being assumed to be the box's direct child.
+	var card := main.draft_overlay.card_at(0)
 	if card != null:
 		card.pressed.emit()
 		print("QUICK_CAPTURE dismissed a mutation draft")
+
+
+func _open_draft_if_requested() -> void:
+	## Photographs the mutation draft itself. Without this the tool actively dodges
+	## the one screen the draft work is about: `_wait_in_arena` dismisses any draft
+	## it lands on, so every capture of the overlay would have to be taken by hand.
+	## The draft is requested AFTER the arena wait so the dismiss guard cannot eat it.
+	if OS.get_environment("QUICK_CAPTURE_DRAFT") != "1":
+		return
+	if main == null or main.arena == null:
+		return
+	# A matched pair: the same frame with and without the pane. Two separate runs
+	# can land on different window sizes (the OS clamps the requested size), which
+	# makes any pixel-by-pixel blur measurement between them meaningless.
+	var pre_path := OS.get_environment("QUICK_CAPTURE_PRE_OUT")
+	if not pre_path.is_empty():
+		await RenderingServer.frame_post_draw
+		var pre := get_viewport().get_texture().get_image()
+		if pre != null and not pre.is_empty():
+			pre.save_png(pre_path)
+			print("QUICK_CAPTURE pre-draft %s %dx%d" % [pre_path, pre.get_width(), pre.get_height()])
+	main.arena.request_mutation_draft()
+	if App.state != App.State.MUTATION_DRAFT:
+		push_error("QUICK_CAPTURE_DRAFT: the arena refused to open a draft")
+		return
+	var hold := 0.6
+	var hold_env := OS.get_environment("QUICK_CAPTURE_DRAFT_T")
+	if not hold_env.is_empty():
+		hold = float(hold_env)
+	# create_timer runs while paused, which the draft does to the tree.
+	await get_tree().create_timer(maxf(0.0, hold)).timeout
+	var cards: int = 0
+	if main.draft_overlay != null:
+		cards = main.draft_overlay.card_count()
+	_apply_glass_overrides()
+	print("QUICK_CAPTURE draft held %.2fs, %d cards, state=%d" % [hold, cards, App.state])
+	if main.draft_overlay != null:
+		# Print where each card actually is, so "the fly-in works" is a number
+		# rather than an impression of a still frame.
+		for i in range(cards):
+			var c := main.draft_overlay.card_at(i)
+			if c != null:
+				print("QUICK_CAPTURE card%d y=%.1f alpha=%.3f scale=%.3f" % [
+					i, c.position.y, c.modulate.a, c.scale.x])
+
+
+func _apply_glass_overrides() -> void:
+	## Tuning hook for the frosted pane, same idea as QUICK_CAPTURE_FLOOR: sweep a
+	## uniform without editing the shader, so "transmission 0.42 vs 0.30" is an
+	## A/B on one frame instead of two builds.
+	var spec := OS.get_environment("QUICK_CAPTURE_GLASS")
+	if spec.is_empty() or main == null or main.draft_overlay == null:
+		return
+	var rect := main.draft_overlay.glass_rect()
+	if rect == null or rect.material == null:
+		return
+	var mat := rect.material as ShaderMaterial
+	for pair in spec.split(","):
+		var kv := pair.split("=")
+		if kv.size() != 2:
+			continue
+		var key := kv[0].strip_edges()
+		var raw := kv[1].strip_edges()
+		if key.begins_with("glass_tint") or key.begins_with("tint"):
+			var parts := raw.split(" ")
+			if parts.size() == 3:
+				mat.set_shader_parameter("glass_tint",
+					Color(float(parts[0]), float(parts[1]), float(parts[2]), 1.0))
+			continue
+		mat.set_shader_parameter(key, float(raw))
+		print("QUICK_CAPTURE glass %s=%s" % [key, raw])
 
 
 func _apply_floor_overrides() -> void:

@@ -578,7 +578,7 @@ func _physics_process(_delta: float) -> void:
 		_last_state_logged = App.state
 		var cards := -1
 		if main.draft_overlay != null:
-			cards = main.draft_overlay._cards_box.get_child_count()
+			cards = main.draft_overlay.card_count()
 		print("STATE_CHANGE t=", roundf(arena.run_elapsed * 10.0) / 10.0, " state=", App.state, " draft_cards=", cards)
 
 	if not _recording_boss and arena.run_elapsed >= arena.boss_spawn_time - 2.0:
@@ -586,7 +586,7 @@ func _physics_process(_delta: float) -> void:
 
 	if App.state == App.State.MUTATION_DRAFT:
 		_set_joystick_dir(Vector2.ZERO)
-		if main.draft_overlay._cards_box.get_child_count() > 0:
+		if main.draft_overlay.card_count() > 0:
 			# Hold the first draft open briefly so the overlay is actually rendered and captured.
 			if not _draft_snapped:
 				_draft_snapped = true
@@ -597,7 +597,7 @@ func _physics_process(_delta: float) -> void:
 					_snap("04_mutation_draft")
 				return
 			var pick_idx := _pick_best_draft_card_index()
-			var card_btn := main.draft_overlay._cards_box.get_child(pick_idx) as Button
+			var card_btn := main.draft_overlay.card_at(pick_idx)
 			if card_btn != null:
 				card_btn.pressed.emit()
 		return

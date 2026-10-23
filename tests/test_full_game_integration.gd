@@ -35,6 +35,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_endless_and_zen_modes(tree, main_inst)
 	await _test_moss_trail_and_caustics(tree, main_inst)
 	await _test_biomes_undergrowth_and_wonders(tree, main_inst)
+	await _test_glass_draft_and_breathing_hud(tree, main_inst)
 
 	main_inst.queue_free()
 	await tree.process_frame
@@ -510,7 +511,7 @@ func _test_evolution_queue_and_restart(tree: SceneTree, main: MainRoot) -> void:
 	await tree.process_frame
 	var arena := main.arena
 	arena.player.add_evolution_xp(500.0)
-	assert_eq(main.draft_overlay._cards_box.get_child_count(), 3, "Draft displays exactly three cards")
+	assert_eq(main.draft_overlay.card_count(), 3, "Draft displays exactly three cards")
 	var initial_cards := arena.current_draft_choices.duplicate(true)
 	arena.player.add_evolution_xp(1.0)
 	assert_eq(arena.current_draft_choices, initial_cards, "Extra XP never replaces open mutation cards")
@@ -520,11 +521,14 @@ func _test_evolution_queue_and_restart(tree: SceneTree, main: MainRoot) -> void:
 	assert_eq(App.state, App.State.MUTATION_DRAFT, "Invalid selection keeps draft open")
 	var picks := 0
 	while App.state == App.State.MUTATION_DRAFT and picks < 10:
-		var card := main.draft_overlay._cards_box.get_child(0) as Button
+		var card := main.draft_overlay.card_at(0)
+		assert_true(card != null, "An open draft always exposes card 0")
+		if card == null:
+			break
 		card.pressed.emit()
 		picks += 1
 		if App.state == App.State.MUTATION_DRAFT:
-			assert_eq(main.draft_overlay._cards_box.get_child_count(), 3, "Chained draft replaces cards immediately")
+			assert_eq(main.draft_overlay.card_count(), 3, "Chained draft replaces cards immediately")
 	assert_eq(picks, 4, "501 XP produces four consecutive choices without another pickup")
 	assert_eq(App.state, App.State.PLAYING, "Combat resumes after all earned choices")
 	assert_approx(arena.player.evolution_xp, 145.0, 0.01, "Unspent evolution XP preserved")
@@ -1709,3 +1713,233 @@ func _test_biomes_undergrowth_and_wonders(tree: SceneTree, main: MainRoot) -> vo
 	assert_true(stable, "Chunk prop positions are stable across calls")
 
 	main._return_to_main_menu()
+
+
+func _test_glass_draft_and_breathing_hud(tree: SceneTree, main: MainRoot) -> void:
+	## Block 4 of the flow pass: the mutation draft sits on a frosted pane and its
+	## cards fly in; the HUD dims to 0.45 while the player is flowing and comes back
+	## on the same frame they touch the screen or take a hit.
+	##
+	## Both halves fail silently by nature. A pane that is only a tint still looks
+	## like "a modal". A HUD that never restores still looks like "a design choice"
+	## until a player misses the clock during a boss fight. So the assertions are on
+	## the shader's own uniforms, on WCAG contrast computed from the colours the
+	## overlay really paints, and on the alpha values over time.
+
+	await tree.process_frame
+	main._start_run("standard", 424242)
+	await tree.process_frame
+	await tree.process_frame
+	var arena: ArenaController = main.arena
+	assert_true(arena != null, "The arena exists for the glass pass")
+	if arena == null:
+		main._return_to_main_menu()
+		return
+	var overlay: MutationDraftOverlay = main.draft_overlay
+	assert_true(overlay != null, "The draft overlay exists")
+
+	# --- the pane is glass, not a wash -------------------------------------------
+	var glass := overlay.glass_rect()
+	assert_true(glass != null, "The draft has a glass pane")
+	var mat := glass.material as ShaderMaterial
+	assert_true(mat != null, "The glass pane carries a shader material")
+	if mat == null or mat.shader == null:
+		main._return_to_main_menu()
+		return
+	var code: String = mat.shader.code
+	assert_true(code.contains("hint_screen_texture"),
+		"The pane reads the screen behind it instead of painting over it")
+	# A one-tap "blur" would satisfy contains("screen_tex") and still be sharp. Count
+	# the taps: the kernel is 13 samples.
+	var taps := 0
+	var at := code.find("texture(screen_tex", 0)
+	while at >= 0:
+		taps += 1
+		at = code.find("texture(screen_tex", at + 1)
+	assert_gte(float(taps), 12.0, "The pane blurs with a real multi-tap kernel (%d taps)" % taps)
+
+	var tint: Color = mat.get_shader_parameter("glass_tint")
+	var transmission: float = mat.get_shader_parameter("transmission")
+	assert_true(transmission > 0.10 and transmission < 0.60,
+		"The pane is translucent but not clear (transmission %.2f)" % transmission)
+	# The quad itself must be opaque: what survives of the world is `transmission`,
+	# not the quad's alpha. An alpha-blended tint would let sharp detail through.
+	assert_approx(glass.color.a, 1.0, 0.001, "The pane quad is opaque; the world shows through the shader")
+
+	# --- the cards stay readable on top of it -------------------------------------
+	# The brightest the pane can get: the milky term is the blurred frame * 0.82,
+	# and the brightest thing behind the pane is a bloom sprite at full white.
+	var milk_peak := 0.82
+	var glass_peak := Color(
+		tint.r * (1.0 - transmission) + milk_peak * transmission,
+		tint.g * (1.0 - transmission) + milk_peak * transmission,
+		tint.b * (1.0 - transmission) + milk_peak * transmission, 1.0)
+	for rarity in ["common", "rare", "epic"]:
+		var card_bg := MutationDraftOverlay.card_background(rarity)
+		var on_glass := _composite_over(card_bg, glass_peak)
+		var head_c := _contrast_ratio(MutationDraftOverlay.card_header_color(rarity), on_glass)
+		assert_gte(head_c, 4.5, "Card header stays readable over the brightest pane (%s, %.1f:1)" % [rarity, head_c])
+		var body_c := _contrast_ratio(Color(0.92, 0.98, 0.96), on_glass)
+		assert_gte(body_c, 4.5, "Card body stays readable over the brightest pane (%s, %.1f:1)" % [rarity, body_c])
+	# The title sits directly on the pane, so it needs its own dark outline.
+	assert_gte(float(overlay._title_lbl.get_theme_constant("outline_size")), 3.0,
+		"The title keeps a dark outline so it survives a bright patch of forest")
+
+	# --- the cards fly in over 0.22 s ---------------------------------------------
+	assert_approx(MutationDraftOverlay.CARD_FLY_SEC, 0.22, 0.001,
+		"A card's flight is the 0.22 s the brief asks for")
+	arena.request_mutation_draft()
+	assert_eq(App.state, App.State.MUTATION_DRAFT, "The arena opens a draft for the glass pass")
+	assert_eq(overlay.card_count(), 3, "The draft shows three cards")
+	if overlay.card_count() < 3:
+		main._return_to_main_menu()
+		return
+	# One frame in: card 0 has started, card 2 has not. This is the stagger, measured
+	# rather than assumed — the first version of the tween ran all three in lock-step
+	# (every card at y=36.3, alpha=0.105) because set_parallel(true) swallowed the
+	# interval, and nothing about the settled frame would ever have shown it.
+	await tree.process_frame
+	var a0: float = overlay.card_at(0).modulate.a
+	var a2: float = overlay.card_at(2).modulate.a
+	assert_gt(a0, 0.001, "Card 0 begins its flight on the first frame (alpha %.3f)" % a0)
+	assert_lt(a2, 0.001, "Card 2 waits for its stagger slot (alpha %.3f)" % a2)
+	assert_lt(overlay.card_at(0).position.y, MutationDraftOverlay.CARD_FLY_OFFSET,
+		"Card 0 has left its start offset")
+
+	# Settled: inside the flight window plus the stagger, everything is at rest.
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 500:
+		await tree.process_frame
+	for i in range(3):
+		var c := overlay.card_at(i)
+		assert_approx(c.modulate.a, 1.0, 0.01, "Card %d is fully opaque once settled" % i)
+		assert_approx(c.position.y, 0.0, 0.6, "Card %d reached its slot" % i)
+		assert_approx(c.scale.x, 1.0, 0.02, "Card %d reached full scale" % i)
+
+	overlay.card_at(0).pressed.emit()
+	await tree.process_frame
+	assert_eq(App.state, App.State.PLAYING, "Picking a card closes the draft")
+	assert_false(overlay.visible, "The pane hides when the draft closes")
+	assert_approx(glass.modulate.a, 0.0, 0.001,
+		"The pane resets so the next draft can frost in again")
+
+	# --- the HUD breathes ----------------------------------------------------------
+	var hud: GameHUD = main.hud
+	assert_eq(hud.secondary_elements().size(), 3, "Exactly three readouts are allowed to dim")
+	for el in [hud._hp_bar, hud._evo_bar, hud._dash_btn, hud._split_btn, hud._boss_box, hud._toast_panel]:
+		assert_false(hud.secondary_elements().has(el),
+			"A primary HUD element is never dimmed (%s)" % el.name)
+	assert_approx(GameHUD.BREATHE_FLOOR, 0.45, 0.0001, "The dim floor is the brief's 0.45")
+
+	var step := 1.0 / 60.0
+	hud.wake_hud()
+	assert_approx(hud.secondary_alpha(), 1.0, 0.001, "Wake restores the readouts to full")
+	assert_approx(hud._timer_label.modulate.a, 1.0, 0.001, "The clock element follows the wake")
+
+	# Two full breaths, sampled per frame, to catch both the floor and the ceiling.
+	# The first IDLE_SEC + fade is skipped: the readouts are supposed to be at full
+	# strength there, and including that stretch would make "max" trivially 1.0.
+	var samples: Array[float] = []
+	var settle_frames := int((GameHUD.IDLE_SEC + GameHUD.BREATHE_FADE_SEC) / step) + 2
+	for i in range(settle_frames + 600):
+		hud._update_breathe(step)
+		if i >= settle_frames:
+			samples.append(hud.secondary_alpha())
+	var lo: float = samples.min()
+	var hi: float = samples.max()
+	assert_gte(lo, GameHUD.BREATHE_FLOOR - 0.001,
+		"The breath never goes below the 0.45 floor (min %.3f)" % lo)
+	assert_lte(hi, GameHUD.BREATHE_FLOOR + GameHUD.BREATHE_SWING + 0.001,
+		"The breath stays inside its band (max %.3f)" % hi)
+	assert_gt(hi - lo, 0.06, "The HUD actually breathes instead of just sitting dim (swing %.3f)" % (hi - lo))
+	assert_approx(hud._timer_label.modulate.a, hud.secondary_alpha(), 0.001,
+		"The clock element is drawn at the breathing alpha")
+
+	# Combat restores. Damage is the one event that must never find a dim HUD.
+	hud._idle_sec = 0.0
+	for i in range(300):
+		hud._update_breathe(step)
+	assert_lt(hud.secondary_alpha(), 0.70, "The HUD is dim before the hit")
+	Events.player_hp_changed.emit(60.0, 100.0)
+	assert_approx(hud.secondary_alpha(), 1.0, 0.001, "Taking damage restores the readouts instantly")
+
+	# A touch restores, on the same frame, through the real input path.
+	hud._idle_sec = 0.0
+	for i in range(300):
+		hud._update_breathe(step)
+	assert_lt(hud.secondary_alpha(), 0.70, "The HUD is dim before the touch")
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	touch.index = 3
+	touch.position = Vector2(120.0, 900.0)
+	hud._input(touch)
+	assert_approx(hud.secondary_alpha(), 1.0, 0.001, "A touch restores the readouts on the same frame")
+
+	# A boss fight is exempt by rule, so the clock cannot dim mid-fight even if the
+	# player's thumb is off the screen for a moment.
+	hud._idle_sec = 0.0
+	hud._boss_box.visible = true
+	for i in range(400):
+		hud._update_breathe(step)
+	assert_approx(hud.secondary_alpha(), 1.0, 0.001, "A boss fight never dims the clock")
+	hud._boss_box.visible = false
+
+	# --- the joystick rests at 0.22 -------------------------------------------------
+	var joy := hud.joystick
+	assert_approx(VirtualJoystick.REST_ALPHA, 0.22, 0.0001, "The joystick's rest alpha is the brief's 0.22")
+	# Park it deliberately: the HUD section above already gave it enough frames to
+	# settle, and resetting a parked stick must NOT wake it.
+	joy.reset_stick()
+	var elapsed := 0.0
+	while elapsed < 1.2:
+		joy.tick_rest(step)
+		elapsed += step
+	assert_approx(joy.draw_alpha(), VirtualJoystick.REST_ALPHA, 0.001,
+		"A parked stick settles at exactly 0.22")
+	joy._begin_drag(0, Vector2(200.0, 900.0))
+	assert_approx(joy.draw_alpha(), 1.0, 0.001, "Touching the stick restores it instantly")
+	for i in range(120):
+		joy.tick_rest(step)
+	assert_approx(joy.draw_alpha(), 1.0, 0.001, "A held stick never fades")
+	joy._finish_drag(Vector2(200.0, 900.0))
+	assert_approx(joy.draw_alpha(), 1.0, 0.001,
+		"Releasing does not snap the stick dark on the same frame")
+	elapsed = 0.0
+	while elapsed < 1.2:
+		joy.tick_rest(step)
+		elapsed += step
+	assert_approx(joy.draw_alpha(), VirtualJoystick.REST_ALPHA, 0.001,
+		"The stick parks again after release")
+
+	main._return_to_main_menu()
+
+
+# --- readability helpers -----------------------------------------------------
+
+func _srgb_channel_to_linear(c: float) -> float:
+	if c <= 0.04045:
+		return c / 12.92
+	return pow((c + 0.055) / 1.055, 2.4)
+
+
+func _relative_luminance(c: Color) -> float:
+	return 0.2126 * _srgb_channel_to_linear(c.r) \
+		+ 0.7152 * _srgb_channel_to_linear(c.g) \
+		+ 0.0722 * _srgb_channel_to_linear(c.b)
+
+
+func _contrast_ratio(a: Color, b: Color) -> float:
+	## WCAG 2.1 contrast ratio. 4.5:1 is the AA threshold for body text.
+	var la := _relative_luminance(a)
+	var lb := _relative_luminance(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+func _composite_over(fg: Color, bg: Color) -> Color:
+	## Source-over alpha composite, so "card colour on a translucent pane" is the
+	## colour the player actually sees rather than the card colour alone.
+	var a := fg.a
+	return Color(
+		fg.r * a + bg.r * (1.0 - a),
+		fg.g * a + bg.g * (1.0 - a),
+		fg.b * a + bg.b * (1.0 - a), 1.0)
