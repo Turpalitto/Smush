@@ -103,36 +103,92 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		if prop_tex != null:
 			assert_eq(prop_tex.get_width(), 256, "Prop art is 256 px wide: " + prop_id)
 
-	var prop_root := arena.world.get_node_or_null("StaticObstacles") as Node2D
-	assert_true(prop_root != null, "Static obstacle root exists")
-	if prop_root != null:
-		var prop_sprites := 0
-		for ch in prop_root.get_children():
-			if ch is Sprite2D:
-				prop_sprites += 1
-		assert_eq(prop_sprites, arena.world.obstacles.size(),
-			"Every obstacle has a painted sprite, not just a collision shape")
+	# --- Endless world: chunks instead of an arena ---------------------------------
+	# The world used to be a 2560 px box with a drawn rim and a hedge along it. The
+	# thing worth asserting now is the opposite: that nothing marks an edge, that the
+	# forest is streamed around wherever the player is, and that it is the *same*
+	# forest when they walk away and come back.
+	var chunk_root := arena.world.get_node_or_null("Chunks") as Node2D
+	assert_true(chunk_root != null, "Chunk root exists")
+	assert_true(arena.world.get_node_or_null("BorderHedge") == null,
+		"No border hedge: the world has no edge to draw")
+	assert_gt(float(arena.camera.limit_right), 1000000.0,
+		"Camera is not clamped to an arena")
 
-	var decor_root := arena.world.get_node_or_null("DecorProps") as Node2D
-	assert_true(decor_root != null, "Decor prop root exists")
-	if decor_root != null:
-		var decor_sprites := 0
-		for ch in decor_root.get_children():
-			if ch is Sprite2D:
-				decor_sprites += 1
-		assert_gt(float(decor_sprites), 10.0, "Decor props are scattered through the arena")
-		assert_true(arena.world._swayers.size() == decor_sprites,
-			"Every decor prop sways with the spores")
+	var chunk_count := 0
+	var prop_sprites := 0
+	var bodies := 0
+	if chunk_root != null:
+		for chunk in chunk_root.get_children():
+			chunk_count += 1
+			for ch in chunk.get_children():
+				if ch is Sprite2D:
+					prop_sprites += 1
+				elif ch is StaticBody2D:
+					bodies += 1
 
-	var hedge_root := arena.world.get_node_or_null("BorderHedge") as Node2D
-	assert_true(hedge_root != null, "Border hedge root exists")
-	if hedge_root != null:
-		var hedge_sprites := 0
-		for ch in hedge_root.get_children():
-			if ch is Sprite2D:
-				hedge_sprites += 1
-		# Three staggered rows on four sides of a 2560 px arena at 62 px spacing.
-		assert_gt(float(hedge_sprites), 200.0, "The arena edge is a real treeline, not a circle fence")
+	assert_gt(float(chunk_count), 40.0, "A ring of chunks is built around the player")
+	assert_eq(arena.world.streamed_chunk_count(), chunk_count, "Chunk registry matches the node tree")
+	assert_gt(float(arena.world.obstacles.size()), 40.0, "The forest has props in every direction")
+	assert_eq(bodies, arena.world.obstacles.size(),
+		"Every obstacle has a collision body, not just a sprite")
+
+	var painted_plants := 0
+	var swaying_plants := 0
+	for d in arena.world.decor_flora:
+		var dk := int(d["kind"])
+		if dk == 1:
+			continue
+		painted_plants += 1
+		if float(WorldGenerator.DECOR_KINDS[dk].get("sway", 0.0)) > 0.0:
+			swaying_plants += 1
+	assert_eq(prop_sprites, arena.world.obstacles.size() + painted_plants,
+		"Every prop and every painted plant is a real sprite")
+	assert_eq(arena.world._swayers.size(), swaying_plants,
+		"Every plant that should move with the spores does (and only those)")
+
+	# The undergrowth set is what stops one fern sprite from repeating hundreds of
+	# times per screen. If any of these goes missing the world quietly falls back to
+	# a single silhouette everywhere, which is exactly what it looked like before.
+	for under_id in ["broadleaf_clump", "grass_tuft", "fallen_branch", "glow_shrooms", "root_cluster"]:
+		var under_path: String = "res://resources/art/props/%s.png" % under_id
+		assert_true(ResourceLoader.exists(under_path), "Undergrowth art exists: " + under_id)
+		var under_tex := load(under_path) as Texture2D
+		assert_true(under_tex != null, "Undergrowth art loads: " + under_id)
+		if under_tex != null:
+			assert_eq(under_tex.get_width(), 256, "Undergrowth art is 256 px wide: " + under_id)
+
+	# Walking 4 km east and back must not change what grows at the origin.
+	var sig_before := ""
+	for ob in arena.world.obstacles:
+		if ob.get("chunk") == Vector2i.ZERO:
+			var bp: Vector2 = ob["pos"]
+			sig_before += "%.1f,%.1f;" % [bp.x, bp.y]
+	arena.world.stream_around(Vector2(4096.0, 4096.0), true)
+	assert_gt(float(arena.world.streamed_chunk_count()), 40.0,
+		"The forest streams in around a point far from the spawn")
+	var strays := 0
+	# FREE_RADIUS chunks survive the move (hysteresis: a chunk is never freed in the
+	# same step that builds its replacement), so the honest bound is that ring, not
+	# the stream radius.
+	var leash := float(WorldGenerator.FREE_RADIUS + 2) * WorldGenerator.CHUNK_SIZE
+	for ob in arena.world.obstacles:
+		var op: Vector2 = ob["pos"]
+		if op.distance_to(Vector2(4096.0, 4096.0)) > leash:
+			strays += 1
+	assert_eq(strays, 0, "Streamed props stay around the player")
+	arena.world.stream_around(Vector2.ZERO, true)
+	var sig_after := ""
+	for ob in arena.world.obstacles:
+		if ob.get("chunk") == Vector2i.ZERO:
+			var ap: Vector2 = ob["pos"]
+			sig_after += "%.1f,%.1f;" % [ap.x, ap.y]
+	assert_eq(sig_after, sig_before, "The forest is identical when you walk away and come back")
+
+	# Nothing clamps the player to a box any more.
+	var far_point := Vector2(9000.0, -7000.0)
+	assert_true(arena.constrain_player_position(far_point, 24.0, false).is_equal_approx(far_point),
+		"A point 11 km out is a legal position: there is no wall")
 
 	# Floor tile: seamless by construction, but a replaced or re-exported PNG could
 	# still reintroduce a grid, so the wrap step is compared against the interior.
@@ -206,6 +262,40 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		assert_gt(amax - amin, 0.35, "AO map has real contrast (%.2f)" % (amax - amin))
 		assert_true(amean > 0.45 and amean < 0.90,
 			"AO map mean is in a sane range (%.2f)" % amean)
+	# Canopy light: the fourth map, and the only one that is not the floor itself.
+	var light_tex := load(ArenaController.FLOOR_LIGHT_PATH) as Texture2D
+	assert_true(light_tex != null, "Canopy light map loads")
+	if light_tex != null:
+		assert_eq(light_tex.get_width(), 1024, "Canopy light map is 1024 px")
+		var limg := light_tex.get_image()
+		var lmin := 1.0
+		var lmax := 0.0
+		var lsum := 0.0
+		var lcount := 0
+		for ly in range(0, limg.get_height(), 8):
+			for lx in range(0, limg.get_width(), 8):
+				var v := limg.get_pixel(lx, ly).r
+				lmin = minf(lmin, v)
+				lmax = maxf(lmax, v)
+				lsum += v
+				lcount += 1
+		var lmean := lsum / float(maxi(1, lcount))
+		assert_gt(lmax - lmin, 0.70, "Canopy light has full range (%.2f)" % (lmax - lmin))
+		# A canopy that is too dense bakes nearly black, too sparse nearly white.
+		assert_true(lmean > 0.30 and lmean < 0.72,
+			"Canopy light is dappled, not solid or empty (%.2f)" % lmean)
+		# The tile has to repeat: the border must not be a step. Sampled the same way
+		# the bake script measures it, against the interior step.
+		var seam := 0.0
+		var interior := 0.0
+		for ly in range(limg.get_height()):
+			seam += absf(limg.get_pixel(0, ly).r - limg.get_pixel(limg.get_width() - 1, ly).r)
+			var mid := limg.get_width() / 2
+			interior += absf(limg.get_pixel(mid, ly).r - limg.get_pixel(mid + 1, ly).r)
+		seam /= float(limg.get_height())
+		interior /= float(limg.get_height())
+		assert_lte(seam, interior * 3.0 + 0.02,
+			"Canopy light wrap seam (%.4f) is no worse than an interior step (%.4f)" % [seam, interior])
 	if arena.canopy_mat != null:
 		assert_true(arena.canopy_mat.get_shader_parameter("floor_normal") != null,
 			"Arena background received the normal map")
@@ -215,6 +305,12 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 			"Arena background received the AO map")
 		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_occlusion")), 0.1,
 			"Occlusion is switched on")
+		assert_true(arena.canopy_mat.get_shader_parameter("floor_light") != null,
+			"Arena background received the canopy light")
+		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_dapple")), 0.1,
+			"Canopy light modulates the arena")
+		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_mist")), 0.1,
+			"Shade haze is switched on")
 
 	# Verify all 8 creature types spawn and run their FSM without error
 	var spawned_enemies: Array[EnemyEntity] = []

@@ -1,0 +1,22 @@
+# FLUX.1-schnell prompts for the undergrowth sprites in resources/art/props.
+# Regenerate with:
+#   python3 /Users/turpal/Documents/WORK/cf-flux/cf_flux.py --batch-file tools/undergrowth_prompts.txt --out-dir /tmp/flux_under --steps 6
+#   python3 tools/process_creature_art.py /tmp/flux_under resources/art/props --size 256
+# Order: fern_wide, grass_tuft, fallen_branch, glow_shrooms, leaf_litter, root_cluster
+#
+# Why these exist: the endless world scatters undergrowth in groves, and with one
+# fern sprite the same silhouette repeats hundreds of times per screen. These are
+# deliberately flat (viewed from directly above) and low-contrast, because they are
+# ground cover and must never read as a creature.
+
+a wide low clump of enchanted forest ferns, seven broad curling fronds spreading outward from a centre, deep emerald green with pale glowing edges, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a tuft of tall pale forest grass blades, thin curved stalks in muted sage and straw, a few tiny seed heads, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a fallen moss-covered branch lying flat on the forest floor, dark wet bark, emerald moss along the upper side, two small shelf fungi, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a small cluster of tiny pale cyan glowing mushrooms, five thin stems with translucent luminous caps, faint light pooling on the caps, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a patch of broad fallen leaves on a forest floor, overlapping teal and olive leaves, one or two curling at the edges, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size
+
+a low tangle of gnarled tree roots breaking through the forest floor, dark bark ridges, moss in the crevices, seen from directly above, hand-painted 2D game ground cover sprite, muted forest palette, flat top-down view, centered, isolated on a flat solid magenta background, no ground shadow, no text, no border, crisp clean silhouette readable at small size

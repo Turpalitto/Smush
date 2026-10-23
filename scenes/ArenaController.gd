@@ -21,6 +21,16 @@ const FLOOR_AO_PATH: String = "res://resources/art/environment/forest_floor_ao.p
 const FLOOR_AO_MEAN: float = 0.6977
 const FLOOR_RELIEF: float = 3.0
 const FLOOR_OCCLUSION: float = 0.55
+## The canopy's own shadow, baked from a leaf canopy under the same sun by
+## tools/bake_canopy_light.py. Not part of the floor tile: it repeats every few
+## tiles and sways, so the light moves across the ground.
+const FLOOR_LIGHT_PATH: String = "res://resources/art/environment/forest_canopy_light.png"
+const FLOOR_LIGHT_MEAN: float = 0.5140
+const FLOOR_DAPPLE: float = 0.50
+const FLOOR_LIGHT_SCALE: float = 1.45
+## Haze that pools in the canopy's shade, so the gaps read as light and the shade
+## reads as humid air rather than as dirt.
+const FLOOR_MIST: float = 0.6
 
 var world: WorldGenerator
 var player: PlayerSlime
@@ -116,10 +126,8 @@ func _ready() -> void:
 	camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 7.5
-	camera.limit_left = int(-WorldGenerator.ARENA_HALF_SIZE - 90.0)
-	camera.limit_right = int(WorldGenerator.ARENA_HALF_SIZE + 90.0)
-	camera.limit_top = int(-WorldGenerator.ARENA_HALF_SIZE - 90.0)
-	camera.limit_bottom = int(WorldGenerator.ARENA_HALF_SIZE + 90.0)
+	# No limit_* on purpose. The forest has no edge, so clamping the camera to one
+	# would reintroduce the border the world was just rebuilt to lose.
 	player.add_child(camera)
 
 	tutorial = TutorialManager.new()
@@ -256,6 +264,12 @@ func _setup_canopy_background() -> void:
 		canopy_mat.shader = sh
 		canopy_rect.material = canopy_mat
 		apply_floor_texture(canopy_mat, 1.0)
+		# The distance haze that replaces the arena border. Same numbers as the
+		# streamer uses to dissolve props, so floor and props recede together.
+		canopy_mat.set_shader_parameter("floor_fog", 1.0)
+		canopy_mat.set_shader_parameter("floor_fog_start", WorldGenerator.FOG_START)
+		canopy_mat.set_shader_parameter("floor_fog_end", WorldGenerator.FOG_END)
+		canopy_mat.set_shader_parameter("fog_tint", WorldGenerator.FOG_TINT)
 	else:
 		canopy_rect.color = Color(0.07, 0.16, 0.18)
 	canopy_bg.add_child(canopy_rect)
@@ -286,6 +300,14 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 		mat.set_shader_parameter("floor_ao", ao_tex)
 		mat.set_shader_parameter("floor_ao_mean", FLOOR_AO_MEAN)
 		mat.set_shader_parameter("floor_occlusion", FLOOR_OCCLUSION)
+
+	var light_tex := load(FLOOR_LIGHT_PATH) as Texture2D
+	if light_tex != null:
+		mat.set_shader_parameter("floor_light", light_tex)
+		mat.set_shader_parameter("floor_light_mean", FLOOR_LIGHT_MEAN)
+		mat.set_shader_parameter("floor_light_scale", FLOOR_LIGHT_SCALE)
+		mat.set_shader_parameter("floor_dapple", FLOOR_DAPPLE)
+		mat.set_shader_parameter("floor_mist", FLOOR_MIST)
 	return true
 
 
@@ -582,8 +604,18 @@ func _spawn_burst(pos: Vector2, col: Color, count: int = 8, ring_r: float = 0.0,
 # --- Player & World Interactions ---
 
 func clamp_world_point(pos: Vector2, radius: float) -> Vector2:
-	var lim := WorldGenerator.ARENA_HALF_SIZE - radius
-	return Vector2(clampf(pos.x, -lim, lim), clampf(pos.y, -lim, lim))
+	## The world has no edge any more, so there is nothing to clamp against — a wall
+	## you cannot see is worse than no wall. Kept as a function because it is called
+	## from every separation and knockback site; the only thing it still does is stop
+	## a runaway position (a NaN or a bad knockback impulse) from teleporting an
+	## entity so far out that the chunk streamer follows it into empty space.
+	const RUNAWAY_LIMIT: float = 40000.0
+	if not is_finite(pos.x) or not is_finite(pos.y):
+		return Vector2.ZERO
+	return Vector2(
+		clampf(pos.x, -RUNAWAY_LIMIT, RUNAWAY_LIMIT),
+		clampf(pos.y, -RUNAWAY_LIMIT, RUNAWAY_LIMIT)
+	)
 
 
 func constrain_player_position(pos: Vector2, p_radius: float, is_dashing: bool) -> Vector2:
@@ -1049,6 +1081,40 @@ func _cleanup_pools() -> void:
 		var fx := node as BurstFX
 		if fx != null and fx.is_expired():
 			fx_pool.release(fx)
+
+	# Recycle whatever the player has left behind. This is what the arena border used
+	# to do for free: in a 2560 px box nothing could drift out of reach, so nothing
+	# accumulated. In an endless forest the pools are the only thing with a size, and
+	# they fill up with orphans — 85 orbs dropped three kilometres back are 85 orbs
+	# that will never appear near the player, and the spawner silently stops. The
+	# first endless playthrough died to exactly this: 44 absorptions instead of 261
+	# and a 103-second stretch with nothing to eat.
+	if player != null:
+		var ppos := player.global_position
+		var keep_r := WorldGenerator.FOG_END + 220.0
+		var keep_sq := keep_r * keep_r
+		# Orbs are recycled at the edge of the visible field, not at the fog: the pool
+		# is a fixed 85, and an orb parked off-screen still occupies a slot that could
+		# be feeding the player right now. Enemies get the wider radius because they
+		# are walking in, not lying there.
+		var orb_r := WorldGenerator.FOG_END - 200.0
+		var orb_sq := orb_r * orb_r
+
+		for node in orb_pool.get_active_items().duplicate():
+			var orb := node as CollectibleOrb
+			if orb != null and orb.visible and orb.global_position.distance_squared_to(ppos) > orb_sq:
+				orb_pool.release(orb)
+
+		for node in enemy_pool.get_active_items().duplicate():
+			var en := node as EnemyEntity
+			if en == null or not en.visible or en.is_miniboss:
+				continue
+			# The miniboss and the boss are encounters, not spawn traffic: they are
+			# tracked by the run and must survive being outrun.
+			if en == _tracked_miniboss:
+				continue
+			if en.global_position.distance_squared_to(ppos) > keep_sq:
+				enemy_pool.release(en)
 
 	for i in range(active_clones.size() - 1, -1, -1):
 		var cl := active_clones[i]

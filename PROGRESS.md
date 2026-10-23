@@ -235,11 +235,11 @@
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
-  - `./scripts/run_qa.sh` → **551 assertions, 0 failures**, `exit 0` (`reports/macos-source-qa-environment-2026-10-23.log`);
-  - автоматизированное прохождение `VICTORY` за `330.3 с` + запись шины `Master`
-    (`reports/macos-automated-playthrough-environment-2026-10-23.json`; прогоны прошлых итераций —
-    `reports/macos-automated-playthrough-art-2026-10-22.json`, `reports/macos-automated-playthrough-2026-10-22.json`,
-    консоль `reports/macos-playthrough-console-2026-10-22.log`);
+  - `./scripts/run_qa.sh` → **591 assertions, 0 failures**, `exit 0`;
+  - автоматизированное прохождение `VICTORY` за `301.7 с` + запись шины `Master`
+    (`reports/macos-automated-playthrough-endless-2026-10-23.json`; прогоны прошлых итераций —
+    `reports/macos-automated-playthrough-canopy-2026-10-23.json`,
+    `reports/macos-automated-playthrough-art-2026-10-22.json`, `reports/macos-automated-playthrough-2026-10-22.json`);
   - пакет `deliverables/SlimeRushEvolution_macOS_Universal_Playtest_v1.0.0.zip` (64 MiB, universal `x86_64+arm64`) + `.sha256` + `.build.json`;
   - скриншоты `deliverables/macos_screenshots/` — 23 реальных кадра GPU (`720x1280`, `540x1200`, `1080x1920`, `1280x720`),
     включая `16_creatures_grid` / `17_bestiary_painted` / `18_boss_and_miniboss_painted` с артом существ

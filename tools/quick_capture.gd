@@ -108,6 +108,12 @@ func _enter_arena() -> void:
 		await _tap(start_btn)
 	for _i in range(3):
 		await get_tree().process_frame
+	print("WORLD chunks=%d props=%d decor=%d children=%d" % [
+		main.arena.world.streamed_chunk_count(),
+		main.arena.world.obstacles.size(),
+		main.arena.world.decor_flora.size(),
+		main.arena.world.get_node("Chunks").get_child_count() if main.arena.world.get_node_or_null("Chunks") != null else -1,
+	])
 
 
 func _apply_floor_overrides() -> void:

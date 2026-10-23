@@ -446,8 +446,9 @@ func _compute_steering() -> Vector2:
 			steer += (-ppos).normalized() * 0.6 + Vector2.RIGHT.rotated(arena.run_elapsed * 0.5) * 0.5
 
 		if threat_d < 215.0:
-			# Run away, but curve toward the arena centre: a straight escape pins the slime
-			# against the wall where the miniboss's contact damage finishes it.
+			# Run away, but curve toward the world origin: a straight escape lets a
+			# lunging chaser cut the corner and keeps the slime in contact for the whole
+			# chase. Curving keeps the distance while still travelling.
 			var away := (ppos - threat_pos).normalized() if threat_d > 0.5 else Vector2.UP
 			var tangent := away.orthogonal()
 			if tangent.dot(-ppos) < 0.0:
@@ -468,7 +469,11 @@ func _compute_steering() -> Vector2:
 				var push := dv.normalized() if dist > 0.5 else Vector2.UP
 				steer = (steer * 0.25 + push * 2.1).normalized()
 
-	var lim := WorldGenerator.ARENA_HALF_SIZE - 130.0
+	# No arena wall to avoid any more — the forest is endless. This is a leash on the
+	# bot, not on the player: an unattended run should stay in the interesting part of
+	# the world instead of chasing a stray enemy for a kilometre. 1800 px is wide
+	# enough that the run crosses several chunk boundaries and exercises streaming.
+	var lim := 1800.0
 	if absf(ppos.x) > lim:
 		steer.x -= signf(ppos.x) * 1.2
 	if absf(ppos.y) > lim:

@@ -68,7 +68,7 @@ def measure_backdrop_hue(rgb: Image.Image) -> float:
     return sat_hues[len(sat_hues) // 2]
 
 
-def cutout(img: Image.Image) -> Image.Image:
+def cutout(img: Image.Image, key_mode: str = "flood") -> Image.Image:
     rgb = img.convert("RGB")
     w, h = rgb.size
     px = rgb.load()
@@ -97,25 +97,34 @@ def cutout(img: Image.Image) -> Image.Image:
             seen[idx] = 1
             queue.append(idx)
 
-    for x in range(w):
-        push(x)
-        push((h - 1) * w + x)
-    for y in range(h):
-        push(y * w)
-        push(y * w + w - 1)
+    if key_mode == "color":
+        # Ground cover only. A clump of fronds has backdrop showing *through* it, and
+        # those holes are enclosed by the silhouette, so the edge flood fill keeps
+        # them and the sprite ships with magenta patches between the leaves. These
+        # sprites have no magenta details worth protecting, so the whole band goes.
+        for idx in range(w * h):
+            if candidate[idx]:
+                ap[idx % w, idx // w] = 0
+    else:
+        for x in range(w):
+            push(x)
+            push((h - 1) * w + x)
+        for y in range(h):
+            push(y * w)
+            push(y * w + w - 1)
 
-    while queue:
-        idx = queue.popleft()
-        ap[idx % w, idx // w] = 0
-        x = idx % w
-        if x > 0:
-            push(idx - 1)
-        if x < w - 1:
-            push(idx + 1)
-        if idx >= w:
-            push(idx - w)
-        if idx < (h - 1) * w:
-            push(idx + w)
+        while queue:
+            idx = queue.popleft()
+            ap[idx % w, idx // w] = 0
+            x = idx % w
+            if x > 0:
+                push(idx - 1)
+            if x < w - 1:
+                push(idx + 1)
+            if idx >= w:
+                push(idx - w)
+            if idx < (h - 1) * w:
+                push(idx + w)
 
     # 3. Kill the 1px magenta fringe JPEG leaves on the silhouette, then soften the
     #    cut so the sprite does not look like a sticker pasted on the arena floor.
@@ -175,6 +184,11 @@ def main() -> int:
     ap.add_argument("--size", type=int, default=256)
     ap.add_argument("--manifest", default="", help="JSON mapping raw filename -> sprite id")
     ap.add_argument("--icons-from", default="", help="Derive UI icons from this sprite dir")
+    ap.add_argument("--key-mode", default="flood", choices=("flood", "color"),
+                    help="flood: clear only backdrop reachable from the frame edge "
+                         "(default, protects enclosed hot-pink details); "
+                         "color: clear the whole backdrop hue band (ground cover, "
+                         "where the backdrop shows through gaps in the silhouette)")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -199,7 +213,7 @@ def main() -> int:
         if src.stem.endswith("_cut"):
             continue
         target = names.get(src.name, src.stem)
-        img = cutout(Image.open(src))
+        img = cutout(Image.open(src), args.key_mode)
         img = autocrop(img)
         img = img.resize((args.size, args.size), Image.LANCZOS)
         dst = out_dir / f"{target}.png"
