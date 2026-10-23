@@ -84,9 +84,18 @@ func _populate_choices(choices: Array) -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(0, 128)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.add_theme_stylebox_override("normal", UIThemeBuilder.make_box(Color(0.08, 0.17, 0.20, 0.98), border_col, 18, 3, 14, 12))
-		btn.add_theme_stylebox_override("hover", UIThemeBuilder.make_box(Color(0.13, 0.25, 0.28, 1.0), border_col.lightened(0.25), 18, 3, 14, 12))
-		btn.add_theme_stylebox_override("pressed", UIThemeBuilder.make_box(Color(0.06, 0.14, 0.17, 1.0), Color(0.85, 1.0, 0.92), 18, 3, 14, 12))
+		# The card is tinted a little toward its rarity and carries a rarity-coloured
+		# halo, so the rarity is readable from the row without reading the word
+		# "Обычная" on every card. Layout and hit area are unchanged.
+		var card_bg := Color(0.08, 0.17, 0.20, 0.98).lerp(border_col, 0.10)
+		var halo := Color(border_col.r, border_col.g, border_col.b, 0.20)
+		var halo_hi := Color(border_col.r, border_col.g, border_col.b, 0.36)
+		btn.add_theme_stylebox_override("normal",
+			UIThemeBuilder.make_box(card_bg, border_col, 18, 3, 14, 12, halo, 9))
+		btn.add_theme_stylebox_override("hover",
+			UIThemeBuilder.make_box(card_bg.lightened(0.06), border_col.lightened(0.25), 18, 3, 14, 12, halo_hi, 15))
+		btn.add_theme_stylebox_override("pressed",
+			UIThemeBuilder.make_box(Color(0.06, 0.14, 0.17, 1.0), Color(0.85, 1.0, 0.92), 18, 3, 14, 12, halo_hi, 12))
 		btn.pressed.connect(func() -> void:
 			if arena != null:
 				arena.select_draft_mutation(mid)

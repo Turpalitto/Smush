@@ -112,8 +112,15 @@ static func t_for_mass(m: float) -> float:
 
 
 static func progress_to_next(m: float) -> float:
-	## 0..1 within the current stage, for the HUD ring.
+	## 0..1 within the current stage, for the HUD bar.
+	##
+	## At the top of the ladder `t` clamps to COUNT, so `t - floor(t)` is 0 and the
+	## bar sat empty while the label read "Рост 15/15" — seen in the boss-phase-3
+	## capture at mass 110.3. There is no sixteenth stage, so full is the honest
+	## reading once the last threshold is passed.
 	var t := t_for_mass(m)
+	if t >= float(COUNT):
+		return 1.0
 	return t - floorf(t)
 
 

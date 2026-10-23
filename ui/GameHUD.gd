@@ -360,8 +360,15 @@ func _refresh_evo_label() -> void:
 	# slime does. A full bar at stage 15 stays full and gold.
 	var look := EvolutionStages.look_at(EvolutionStages.t_for_mass(arena.player.mass))
 	var col: Color = look.get("body_c", Color(0.2, 0.82, 0.66))
+	var fill := col.lerp(Color.WHITE, 0.15)
 	_evo_bar.add_theme_stylebox_override("fill",
-		UIThemeBuilder.make_box(col.lerp(Color.WHITE, 0.15), Color.TRANSPARENT, 8, 0, 2, 2))
+		UIThemeBuilder.make_box(fill, Color.TRANSPARENT, 8, 0, 2, 2))
+	# The label sits on the fill, and the fill follows the stage: by stage 13 it is
+	# pale gold and white text on it is unreadable. Flip the label to dark ink once
+	# the fill is light, instead of keeping one colour for the whole ladder.
+	var ink := Color(0.09, 0.13, 0.12, 0.92) if fill.get_luminance() > 0.55 \
+		else Color(1.0, 1.0, 1.0, 0.95)
+	_mass_label.add_theme_color_override("font_color", ink)
 
 
 func _sync_joystick_skill_guard() -> void:

@@ -115,6 +115,13 @@ func _test_growth_is_continuous() -> void:
 		if p < 0.0 or p > 1.0:
 			ring_ok = false
 	assert_true(ring_ok, "Stage progress stays within 0..1")
+	# At the top of the ladder the bar must read full, not empty: t clamps to COUNT,
+	# so the old implementation returned 0 at mass 104+ while the label said 15/15.
+	var top_mass: float = EvolutionStages.MASS_KEYS[EvolutionStages.COUNT - 1]
+	assert_approx(EvolutionStages.progress_to_next(top_mass), 1.0, 0.001,
+		"Final stage shows a full growth bar")
+	assert_approx(EvolutionStages.progress_to_next(top_mass + 40.0), 1.0, 0.001,
+		"Growth bar stays full past the last threshold")
 
 
 func _test_environment_follows_growth() -> void:
