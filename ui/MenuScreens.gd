@@ -48,10 +48,21 @@ func _ready() -> void:
 		if ArenaController.apply_floor_texture(mat, 0.55):
 			mat.set_shader_parameter("floor_tile_px", 1400.0)
 			mat.set_shader_parameter("world_offset", Vector2(240.0, 90.0))
+		# The menu is not a run, but it should still promise the forest the game
+		# becomes. At growth 0 the floor is the coldest state in the whole game —
+		# near-black teal — which undersells the subtitle "Зачарованный лес" on the
+		# very first screen. A fixed mid growth gives it the warm light and the
+		# open vignette without touching gameplay.
+		mat.set_shader_parameter("growth", 0.62)
 		bg.material = mat
 	else:
 		bg.color = Color(0.06, 0.14, 0.17)
 	add_child(bg)
+
+	# Drifting motes and a few glowing blooms over the floor, under the UI.
+	var garden := MenuGarden.new()
+	garden.name = "MenuGarden"
+	add_child(garden)
 
 	var root_vbox := VBoxContainer.new()
 	root_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
