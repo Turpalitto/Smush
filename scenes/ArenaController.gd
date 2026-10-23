@@ -29,8 +29,11 @@ const FLOOR_LIGHT_MEAN: float = 0.5140
 const FLOOR_DAPPLE: float = 0.50
 const FLOOR_LIGHT_SCALE: float = 1.45
 ## Haze that pools in the canopy's shade, so the gaps read as light and the shade
-## reads as humid air rather than as dirt.
+## reads as humid air rather than as dirt. The shade cools down at stage 1 and
+## warms up with the slime, which is why the pair lives here and not in the shader.
 const FLOOR_MIST: float = 0.6
+const MIST_TINT_COLD: Color = Color(0.055, 0.105, 0.115)
+const MIST_TINT_WARM: Color = Color(0.108, 0.112, 0.060)
 
 var world: WorldGenerator
 var player: PlayerSlime
@@ -39,6 +42,8 @@ var tutorial: TutorialManager
 var canopy_bg: CanvasLayer
 var canopy_rect: ColorRect
 var canopy_mat: ShaderMaterial
+## Screen-space grade driven by growth. One fullscreen pass, see ui/WorldMood.gd.
+var mood: WorldMood
 
 var enemy_grid: SpatialHashGrid = SpatialHashGrid.new(180.0)
 var orb_grid: SpatialHashGrid = SpatialHashGrid.new(160.0)
@@ -97,6 +102,8 @@ func _ready() -> void:
 	Events.boss_updated.connect(_on_boss_updated)
 	Events.boss_defeated.connect(_on_boss_defeated_feel)
 	Events.miniboss_spawned.connect(_on_miniboss_spawned_feel)
+	Events.player_mass_changed.connect(_on_player_mass_changed)
+	Events.growth_stage_changed.connect(_on_growth_stage_changed)
 
 	world = WorldGenerator.new()
 	world.name = "EnchantedForest"
@@ -121,6 +128,12 @@ func _ready() -> void:
 	player = PlayerSlime.new()
 	player.name = "PlayerSlime"
 	_entities_layer.add_child(player)
+
+	# After the player exists: the grade needs a target to light.
+	mood = WorldMood.new()
+	add_child(mood)
+	mood.set_player(player)
+	mood.set_growth(EvolutionStages.env_for_mass(player.mass))
 
 	camera = Camera2D.new()
 	camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
@@ -230,6 +243,48 @@ func _update_game_feel(delta: float) -> void:
 func _on_player_damaged(_amount: float, _source_id: String) -> void:
 	add_shake(9.0, 0.24)
 	Haptics.play("damage")
+
+
+func _on_player_mass_changed(new_mass: float, _radius: float) -> void:
+	## The world wakes up with the slime. One number, computed from the same ladder
+	## the body uses, so the character and the forest never disagree about how grown
+	## the player is.
+	_apply_env_growth(EvolutionStages.env_for_mass(new_mass))
+
+
+func _apply_env_growth(env: float) -> void:
+	## Three levers, all driven by the same 0..1 value: the streamed props and their
+	## fireflies (WorldGenerator), the floor shader's warmth, and the screen grade.
+	## Nothing here rebuilds a chunk or allocates.
+	var v := clampf(env, 0.0, 1.0)
+	if world != null:
+		world.set_growth(v)
+	if mood != null:
+		mood.set_growth(v)
+	if canopy_mat != null:
+		canopy_mat.set_shader_parameter("growth", v)
+		canopy_mat.set_shader_parameter("fog_tint",
+			WorldGenerator.FOG_TINT.lerp(WorldGenerator.FOG_TINT_WARM, v))
+		canopy_mat.set_shader_parameter("mist_tint", MIST_TINT_COLD.lerp(MIST_TINT_WARM, v))
+
+
+func _on_growth_stage_changed(stage_idx: int, name_key: String) -> void:
+	## A stage change is a visible event, not a stat tick: the body pops, a ring of
+	## light goes out, and the name is announced.
+	if player == null:
+		return
+	var look := EvolutionStages.look_at(player.visual.growth_t if player.visual != null else 1.0)
+	var col: Color = look.get("rim_c", Color(0.8, 1.0, 0.9))
+	_spawn_burst(player.global_position, col, 14, 62.0)
+	Events.toast_requested.emit(Loc.t(name_key), col)
+	Haptics.play("evolve")
+	# The moment has to be audible and visible across the whole screen, not just at
+	# the slime: a ring of light washes over the forest, and the same evolution bell
+	# plays a step higher on every rung, so the ladder is a melody you climb.
+	if mood != null:
+		mood.flash(col.lerp(Color.WHITE, 0.35), 0.85)
+	var semis := float(stage_idx - 1) * 1.5
+	Audio.play_sfx("evolution", 0.82 * pow(2.0, semis / 12.0))
 
 
 func _on_boss_updated(_current_hp: float, _max_hp: float, phase: int) -> void:
@@ -357,6 +412,7 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	world.generate_world(world_seed)
 	player.global_position = Vector2.ZERO
 	player.initialize_for_run(self)
+	_apply_env_growth(0.0)
 
 	# Populate initial welcoming spores & passive creatures around central clearing
 	for _i in range(16):

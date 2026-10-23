@@ -118,6 +118,7 @@ func _sync_mass_metrics() -> void:
 		circle_shape.radius = r * 0.86
 	if visual != null:
 		visual.radius = r
+		visual.set_growth(mass)
 		visual.mutation_levels = mutations.levels
 		visual.active_synergies = mutations.active_synergies
 	Events.player_mass_changed.emit(mass, r)

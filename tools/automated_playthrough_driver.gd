@@ -418,14 +418,20 @@ func _compute_steering() -> Vector2:
 				if sc > best_score:
 					best_score = sc
 					best_target = en.global_position - ppos
-			elif en.contact_damage >= 14.0:
+			elif en.contact_damage >= 6.0:
 				if d < 175.0:
 					steer -= (en.global_position - ppos).normalized() * ((180.0 - d) / 90.0)
 				# Remember the nearest threat that can actually catch the slime: the escape
 				# below overrides foraging, because a nudge is not enough against a miniboss
 				# that closes faster than the slime runs (that is what used to corner the bot).
 				# A slow heavy hitter (predator_flower) is left to the mild repulsion above.
-				if (en.is_miniboss or en.move_speed >= 95.0) and d < threat_d:
+				#
+				# Anything at body-contact range is an emergency regardless of speed or
+				# damage: on one playthrough a stone_slug dealt 8 hits in 8 seconds to a
+				# bot that steered straight through it, because 11.9 damage sat under the
+				# old 14.0 threshold and the slug is too slow to qualify as a threat. The
+				# game was not at fault — the bot had no rule for "I am inside it".
+				if (en.is_miniboss or en.move_speed >= 95.0 or d < 115.0) and d < threat_d:
 					threat_d = d
 					threat_pos = en.global_position
 
@@ -614,9 +620,13 @@ func _physics_process(_delta: float) -> void:
 
 	if arena.run_elapsed >= _next_heartbeat_sec:
 		var b_hp := -1.0
+		var b_state := "-"
+		var b_dist := -1.0
 		if is_instance_valid(arena.active_boss):
 			b_hp = roundf(arena.active_boss.hp)
-		print("HEARTBEAT t=", roundf(arena.run_elapsed), "s hp=", roundf(player.hp), " mass=", roundf(player.mass), " evo=", player.evolution_level, " boss_hp=", b_hp)
+			b_state = str(arena.active_boss.action_state)
+			b_dist = roundf(arena.active_boss.global_position.distance_to(player.global_position))
+		print("HEARTBEAT t=", roundf(arena.run_elapsed), "s hp=", roundf(player.hp), " mass=", roundf(player.mass), " evo=", player.evolution_level, " boss_hp=", b_hp, " boss_state=", b_state, " boss_dist=", b_dist)
 		_next_heartbeat_sec += 30.0
 
 	if not _stutter_checked and arena.run_elapsed > 32.0 and player.mutations.has_mutation("dash") and player.dash_cooldown <= 0.0:

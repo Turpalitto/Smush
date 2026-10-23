@@ -17,6 +17,8 @@ signal narrow_passage_blocked()
 
 # Evolution & Mutations
 signal evolution_progress_changed(current_xp: float, threshold_xp: float, level: int)
+## The body changed shape, not just a number: stage is 1..15 on the growth ladder.
+signal growth_stage_changed(stage: int, name_key: String)
 signal mutation_draft_requested(choices: Array)
 signal mutation_applied(mutation_id: String, new_level: int)
 signal synergy_activated(synergy_id: String)

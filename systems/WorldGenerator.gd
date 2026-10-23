@@ -46,6 +46,10 @@ const PROPS_PER_CHUNK: float = 1.6
 const FOG_START: float = 460.0
 const FOG_END: float = 1250.0
 const FOG_TINT: Color = Color(0.050, 0.098, 0.105)
+## The haze warms as the slime grows: at stage 1 the far field is cold cave air, by
+## stage 15 it is the same air lit from the grove. `fog_tint` below is the live
+## value; this is only the starting point and the target of the interpolation.
+const FOG_TINT_WARM: Color = Color(0.100, 0.118, 0.070)
 ## Sentinel chunk id for things that are not owned by a chunk (the gate pillars).
 ## _free_chunk filters by chunk id, so this key guarantees they are never dropped.
 const GATE_CHUNK: Vector2i = Vector2i(0x3FFFFFFF, 0x3FFFFFFF)
@@ -75,6 +79,12 @@ const PROP_TEXTURES: Dictionary = {
 	"fallen_branch": PROP_DIR + "fallen_branch.png",
 	"glow_shrooms": PROP_DIR + "glow_shrooms.png",
 	"root_cluster": PROP_DIR + "root_cluster.png",
+	# Bloom set, generated with FLUX (tools/bloom_prompts.txt). These are the
+	# opposite of the glow mushrooms: warm gold, and invisible until the slime has
+	# grown enough to wake the grove. See _bloom_entries.
+	"bloom_pod": PROP_DIR + "bloom_pod.png",
+	"bloom_flower": PROP_DIR + "bloom_flower.png",
+	"bloom_bells": PROP_DIR + "bloom_bells.png",
 }
 ## Decor kinds. `px` is the drawn width at scale 1.0, `shadow` the radius of the
 ## contact shadow, `sway` the rotation amplitude (0 for anything lying flat — a
@@ -88,7 +98,15 @@ const DECOR_KINDS: Dictionary = {
 	5: {"prop": "fallen_branch", "px": 104.0, "tint": Color(0.60, 0.60, 0.56), "shadow": 38.0, "sway": 0.0},
 	6: {"prop": "glow_shrooms", "px": 46.0, "tint": Color(0.70, 0.90, 0.96), "shadow": 17.0, "sway": 0.025},
 	7: {"prop": "root_cluster", "px": 98.0, "tint": Color(0.54, 0.54, 0.50), "shadow": 36.0, "sway": 0.0},
+	# 8..10 are the bloom set: streamed with every chunk like the rest of the
+	# undergrowth, but faded in by growth (set_growth writes their alpha). That is
+	# what lets the same forest bloom around the player without regenerating a chunk.
+	8: {"prop": "bloom_pod", "px": 48.0, "tint": Color(0.90, 0.82, 0.62), "shadow": 17.0, "sway": 0.030},
+	9: {"prop": "bloom_flower", "px": 52.0, "tint": Color(0.94, 0.86, 0.64), "shadow": 18.0, "sway": 0.038},
+	10: {"prop": "bloom_bells", "px": 52.0, "tint": Color(0.92, 0.84, 0.60), "shadow": 16.0, "sway": 0.045},
 }
+## First decor kind that belongs to the bloom set.
+const BLOOM_KIND_MIN: int = 8
 ## How wide a prop is drawn relative to its collision radius. Props are meant to
 ## overhang their hitbox slightly, the way the painted silhouette suggests volume.
 const PROP_WIDTH_PER_RADIUS: float = 2.45
@@ -104,6 +122,20 @@ const SPORE_RADIUS: float = 1300.0
 ## pass both want to iterate it, and 60-90 entries do not need a spatial index.
 var obstacles: Array[Dictionary] = [] # {pos, radius, kind, chunk}
 var narrow_gates: Array[Dictionary] = [] # {center, axis, half_gap}
+
+## How alive the forest looks, 0..1, driven by the player's growth stage. The world
+## does not regenerate — it brightens: the glowing flora already standing around
+## the player lifts, fireflies appear, and a soft aura of the grove follows the
+## slime. That way growth is visible in the environment without a single new chunk.
+var growth: float = 0.0
+## Live haze colour: FOG_TINT at stage 1, FOG_TINT_WARM at stage 15. _apply_fog
+## reads this, so the far field warms with the player instead of staying cold.
+var fog_tint: Color = FOG_TINT
+var _glow_entries: Array[Dictionary] = []
+## Bloom-set sprites: {"entry": <fogged entry>, "base": <original tint>}. Their alpha
+## is owned by set_growth, so the grove flowers as the slime grows.
+var _bloom_entries: Array[Dictionary] = []
+var _growth_applied: float = -1.0
 var decor_flora: Array[Dictionary] = []
 var ambient_spores: Array[Dictionary] = []
 
@@ -165,6 +197,11 @@ func generate_world(seed_val: int = 0) -> void:
 	decor_flora.clear()
 	ambient_spores.clear()
 	_fogged.clear()
+	# These two index into _fogged, so they must die with it. They used to be left
+	# behind: the entries then pointed at nodes that generate_world had freed, and
+	# the next growth tick cast a freed object (seen in a capture run, not in QA).
+	_glow_entries.clear()
+	_bloom_entries.clear()
 	_swayers.clear()
 	_chunks.clear()
 	_pending.clear()
@@ -268,6 +305,46 @@ func streamed_chunk_count() -> int:
 	return _chunks.size()
 
 
+func set_growth(g: float) -> void:
+	## 0..1 world bloom, driven by the player's growth stage. The forest is not
+	## regenerated: the glowing flora that is already standing around the player
+	## lifts, and _draw adds fireflies and a grove aura on top. That keeps growth
+	## visible in the environment without rebuilding a single chunk, and keeps the
+	## cost at one modulate write per glow mushroom when the value actually moves.
+	var v := clampf(g, 0.0, 1.0)
+	if absf(v - _growth_applied) < 0.01:
+		return
+	_growth_applied = v
+	growth = v
+	fog_tint = FOG_TINT.lerp(FOG_TINT_WARM, v)
+	for g_entry: Dictionary in _glow_entries:
+		var e: Dictionary = g_entry["entry"]
+		var b: Color = g_entry["base"]
+		var k := 1.0 + v * 1.25
+		e["base"] = Color(minf(1.7, b.r * k), minf(1.7, b.g * k), minf(1.7, b.b * k), b.a)
+	for b_entry: Dictionary in _bloom_entries:
+		_apply_bloom(b_entry["entry"], b_entry["base"], v)
+	queue_redraw()
+
+
+func _apply_bloom(entry: Dictionary, base: Color, v: float) -> void:
+	## The bloom set is present in every chunk but only visible once the grove has
+	## woken. Written into the fog entry's `base` rather than straight onto the
+	## sprite, because _apply_fog rewrites modulate from `base` every third frame
+	## and would otherwise erase the fade within 50 ms.
+	var raw: Variant = entry.get("node")
+	var node: Sprite2D = null
+	if raw != null and is_instance_valid(raw):
+		node = raw as Sprite2D
+	var a := clampf((v - 0.10) / 0.90, 0.0, 1.0)
+	# Slight warm lift as well as the alpha: a flower that fades in without getting
+	# brighter reads as a cross-fade, not as something opening.
+	var k := 1.0 + a * 0.22
+	entry["base"] = Color(minf(1.6, base.r * k), minf(1.6, base.g * k), minf(1.6, base.b * k), base.a * a)
+	if node != null and is_instance_valid(node):
+		node.visible = a > 0.02
+
+
 func _chunk_seed(cx: int, cy: int) -> int:
 	## Integer hash of the chunk coordinate. The forest is a pure function of
 	## (chunk, world seed), which is what makes walking away and back idempotent.
@@ -366,6 +443,27 @@ func _chunk_content(cx: int, cy: int) -> Dictionary:
 			"hue": rng.randf_range(0.36, 0.56),
 		})
 
+	# Bloom set. Always generated — the forest is the same forest at every stage —
+	# but faded in by growth, so a stage-1 run never sees it and a stage-15 run is
+	# walking through it. Two or three per chunk, in their own loose cluster so they
+	# read as a flowering patch rather than as a sprinkle.
+	var bloom_centre := origin + Vector2(
+		rng.randf_range(60.0, CHUNK_SIZE - 60.0),
+		rng.randf_range(60.0, CHUNK_SIZE - 60.0)
+	)
+	if bloom_centre.length() >= 170.0:
+		for _i in range(rng.randi_range(2, 3)):
+			var bpos := bloom_centre + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(10.0, 86.0)
+			if bpos.length() < 120.0:
+				continue
+			decor.append({
+				"pos": bpos,
+				"scale": rng.randf_range(0.55, 1.05),
+				"kind": rng.randi_range(BLOOM_KIND_MIN, BLOOM_KIND_MIN + 2),
+				"phase": rng.randf() * TAU,
+				"hue": rng.randf_range(0.09, 0.16),
+			})
+
 	return {"props": props, "decor": decor}
 
 
@@ -457,6 +555,20 @@ func _free_chunk(key: Vector2i) -> void:
 			kept_fog.append(f)
 	_fogged = kept_fog
 
+	var kept_glow: Array[Dictionary] = []
+	for g: Dictionary in _glow_entries:
+		var ge: Dictionary = g["entry"]
+		if ge.get("chunk") != key:
+			kept_glow.append(g)
+	_glow_entries = kept_glow
+
+	var kept_bloom: Array[Dictionary] = []
+	for b: Dictionary in _bloom_entries:
+		var be: Dictionary = b["entry"]
+		if be.get("chunk") != key:
+			kept_bloom.append(b)
+	_bloom_entries = kept_bloom
+
 
 func _add_static_pillar(d: Dictionary, root: Node2D, key: Vector2i = GATE_CHUNK) -> Dictionary:
 	var pos: Vector2 = d["pos"]
@@ -533,6 +645,19 @@ func _add_decor_sprite(d: Dictionary, root: Node2D, key: Vector2i) -> void:
 			"chunk": key,
 		})
 	_fogged.append({"node": sp, "base": base_col, "chunk": key})
+	if kind == 6:
+		# Glow mushrooms are the one piece of flora that reacts to growth: their
+		# base tint is lifted in set_growth(), and because _apply_fog rewrites
+		# modulate from `base`, the lift survives the haze pass for free.
+		_glow_entries.append({"entry": _fogged[_fogged.size() - 1], "base": base_col})
+	elif kind >= BLOOM_KIND_MIN:
+		# Bloom set: same mechanism, but the growth value writes the alpha instead
+		# of the colour. A chunk streamed in at stage 9 must appear already half
+		# open, so the current value is applied here rather than only on the next
+		# growth change.
+		var entry: Dictionary = _fogged[_fogged.size() - 1]
+		_bloom_entries.append({"entry": entry, "base": base_col})
+		_apply_bloom(entry, base_col, growth)
 
 
 # --- Spawn helpers ---
@@ -656,7 +781,7 @@ func _apply_fog(p: Vector2) -> void:
 			continue
 		var f := (d - FOG_START) / (FOG_END - FOG_START)
 		f = f * f * (3.0 - 2.0 * f)
-		var m := base.lerp(FOG_TINT, f)
+		var m := base.lerp(fog_tint, f)
 		m.a = base.a * (1.0 - f)
 		sp.modulate = m
 
@@ -679,6 +804,7 @@ func _draw() -> void:
 
 	# Decorative flora: painted props get a contact shadow only; the moss pad is
 	# still a drawn patch because it is flat on the ground by definition.
+	var bloom_f := clampf((growth - 0.10) / 0.90, 0.0, 1.0)
 	for fl: Dictionary in decor_flora:
 		var fp: Vector2 = fl["pos"]
 		var fd := fp.distance_to(p)
@@ -686,10 +812,17 @@ func _draw() -> void:
 			continue
 		var fade := _fog_fade(fd)
 		var sc: float = float(fl["scale"])
-		if int(fl["kind"]) == 1:
+		var fkind := int(fl["kind"])
+		if fkind >= BLOOM_KIND_MIN:
+			# A closed flower has no shadow. Without this the ground showed a ring of
+			# shadows around nothing for the first half of every run.
+			fade *= bloom_f
+			if fade <= 0.01:
+				continue
+		if fkind == 1:
 			draw_circle(fp, 22.0 * sc, Color(0.14, 0.34, 0.28, 0.38 * fade))
 		else:
-			var spec: Dictionary = DECOR_KINDS.get(int(fl["kind"]), {})
+			var spec: Dictionary = DECOR_KINDS.get(fkind, {})
 			_draw_ground_shadow(fp, float(spec.get("shadow", 19.0)) * sc, 0.20 * fade)
 
 	# Narrow passage floor rune markers (reacts to player size for instant tactical clarity!)
@@ -735,6 +868,40 @@ func _draw() -> void:
 				continue
 			var a := (0.35 + 0.25 * sin(_anim_time * 2.5 + float(sp["phase"]))) * _fog_fade(sd)
 			draw_circle(sp_pos, float(sp["size"]), Color(0.68, 1.0, 0.85, a))
+
+	if growth > 0.02:
+		_draw_growth_life(p)
+
+
+func _draw_growth_life(p: Vector2) -> void:
+	## Fireflies and the grove aura. Both are pure functions of index and time, so
+	## they need no state, cannot drift, and cost nothing when growth is low.
+	##
+	## The aura is deliberately two very faint discs rather than a gradient: a real
+	## radial gradient would need a texture, and at this alpha over a textured floor
+	## the banding is invisible.
+	var warm := Color(0.78, 1.0, 0.82)
+	if growth > 0.45:
+		warm = warm.lerp(Color(1.0, 0.94, 0.70), (growth - 0.45) / 0.55)
+	draw_circle(p, 300.0, Color(warm.r, warm.g, warm.b, 0.020 * growth))
+	draw_circle(p, 190.0, Color(warm.r, warm.g, warm.b, 0.026 * growth))
+
+	var count := int(round(growth * 26.0))
+	for i in range(count):
+		# Hash the index into a stable spot in a disc around the player.
+		var hx := fmod(sin(float(i) * 12.9898) * 43758.5453, 1.0)
+		var hy := fmod(sin(float(i) * 78.233) * 12345.6789, 1.0)
+		var hz := fmod(sin(float(i) * 39.425) * 24634.6345, 1.0)
+		var ang := (hx * TAU) + _anim_time * (0.06 + 0.05 * hz)
+		var rad := 170.0 + absf(hy) * 470.0
+		var pos := p + Vector2(cos(ang) * rad, sin(ang) * rad * 0.78)
+		pos.y += sin(_anim_time * (0.7 + hz) + float(i)) * 16.0
+		var tw := 0.45 + 0.55 * sin(_anim_time * (2.0 + hz * 1.8) + float(i) * 2.3)
+		var a := tw * growth * _fog_fade(pos.distance_to(p))
+		if a <= 0.02:
+			continue
+		draw_circle(pos, 2.6 + 1.6 * tw, Color(warm.r, warm.g, warm.b, 0.16 * a))
+		draw_circle(pos, 1.2 + 0.7 * tw, Color(1.0, 1.0, 0.92, 0.85 * a))
 
 
 func _draw_ground_shadow(center: Vector2, radius: float, alpha: float) -> void:

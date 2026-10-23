@@ -74,6 +74,15 @@ func _boot() -> void:
 			var parts := pos_env.split(",")
 			if parts.size() == 2 and main.arena != null and main.arena.player != null:
 				main.arena.player.global_position = Vector2(float(parts[0]), float(parts[1]))
+		# Optional mass, so every growth stage can be photographed without eating
+		# for five minutes. Goes through the same _sync_mass_metrics the game uses,
+		# so the body, the aura and the world's bloom all follow from it.
+		var mass_env := OS.get_environment("QUICK_CAPTURE_MASS")
+		if not mass_env.is_empty() and main.arena != null and main.arena.player != null:
+			main.arena.player.mass = float(mass_env)
+			main.arena.player._sync_mass_metrics()
+			print("QUICK_CAPTURE mass=%s stage=%d" % [
+				mass_env, main.arena.player.visual.stage if main.arena.player.visual != null else -1])
 		# The game auto-pauses on window focus loss (right for a phone, wrong for an
 		# unattended capture: the frame would show the pause overlay). Reclaim focus
 		# and resume if the pause already fired.
@@ -109,17 +118,34 @@ func _boot() -> void:
 
 
 func _enter_arena() -> void:
-	var play_btn := main.menus.find_child("PlayButton", true, false) as Button
-	if play_btn != null:
-		await _tap(play_btn)
-	for _i in range(3):
-		await get_tree().process_frame
+	## Two attempts, and a hard refusal to photograph the menu. A tap can land
+	## before the menu has finished laying out; during the fifteen-stage sweep one
+	## run captured the main menu instead of the arena and the sheet showed an
+	## "ИГРАТЬ" button where a slime should have been. A capture that silently
+	## measures the wrong screen is worse than no capture.
+	for attempt in range(2):
+		var play_btn := main.menus.find_child("PlayButton", true, false) as Button
+		if play_btn != null:
+			await _tap(play_btn)
+		for _i in range(4):
+			await get_tree().process_frame
 
-	var start_btn := _find_button(main.menus, Loc.t("mode.start_btn"))
-	if start_btn != null:
-		await _tap(start_btn)
-	for _i in range(3):
-		await get_tree().process_frame
+		var start_btn := _find_button(main.menus, Loc.t("mode.start_btn"))
+		if start_btn != null:
+			await _tap(start_btn)
+		for _i in range(12):
+			await get_tree().process_frame
+			if App.state == App.State.PLAYING:
+				break
+		if App.state == App.State.PLAYING:
+			break
+		push_warning("quick_capture: arena did not start (attempt %d), retrying" % (attempt + 1))
+
+	if App.state != App.State.PLAYING:
+		push_error("quick_capture: could not enter the arena; refusing to capture the menu")
+		get_tree().quit(5)
+		return
+
 	print("WORLD chunks=%d props=%d decor=%d children=%d" % [
 		main.arena.world.streamed_chunk_count(),
 		main.arena.world.obstacles.size(),

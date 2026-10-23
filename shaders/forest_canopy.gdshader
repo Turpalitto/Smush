@@ -59,6 +59,16 @@ uniform float floor_fog_start = 620.0;
 uniform float floor_fog_end = 1500.0;
 uniform vec4 fog_tint : source_color = vec4(0.042, 0.086, 0.098, 1.0);
 
+// Growth, 0..1 from the slime's stage. The floor is where the player spends the
+// whole run looking, so the ground itself has to answer: the moss warms from cold
+// cave green to sunlit gold-green and starts to breathe a faint glow from its own
+// lit patches. This is a tint and an additive term, not new geometry — the floor
+// has no chunks to rebuild and no extra draw call.
+uniform float growth = 0.0;
+uniform vec3 growth_warm = vec3(1.22, 1.18, 0.86);
+uniform vec3 growth_glow = vec3(0.26, 0.36, 0.12);
+uniform vec3 beam_warm = vec3(1.0, 0.90, 0.58);
+
 // Light direction in the normal map's own frame: -x is "toward the left of the
 // image", +y is "toward the top of the image" (Godot's UV v runs downwards, the
 // normal map's green channel points up). Normalised in the body.
@@ -90,12 +100,21 @@ void fragment() {
 	float n2 = value_noise(wp * 2.3 + vec2(4.2, -1.7));
 	float patch = smoothstep(0.28, 0.78, n1 * 0.65 + n2 * 0.35);
 
-	// Soft diagonal enchanted sunbeams
-	float beam = sin((wp.x * 1.4 + wp.y * 0.8) + TIME * 0.25) * 0.5 + 0.5;
-	beam = pow(beam, 4.0) * 0.14;
+	// Soft diagonal enchanted sunbeams. One broad sine was the first attempt and it
+	// read as a yellow blob at high growth: a shaft has to be a narrow streak, and
+	// it has to be broken up by the canopy, so the pattern is sharpened (pow 5) and
+	// then masked by a slow noise field.
+	float beam_raw = sin((wp.x * 1.55 + wp.y * 0.55) + TIME * 0.10);
+	float beam = pow(max(beam_raw, 0.0), 5.0);
+	beam *= 0.12 + 0.88 * smoothstep(0.34, 0.86, value_noise(wp * 1.25 + vec2(TIME * 0.015, 0.0)));
 
 	vec3 col = mix(moss_dark.rgb, moss_mid.rgb, patch);
-	col += canopy_glow.rgb * beam;
+	// Sunbeams through the canopy. They start as a faint cool wash and become the
+	// main light source of the late stages: by stage 15 the floor is read as
+	// sunlit rather than as a cave, which is the single cheapest way to say "the
+	// forest woke up" without adding geometry.
+	vec3 beam_col = mix(canopy_glow.rgb, beam_warm, growth);
+	col += beam_col * beam * (0.30 + growth * 0.55);
 
 	if (floor_strength > 0.001) {
 		vec2 fuv = world_px / floor_tile_px;
@@ -185,5 +204,17 @@ void fragment() {
 	// Gentle readability vignette on phone edges
 	vec2 vuv = UV - vec2(0.5);
 	float vig = 1.0 - dot(vuv, vuv) * 0.42;
+
+	if (growth > 0.001) {
+		// Warm the moss, then let the lit patches carry a little of the slime's
+		// own light. The glow term is scaled by `patch` so it follows the ground's
+		// tonal structure instead of fogging the whole screen evenly.
+		col *= mix(vec3(1.0), growth_warm, growth * 0.85);
+		col += growth_glow * patch * growth * 0.060;
+		// The vignette opens up as the forest awakens: a growing slime should not
+		// still be standing in a dark tunnel.
+		vig = mix(vig, 1.0 - dot(vuv, vuv) * 0.22, growth);
+	}
+
 	COLOR = vec4(col * clamp(vig, 0.68, 1.0), 1.0);
 }

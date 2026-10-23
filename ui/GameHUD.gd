@@ -89,9 +89,16 @@ func _build_layout() -> void:
 	_hp_label.add_theme_font_size_override("font_size", 14)
 	_hp_bar.add_child(_hp_label)
 
+	# The top bar is the growth meter, not the mutation XP meter. Growth is the
+	# thing the player is watching while eating — it changes the body and the
+	# forest — and the mutation count already has its own counter in the draft
+	# strip. Its fill is recoloured from the stage palette every time the stage
+	# moves, so the bar itself travels the ladder.
 	_evo_bar = ProgressBar.new()
 	_evo_bar.custom_minimum_size = Vector2(0, 22)
 	_evo_bar.show_percentage = false
+	_evo_bar.max_value = 1.0
+	_evo_bar.value = 0.0
 	stats_col.add_child(_evo_bar)
 
 	_mass_label = Label.new()
@@ -233,9 +240,9 @@ func _connect_signals() -> void:
 	Events.player_mass_changed.connect(func(_m: float, _r: float) -> void:
 		_refresh_evo_label()
 	)
-	Events.evolution_progress_changed.connect(func(xp: float, thresh: float, _lv: int) -> void:
-		_evo_bar.max_value = maxf(1.0, thresh)
-		_evo_bar.value = xp
+	Events.evolution_progress_changed.connect(func(_xp: float, _thresh: float, _lv: int) -> void:
+		# The bar belongs to growth now (see _refresh_evo_label); this signal only
+		# needs to keep the label in sync when a draft changes the level.
 		_refresh_evo_label()
 	)
 	Events.run_timer_updated.connect(func(sec: float, target: float) -> void:
@@ -333,12 +340,28 @@ func _connect_signals() -> void:
 func _refresh_evo_label() -> void:
 	if arena == null or arena.player == null:
 		return
-	_mass_label.text = "%s: %.1f  |  %s %d" % [
+	# The number the player watches while eating is the growth stage, because that
+	# is the thing that visibly changes the body and the forest. The mutation level
+	# is still shown by the draft counter, and the two are no longer the same axis.
+	var stage := 1
+	if arena.player.visual != null:
+		stage = arena.player.visual.stage
+	_mass_label.text = "%s: %.1f  |  %s %d/%d" % [
 		Loc.t("hud.mass"),
 		arena.player.mass,
-		Loc.t("hud.evo"),
-		arena.player.evolution_level + 1
+		Loc.t("hud.growth"),
+		stage,
+		EvolutionStages.COUNT
 	]
+	var prog := EvolutionStages.progress_to_next(arena.player.mass)
+	_evo_bar.max_value = 1.0
+	_evo_bar.value = prog
+	# The fill carries the current stage colour, so the meter changes hue as the
+	# slime does. A full bar at stage 15 stays full and gold.
+	var look := EvolutionStages.look_at(EvolutionStages.t_for_mass(arena.player.mass))
+	var col: Color = look.get("body_c", Color(0.2, 0.82, 0.66))
+	_evo_bar.add_theme_stylebox_override("fill",
+		UIThemeBuilder.make_box(col.lerp(Color.WHITE, 0.15), Color.TRANSPARENT, 8, 0, 2, 2))
 
 
 func _sync_joystick_skill_guard() -> void:

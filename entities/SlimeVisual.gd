@@ -39,8 +39,28 @@ var _core_color: Color = Color("#fff080")
 var _rim_color: Color = Color("#a5ffe8")
 var _trail_color: Color = Color("#5ef5c8")
 
+## Growth ladder (see EvolutionStages). `growth_t` is continuous 1..15, `stage` is
+## its integer part, and `_look` is the blended palette + ornament weights for the
+## current position. The body colour is the stage colour pulled toward the chosen
+## cosmetic form, so skins still read while the body evolves.
+var growth_t: float = 1.0
+var stage: int = 1
+var _look: Dictionary = {}
+var _form_body: Color = Color("#22d0a8")
+var _form_core: Color = Color("#fff080")
+var _form_rim: Color = Color("#a5ffe8")
+var _form_trail: Color = Color("#5ef5c8")
+var _back_aura: SlimeAura
+var _front_aura: SlimeAura
+
 
 func _ready() -> void:
+	# Behind the body: the ground sigil, the wings and the petal skirt.
+	_back_aura = SlimeAura.new()
+	_back_aura.name = "GrowthAuraBack"
+	_back_aura.front = false
+	add_child(_back_aura)
+
 	_jelly_rect = ColorRect.new()
 	_jelly_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var shader := load("res://shaders/slime_body.gdshader") as Shader
@@ -53,6 +73,13 @@ func _ready() -> void:
 	_fg_overlay.name = "ForegroundOverlay"
 	_fg_overlay.draw.connect(_draw_foreground)
 	add_child(_fg_overlay)
+
+	# In front of the body: crown, antlers, halo, orbiting motes.
+	_front_aura = SlimeAura.new()
+	_front_aura.name = "GrowthAuraFront"
+	_front_aura.front = true
+	add_child(_front_aura)
+
 	apply_cosmetics()
 	Events.slime_form_changed.connect(func(_fid: String) -> void: apply_cosmetics())
 
@@ -61,20 +88,60 @@ func apply_cosmetics() -> void:
 	var form_id: String = str(SaveData.data.get("selected_form", "forest_drop"))
 	var fcfg: Dictionary = ConfigDB.slime_forms.get(form_id, {})
 	if not fcfg.is_empty():
-		_body_color = Color(str(fcfg.get("body_color", "#22d0a8")))
-		_body_color.a = 0.90
-		_core_color = Color(str(fcfg.get("core_color", "#fff080")))
-		_rim_color = Color(str(fcfg.get("rim_color", "#a5ffe8")))
+		_form_body = Color(str(fcfg.get("body_color", "#22d0a8")))
+		_form_core = Color(str(fcfg.get("core_color", "#fff080")))
+		_form_rim = Color(str(fcfg.get("rim_color", "#a5ffe8")))
 
 	var trail_id: String = str(SaveData.data.get("selected_trail", "default_gel"))
 	var tcfg: Dictionary = ConfigDB.trail_fx.get(trail_id, {})
 	if not tcfg.is_empty():
-		_trail_color = Color(str(tcfg.get("color", "#5ef5c8")))
+		_form_trail = Color(str(tcfg.get("color", "#5ef5c8")))
 
+	_recompute_look()
+
+
+func set_growth(mass: float) -> void:
+	## Called by the player whenever mass changes. Cheap enough to run on every
+	## absorption: it only does arithmetic and touches the shader when the palette
+	## actually moved.
+	growth_t = EvolutionStages.t_for_mass(mass)
+	var new_stage := clampi(int(floorf(growth_t)), 1, EvolutionStages.COUNT)
+	_recompute_look()
+	if new_stage != stage:
+		var rising := new_stage > stage
+		stage = new_stage
+		if rising:
+			trigger_evolution()
+			Events.growth_stage_changed.emit(stage, EvolutionStages.name_key_for_stage(stage))
+
+
+func _recompute_look() -> void:
+	_look = EvolutionStages.look_at(growth_t)
+	# The stage owns the hue; the cosmetic skin pulls it back toward the form the
+	# player chose. The pull is strong at the start of the ladder — so the skin you
+	# picked is the slime you meet — and fades as the body grows, because by stage
+	# 10 the slime has visibly outgrown the skin. A flat 0.45 was tested first and
+	# it flattened the top of the ladder into mud: stage 13's orange came out
+	# olive and stage 15's pearl came out mint.
+	var w := clampf((growth_t - 1.0) / float(EvolutionStages.COUNT - 1), 0.0, 1.0)
+	var k := lerpf(0.45, 0.10, w)
+	_body_color = (_look["body_c"] as Color).lerp(_form_body, k)
+	_core_color = (_look["core_c"] as Color).lerp(_form_core, k * 0.6)
+	_rim_color = (_look["rim_c"] as Color).lerp(_form_rim, k * 0.6)
+	_trail_color = (_look["trail_c"] as Color).lerp(_form_trail, k * 0.5)
+	_body_color.a = 0.90
 	if _shader_mat != null:
 		_shader_mat.set_shader_parameter("body_color", _body_color)
 		_shader_mat.set_shader_parameter("core_color", _core_color)
 		_shader_mat.set_shader_parameter("rim_color", _rim_color)
+		_shader_mat.set_shader_parameter("stage_glow", float(_look.get("glow", 0.0)))
+		_shader_mat.set_shader_parameter("stage_t", growth_t / float(EvolutionStages.COUNT))
+		# A bigger jelly is a heavier jelly: the surface moves in slower, longer
+		# waves. This is the one part of growth the silhouette itself carries, and
+		# it costs two uniform writes.
+		var gt := clampf((growth_t - 1.0) / float(EvolutionStages.COUNT - 1), 0.0, 1.0)
+		_shader_mat.set_shader_parameter("wobble_amount", lerpf(0.032, 0.052, gt))
+		_shader_mat.set_shader_parameter("wobble_speed", lerpf(4.2, 2.6, gt))
 
 
 func trigger_gulp() -> void:
@@ -141,11 +208,18 @@ func _process(delta: float) -> void:
 		_jelly_rect.rotation = velocity_vec.angle() if speed > 15.0 else 0.0
 		_jelly_rect.scale = squash_stretch
 
+	# Computed here (not inside _draw) because the regalia pass needs it too.
+	var alpha_mult := stealth_alpha * (1.0 - death_progress)
+
 	if _shader_mat != null:
 		_shader_mat.set_shader_parameter("hurt_flash", hurt_flash)
-		var eff_alpha := stealth_alpha * (1.0 - death_progress)
-		_shader_mat.set_shader_parameter("stealth_alpha", clampf(eff_alpha, 0.05, 1.0))
+		_shader_mat.set_shader_parameter("stealth_alpha", clampf(alpha_mult, 0.05, 1.0))
 		_shader_mat.set_shader_parameter("evolution_glow", evolution_flash)
+
+	if _back_aura != null:
+		_back_aura.set_look(_look, eff_r, _anim_time, alpha_mult)
+	if _front_aura != null:
+		_front_aura.set_look(_look, eff_r, _anim_time, alpha_mult)
 
 	queue_redraw()
 	if _fg_overlay != null:
