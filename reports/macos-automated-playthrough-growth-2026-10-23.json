@@ -1,8 +1,8 @@
 {
-	"absorbed_count": 201,
+	"absorbed_count": 151,
 	"accidental_double_tap_dash": false,
-	"boss_p2_t": 281.7,
-	"boss_p3_t": 297.8,
+	"boss_p2_t": 288.8,
+	"boss_p3_t": 303.6,
 	"boss_spawn_t": 270.0,
 	"cheats_or_direct_stat_edits": false,
 	"damage_events": [
@@ -10,67 +10,101 @@
 			"dmg": 20.0,
 			"hp": 80.0,
 			"src": "umbral_alpha",
-			"t": 187.6
+			"t": 218.6
 		},
 		{
-			"dmg": 31.1,
-			"hp": 68.9,
-			"src": "boss_slam",
-			"t": 279.7
-		},
-		{
-			"dmg": 11.0,
-			"hp": 87.1,
-			"src": "ancient_guardian",
-			"t": 281.7
+			"dmg": 20.0,
+			"hp": 80.0,
+			"src": "umbral_alpha",
+			"t": 261.9
 		},
 		{
 			"dmg": 11.0,
-			"hp": 89.0,
+			"hp": 76.4,
 			"src": "ancient_guardian",
-			"t": 286.7
-		},
-		{
-			"dmg": 28.6,
-			"hp": 61.6,
-			"src": "boss_slam",
-			"t": 290.1
+			"t": 275.9
 		},
 		{
 			"dmg": 11.0,
-			"hp": 68.2,
+			"hp": 79.4,
 			"src": "ancient_guardian",
-			"t": 292.4
+			"t": 277.4
+		},
+		{
+			"dmg": 11.0,
+			"hp": 68.4,
+			"src": "ancient_guardian",
+			"t": 283.2
 		},
 		{
 			"dmg": 11.0,
 			"hp": 89.0,
 			"src": "ancient_guardian",
-			"t": 297.8
+			"t": 288.3
 		},
 		{
-			"dmg": 27.8,
-			"hp": 72.2,
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 290.4
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 295.0
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 301.2
+		},
+		{
+			"dmg": 26.9,
+			"hp": 63.3,
+			"src": "boss_slam",
+			"t": 302.8
+		},
+		{
+			"dmg": 11.0,
+			"hp": 89.0,
+			"src": "ancient_guardian",
+			"t": 304.1
+		},
+		{
+			"dmg": 26.2,
+			"hp": 73.8,
 			"src": "boss_slam",
 			"t": 306.3
+		},
+		{
+			"dmg": 23.0,
+			"hp": 50.8,
+			"src": "ancient_guardian",
+			"t": 306.7
+		},
+		{
+			"dmg": 11.0,
+			"hp": 70.2,
+			"src": "ancient_guardian",
+			"t": 315.0
 		}
 	],
-	"damage_events_count": 8,
-	"essence_earned_base": 242,
-	"evo_level": 9,
+	"damage_events_count": 14,
+	"essence_earned_base": 198,
+	"evo_level": 7,
 	"evo_times_sec": [
-		12.1,
-		25.8,
-		61.8,
-		95.2,
-		104.0,
-		128.3,
-		167.7,
-		264.8,
-		303.4
+		4.9,
+		26.6,
+		57.4,
+		96.2,
+		108.1,
+		210.0,
+		291.9
 	],
-	"final_hp": 91.7,
-	"final_mass": 129.0,
+	"final_hp": 70.2,
+	"final_mass": 99.7,
 	"final_state": "VICTORY",
 	"human_operated": false,
 	"input_delivery": "InputEventScreenTouch + InputEventScreenDrag via VirtualJoystick & UI Button signals",
@@ -89,13 +123,13 @@
 			"pre_gain_db": 0.0,
 			"release_sec": 0.100000001490116
 		},
-		"pre_limiter_frames": 1983488,
-		"pre_limiter_peak_dbfs": -0.78,
-		"recording_wall_sec": 41.63,
+		"pre_limiter_frames": 2285568,
+		"pre_limiter_peak_dbfs": -0.19,
+		"recording_wall_sec": 47.92,
 		"tap_point": "Master bus effect index after AudioEffectHardLimiter (post-limiter)",
-		"wav_path": "/tmp/boss_final2.wav"
+		"wav_path": "/tmp/boss_final3.wav"
 	},
-	"max_absorb_gap_sec": 14.9,
+	"max_absorb_gap_sec": 30.2,
 	"miniboss_defeated_t": -1.0,
 	"miniboss_spawn_t": 165.0,
 	"music_enabled_default": true,
@@ -109,19 +143,16 @@
 	"mutation_draft_policy": "heuristic_over_legitimate_3_card_offer (synergy -> dash -> spikes -> magnet -> regeneration -> shield -> freeze)",
 	"mutations": {
 		"dash": 2,
-		"freeze": 1,
 		"magnet": 1,
-		"regeneration": 1,
-		"shield": 1,
-		"spikes": 3
+		"spikes": 4
 	},
 	"partial": false,
 	"pause_resume_check": {
 		"paused_and_resumed_with_time_frozen": true,
 		"performed": true
 	},
-	"peak_mass": 133.6,
-	"saved_essence_after_run": 462,
+	"peak_mass": 102.4,
+	"saved_essence_after_run": 418,
 	"screenshots_written": [
 		"01_main_menu (720x1280)",
 		"00_menu_720x1280 (720x1280)",
@@ -130,8 +161,8 @@
 		"00_menu_1280x720_landscape (1280x720)",
 		"02_mode_select (720x1280)",
 		"03_gameplay_start (720x1280)",
-		"05_pause_overlay (720x1280)",
 		"04_mutation_draft (720x1280)",
+		"05_pause_overlay (720x1280)",
 		"06_miniboss (720x1280)",
 		"07_boss_phase1 (720x1280)",
 		"08_boss_phase2 (720x1280)",
@@ -139,27 +170,25 @@
 		"10_run_result (720x1280)"
 	],
 	"sfx_counts_by_event": {
-		"absorb": 175,
-		"attack": 59,
+		"absorb": 136,
+		"attack": 63,
 		"boss_warning": 3,
 		"button_click": 1,
-		"evolution": 24,
-		"hurt": 8,
-		"move": 479,
-		"mutation_pick": 9,
-		"shield_break": 6,
+		"evolution": 22,
+		"hurt": 14,
+		"move": 509,
+		"mutation_pick": 7,
 		"victory": 1
 	},
 	"sfx_max_concurrent_streams": 5,
-	"sfx_total_plays": 765,
+	"sfx_total_plays": 756,
 	"synergies": [
-		"ice_armor",
 		"piercing_strike"
 	],
 	"timing": {
-		"in_game_run_elapsed_sec": 308.8,
+		"in_game_run_elapsed_sec": 315.0,
 		"physics_ticks_per_sec": 60,
-		"wall_clock_elapsed_sec": 312.5
+		"wall_clock_elapsed_sec": 318.9
 	},
 	"verification_kind": "automated_playthrough_script_agent",
 	"world_data_visible_to_agent": [
