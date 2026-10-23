@@ -235,7 +235,7 @@
   `reports/automated-playthrough-verified-2026-10-22.json` и `reports/audio-limiter-verification-2026-10-22.json` (а также сохранённые ранние сводки `reports/rendered-playthrough-before-2026-10-22.json`, `reports/rendered-playthrough-after-2026-10-22.json`, `reports/rendered-audio-audit-2026-10-22.json`).
 - Проверка готовности Android-окружения без сети и без принятия лицензий: `reports/android-preflight-2026-10-22.log` (`exit code 2`).
 - **macOS (Apple M5, Metal 3.2 Forward Mobile), нативная сборка**:
-  - `./scripts/run_qa.sh` → **591 assertions, 0 failures**, `exit 0`;
+  - `./scripts/run_qa.sh` → **592 assertions, 0 failures**, `exit 0`;
   - автоматизированное прохождение `VICTORY` за `301.7 с` + запись шины `Master`
     (`reports/macos-automated-playthrough-endless-2026-10-23.json`; прогоны прошлых итераций —
     `reports/macos-automated-playthrough-canopy-2026-10-23.json`,
