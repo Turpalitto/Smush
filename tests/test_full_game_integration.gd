@@ -97,8 +97,11 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	# fall back to a flat circle and the arena would look like placeholder art again).
 	for prop_id in ["root_pillar", "rune_stone", "mana_crystal", "mushroom_cluster", "fern_cluster"]:
 		var prop_path: String = "res://resources/art/props/%s.png" % prop_id
-		assert_true(ResourceLoader.exists(prop_path), "Prop art exists: " + prop_id)
-		var prop_tex := load(prop_path) as Texture2D
+		# Through AssetRegistry, because that is what the generator uses. Asserting
+		# ResourceLoader.exists() here tested the editor import cache rather than the
+		# game: it passed on a developer machine and failed in the packed QA build,
+		# where the same PNG is present but has no .import remap.
+		var prop_tex := AssetRegistry.get_texture(prop_path)
 		assert_true(prop_tex != null, "Prop art loads: " + prop_id)
 		if prop_tex != null:
 			assert_eq(prop_tex.get_width(), 256, "Prop art is 256 px wide: " + prop_id)
@@ -184,8 +187,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	# a single silhouette everywhere, which is exactly what it looked like before.
 	for under_id in ["broadleaf_clump", "grass_tuft", "fallen_branch", "glow_shrooms", "root_cluster"]:
 		var under_path: String = "res://resources/art/props/%s.png" % under_id
-		assert_true(ResourceLoader.exists(under_path), "Undergrowth art exists: " + under_id)
-		var under_tex := load(under_path) as Texture2D
+		var under_tex := AssetRegistry.get_texture(under_path)
 		assert_true(under_tex != null, "Undergrowth art loads: " + under_id)
 		if under_tex != null:
 			assert_eq(under_tex.get_width(), 256, "Undergrowth art is 256 px wide: " + under_id)
@@ -224,7 +226,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 
 	# Floor tile: seamless by construction, but a replaced or re-exported PNG could
 	# still reintroduce a grid, so the wrap step is compared against the interior.
-	var floor_tex := load(ArenaController.FLOOR_TEXTURE_PATH) as Texture2D
+	var floor_tex := AssetRegistry.get_texture(ArenaController.FLOOR_TEXTURE_PATH)
 	assert_true(floor_tex != null, "Floor tile loads")
 	if floor_tex != null:
 		assert_eq(floor_tex.get_width(), 1024, "Floor tile is 1024 px")
@@ -247,13 +249,16 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	if arena.canopy_mat != null:
 		assert_true(arena.canopy_mat.get_shader_parameter("floor_tex") != null,
 			"Arena background received the floor tile")
-		assert_gt(float(arena.canopy_mat.get_shader_parameter("floor_strength")), 0.5,
+		# Checked for null first: float(null) is a script error, not a failed assert,
+		# and it used to mask the real message ("the material never got the tile").
+		var strength: Variant = arena.canopy_mat.get_shader_parameter("floor_strength")
+		assert_true(strength != null and float(strength) > 0.5,
 			"Floor tile actually modulates the arena background")
 
 	# Relief and occlusion: both are separate maps derived from the same height
 	# field, both are optional in the shader, so a silent loss of either would go
 	# unnoticed until someone looked at the floor.
-	var normal_tex := load(ArenaController.FLOOR_NORMAL_PATH) as Texture2D
+	var normal_tex := AssetRegistry.get_texture(ArenaController.FLOOR_NORMAL_PATH)
 	assert_true(normal_tex != null, "Floor normal map loads")
 	if normal_tex != null:
 		assert_eq(normal_tex.get_width(), 1024, "Floor normal map is 1024 px")
@@ -273,7 +278,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		var xymean := xyspread / float(maxi(1, ncount))
 		assert_gt(bmean, 0.80, "Normal map blue channel is mostly up (%.2f)" % bmean)
 		assert_gt(xymean, 0.02, "Normal map has real slopes (%.3f)" % xymean)
-	var ao_tex := load(ArenaController.FLOOR_AO_PATH) as Texture2D
+	var ao_tex := AssetRegistry.get_texture(ArenaController.FLOOR_AO_PATH)
 	assert_true(ao_tex != null, "Floor AO map loads")
 	if ao_tex != null:
 		assert_eq(ao_tex.get_width(), 1024, "Floor AO map is 1024 px")
@@ -295,7 +300,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 		assert_true(amean > 0.45 and amean < 0.90,
 			"AO map mean is in a sane range (%.2f)" % amean)
 	# Canopy light: the fourth map, and the only one that is not the floor itself.
-	var light_tex := load(ArenaController.FLOOR_LIGHT_PATH) as Texture2D
+	var light_tex := AssetRegistry.get_texture(ArenaController.FLOOR_LIGHT_PATH)
 	assert_true(light_tex != null, "Canopy light map loads")
 	if light_tex != null:
 		assert_eq(light_tex.get_width(), 1024, "Canopy light map is 1024 px")

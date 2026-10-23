@@ -337,7 +337,11 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 	## art is missing, so a build without the texture still renders.
 	if mat == null:
 		return false
-	var tex := load(FLOOR_TEXTURE_PATH) as Texture2D
+	# Through AssetRegistry, not load(): a bare .pck carries the PNG bytes but no
+	# .import remap, so load() returns null there and the floor silently falls back
+	# to the gradient. AssetRegistry tries the imported resource first and decodes
+	# the raw PNG otherwise, which is what makes this work in both worlds.
+	var tex := AssetRegistry.get_texture(FLOOR_TEXTURE_PATH)
 	if tex == null:
 		return false
 	mat.set_shader_parameter("floor_tex", tex)
@@ -346,18 +350,18 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 
 	# Relief and occlusion are set independently: losing one of the two maps
 	# should cost that layer only, not the whole painted floor.
-	var normal_tex := load(FLOOR_NORMAL_PATH) as Texture2D
+	var normal_tex := AssetRegistry.get_texture(FLOOR_NORMAL_PATH)
 	if normal_tex != null:
 		mat.set_shader_parameter("floor_normal", normal_tex)
 		mat.set_shader_parameter("floor_relief", FLOOR_RELIEF)
 
-	var ao_tex := load(FLOOR_AO_PATH) as Texture2D
+	var ao_tex := AssetRegistry.get_texture(FLOOR_AO_PATH)
 	if ao_tex != null:
 		mat.set_shader_parameter("floor_ao", ao_tex)
 		mat.set_shader_parameter("floor_ao_mean", FLOOR_AO_MEAN)
 		mat.set_shader_parameter("floor_occlusion", FLOOR_OCCLUSION)
 
-	var light_tex := load(FLOOR_LIGHT_PATH) as Texture2D
+	var light_tex := AssetRegistry.get_texture(FLOOR_LIGHT_PATH)
 	if light_tex != null:
 		mat.set_shader_parameter("floor_light", light_tex)
 		mat.set_shader_parameter("floor_light_mean", FLOOR_LIGHT_MEAN)

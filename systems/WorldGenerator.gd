@@ -176,9 +176,17 @@ func _prop_texture(kind: String) -> Texture2D:
 	if _prop_cache.has(kind):
 		return _prop_cache[kind] as Texture2D
 	var path := str(PROP_TEXTURES.get(kind, ""))
+	# Go through AssetRegistry, not ResourceLoader. ResourceLoader only sees a .png
+	# when the editor import cache (the .import remap into .godot/imported/*.ctex)
+	# is present, and a pack built without it has the raw PNG but no remap — which
+	# is exactly the state of the packaged QA build. Gating on ResourceLoader.exists
+	# there produced a forest with ZERO props: the sprites were simply never created,
+	# and the tests reported "every prop is a real sprite: expected=632, actual=0".
+	# AssetRegistry tries the imported resource first and falls back to decoding the
+	# raw PNG, so both a real export and a raw pack work.
 	var tex: Texture2D = null
-	if not path.is_empty() and ResourceLoader.exists(path):
-		tex = load(path) as Texture2D
+	if not path.is_empty():
+		tex = AssetRegistry.get_texture(path)
 	_prop_cache[kind] = tex
 	return tex
 
