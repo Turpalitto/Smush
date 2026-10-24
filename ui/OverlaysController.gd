@@ -5,6 +5,9 @@ extends Control
 signal navigate_to_upgrades()
 signal navigate_to_main_menu()
 
+const GLASS_TINT: Color = Color(0.030, 0.078, 0.098)
+const GLASS_TRANSMISSION: float = 0.30
+
 var arena: ArenaController = null
 
 var _pause_root: Control
@@ -61,7 +64,12 @@ func _make_modal_backdrop() -> Control:
 	root.visible = false
 	var dim := ColorRect.new()
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.02, 0.06, 0.08, 0.82)
+	dim.color = Color.WHITE
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/draft_glass.gdshader") as Shader
+	mat.set_shader_parameter("glass_tint", GLASS_TINT)
+	mat.set_shader_parameter("transmission", GLASS_TRANSMISSION)
+	dim.material = mat
 	root.add_child(dim)
 	add_child(root)
 	return root

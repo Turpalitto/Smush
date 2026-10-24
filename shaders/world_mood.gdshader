@@ -61,6 +61,11 @@ void fragment() {
 	// extra code bought nothing measurable.
 	c = mix(c, c * tint * 1.55, tint_amount);
 
+	// Gentle slow ambient forest breath (~52 s period): harmonizes with forest_breath.ogg
+	float breath_cycle = sin(TIME * 0.12) * 0.5 + 0.5;
+	vec3 breath_shift = mix(vec3(0.97, 1.02, 1.03), vec3(1.03, 1.01, 0.97), breath_cycle);
+	c *= mix(vec3(1.0), breath_shift, 0.35);
+
 	// Radial light around the slime. The 1.78 vertical factor turns the ellipse
 	// into a circle on a 720x1280 portrait screen.
 	vec2 d = (SCREEN_UV - player_uv) * vec2(1.0, 1.78);
@@ -83,6 +88,16 @@ void fragment() {
 	// image gains the milky, dreamlike quality the late stages are going for.
 	c += vec3(lift) * (1.0 - smoothstep(0.0, 0.55, l));
 
+	// Volumetric sunshafts (god rays) streaming down through the canopy haze
+	vec2 ray_uv = vec2(SCREEN_UV.x * 1.55 + SCREEN_UV.y * 0.85, SCREEN_UV.y * 0.45);
+	float r1 = sin(ray_uv.x * 5.4 + TIME * 0.08) * 0.5 + 0.5;
+	float r2 = sin(ray_uv.x * 10.2 - TIME * 0.11) * 0.5 + 0.5;
+	float r3 = sin((SCREEN_UV.x * 2.2 - SCREEN_UV.y * 1.3) * 3.2 + TIME * 0.05) * 0.5 + 0.5;
+	float ray_shafts = pow(r1 * r2, 2.4) * (0.68 + 0.32 * r3);
+	float ray_fade = smoothstep(0.96, 0.12, SCREEN_UV.y);
+	vec3 ray_color = mix(vec3(0.52, 0.94, 0.82), vec3(1.0, 0.94, 0.68), clamp(warm_amount * 0.75 + tint_amount * 0.45, 0.0, 1.0));
+	c += ray_color * ray_shafts * ray_fade * 0.068;
+
 	if (dream_bloom > 0.001) {
 		vec3 b1 = textureLod(screen_tex, SCREEN_UV, 2.2).rgb;
 		vec3 b2 = textureLod(screen_tex, SCREEN_UV, 3.4).rgb;
@@ -104,6 +119,11 @@ void fragment() {
 	vec2 v = SCREEN_UV - vec2(0.5);
 	float vd = length(v * vec2(1.0, 1.3));
 	c *= 1.0 - vignette * smoothstep(0.34, 0.98, vd);
+
+	// Soft highlight shoulder prevents high-stage warm aura + dream bloom from
+	// clipping bright petals and regalia into flat white while keeping midtones untouched.
+	vec3 hi = max(c - vec3(0.72), vec3(0.0));
+	c = min(c, vec3(0.72)) + hi / (vec3(1.0) + hi * 2.2);
 
 	COLOR = vec4(max(c, vec3(0.0)), 1.0);
 }

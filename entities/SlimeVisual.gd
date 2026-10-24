@@ -246,10 +246,12 @@ func _draw() -> void:
 		var tr := eff_r * 0.48 * t
 		draw_circle(local_p, tr, Color(_trail_color.r, _trail_color.g, _trail_color.b, 0.26 * t * alpha_mult))
 
-	# 2. 2.5D angled ground shadow aligned with squash & stretch deformation
+	# 2. 2.5D angled ground shadow + bioluminescent ground light pool
 	var sh_rot := velocity_vec.angle() if velocity_vec.length() > 15.0 else 0.0
-	draw_set_transform(Vector2(0.0, eff_r * 0.40), sh_rot, Vector2(squash_stretch.x * 0.90, squash_stretch.y * 0.74))
-	draw_circle(Vector2.ZERO, eff_r, Color(0.02, 0.05, 0.07, 0.36 * alpha_mult))
+	draw_set_transform(Vector2(0.0, eff_r * 0.40), sh_rot, Vector2(squash_stretch.x * 0.92, squash_stretch.y * 0.74))
+	draw_circle(Vector2.ZERO, eff_r * 1.42, Color(_body_color.r, _body_color.g, _body_color.b, 0.085 * alpha_mult))
+	draw_circle(Vector2.ZERO, eff_r * 1.14, Color(0.01, 0.04, 0.06, 0.18 * alpha_mult))
+	draw_circle(Vector2.ZERO, eff_r * 0.92, Color(0.01, 0.04, 0.06, 0.30 * alpha_mult))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# 3. Behind-body / perimeter Mutation visuals

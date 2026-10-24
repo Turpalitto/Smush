@@ -94,6 +94,7 @@ const PROP_TEXTURES: Dictionary = {
 	"singing_crystal": PROP_DIR + "singing_crystal.png",
 	"dew_fountain": PROP_DIR + "dew_fountain.png",
 	"ancient_lantern": PROP_DIR + "ancient_lantern.png",
+	"ancient_shrine": PROP_DIR + "ancient_shrine.png",
 }
 ## Decor kinds. `px` is the drawn width at scale 1.0, `shadow` the radius of the
 ## contact shadow, `sway` the rotation amplitude (0 for anything lying flat — a
@@ -494,10 +495,9 @@ func _apply_bloom(entry: Dictionary, base: Color, v: float) -> void:
 	if raw != null and is_instance_valid(raw):
 		node = raw as Sprite2D
 	var a := clampf((v - 0.10) / 0.90, 0.0, 1.0)
-	# Slight warm lift as well as the alpha: a flower that fades in without getting
-	# brighter reads as a cross-fade, not as something opening.
-	var k := 1.0 + a * 0.22
-	entry["base"] = Color(minf(1.6, base.r * k), minf(1.6, base.g * k), minf(1.6, base.b * k), base.a * a)
+	# Keep RGB <= 1.04 so painted petal shading never clips into a flat yellow silhouette.
+	var k := 0.86 + a * 0.14
+	entry["base"] = Color(minf(1.04, base.r * k), minf(1.04, base.g * k), minf(1.04, base.b * k), base.a * a)
 	if node != null and is_instance_valid(node):
 		node.visible = a > 0.02
 
@@ -1461,28 +1461,38 @@ func _apply_fog(p: Vector2) -> void:
 func _draw() -> void:
 	var p := _player_pos()
 
-	# Fixed landmarks of the starting glade. They are drawn only when the camera is
-	# near them: a draw call 6000 px away would blow up this item's bounding box for
-	# no visible pixel.
-	if p.distance_to(Vector2.ZERO) < DRAW_RADIUS:
-		draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.82, Color(0.14, 0.34, 0.29, 0.16))
-		# A dashed boundary, not a continuous ring. The old version drew one 4 px arc
-		# of radius SAFE_SPAWN_RADIUS*0.75, and because the player spawns on its
-		# centre it read as a UI circle drawn around the character for the whole
-		# opening minute — the least magical thing in the frame. Broken segments with
-		# gaps read as a glade edge.
-		var seg := 22
-		for i in range(seg):
-			var a0 := (TAU / float(seg)) * float(i) + _anim_time * 0.02
-			var a1 := a0 + (TAU / float(seg)) * 0.58
-			draw_arc(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.75, a0, a1, 6,
-				Color(0.42, 0.92, 0.72, 0.20), 3.4)
+	# Fixed landmarks of the starting glade. Drawn as a soft bioluminescent moss
+	# clearing with fairy-ring spore clusters instead of a dashed vector ring.
+	var glade_d := p.distance_to(Vector2.ZERO)
+	if glade_d < DRAW_RADIUS:
+		var gfade := _fog_fade(glade_d)
+		if gfade > 0.01:
+			draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.86, Color(0.10, 0.28, 0.24, 0.11 * gfade))
+			draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.56, Color(0.16, 0.42, 0.35, 0.08 * gfade))
+			var ring_r := SAFE_SPAWN_RADIUS * 0.74
+			for i in range(10):
+				var ang := (TAU / 10.0) * float(i) + sin(float(i) * 2.3) * 0.12
+				var rp := Vector2.from_angle(ang) * ring_r
+				var pulse := 0.65 + 0.35 * sin(_anim_time * 1.4 + float(i) * 1.1)
+				draw_circle(rp, 18.0, Color(0.28, 0.85, 0.68, 0.045 * pulse * gfade))
+				draw_circle(rp, 4.2, Color(0.58, 1.0, 0.86, 0.24 * pulse * gfade))
+				draw_circle(rp + Vector2(6.5, -4.0), 2.6, Color(0.76, 1.0, 0.90, 0.20 * pulse * gfade))
 
-	# Northern Ancient Guardian Shrine circle (world landmark at (0, -480))
-	if p.distance_to(SHRINE_POS) < DRAW_RADIUS:
-		draw_circle(SHRINE_POS, 145.0, Color(0.16, 0.30, 0.28, 0.24))
-		draw_arc(SHRINE_POS, 145.0, 0.0, TAU, 40, Color(0.52, 0.92, 0.74, 0.22), 3.0)
-		draw_arc(SHRINE_POS, 92.0, _anim_time * 0.15, _anim_time * 0.15 + PI * 1.5, 28, Color(0.88, 0.78, 0.42, 0.20), 2.5)
+	# Northern Ancient Guardian Shrine (world landmark at (0, -480))
+	var shrine_d := p.distance_to(SHRINE_POS)
+	if shrine_d < DRAW_RADIUS:
+		var sfade := _fog_fade(shrine_d)
+		if sfade > 0.01:
+			var s_pulse := 0.88 + 0.12 * sin(_anim_time * 1.2)
+			draw_circle(SHRINE_POS, 168.0 * s_pulse, Color(0.20, 0.68, 0.58, 0.055 * sfade))
+			draw_circle(SHRINE_POS, 118.0 * s_pulse, Color(0.36, 0.94, 0.78, 0.075 * sfade))
+			_draw_ground_shadow(SHRINE_POS + Vector2(0.0, 18.0), 128.0, 0.32 * sfade)
+			var stex := _prop_texture("ancient_shrine")
+			if stex != null:
+				var s_side := 264.0
+				var s_tint := Color(0.92, 0.98, 0.96, sfade)
+				draw_texture_rect(stex, Rect2(SHRINE_POS - Vector2(s_side * 0.5, s_side * 0.5), Vector2(s_side, s_side)), false, s_tint)
+				draw_circle(SHRINE_POS, 34.0 * s_pulse, Color(0.45, 1.0, 0.90, 0.12 * sfade))
 
 	# Wonders. The halo is drawn even while a landmark is asleep, and that is the
 	# whole reason it can be found: from a screen away it is a soft light in the fog,
@@ -1507,10 +1517,10 @@ func _draw() -> void:
 				Color(gcol.r, gcol.g, gcol.b,
 					base_a * (1.0 - 0.19 * float(gi)) * wfade))
 		_draw_ground_shadow(wpos + Vector2(0.0, 46.0), 58.0, 0.24 * wfade)
-		# A ring on the floor once it has woken: the landmark has claimed its clearing.
+		# Soft ground illumination once it has woken
 		if wake > 0.02:
-			draw_arc(wpos + Vector2(0.0, 46.0), 96.0, 0.0, TAU, 30,
-				Color(gcol.r, gcol.g, gcol.b, 0.16 * wake * wfade), 2.2)
+			draw_circle(wpos + Vector2(0.0, 46.0), 88.0,
+				Color(gcol.r, gcol.g, gcol.b, 0.065 * wake * wfade))
 
 	# Decorative flora: painted props get a contact shadow only; the moss pad is
 	# still a drawn patch because it is flat on the ground by definition.
@@ -1530,7 +1540,23 @@ func _draw() -> void:
 			if fade <= 0.01:
 				continue
 		if fkind == 1:
-			draw_circle(fp, 22.0 * sc, Color(0.14, 0.34, 0.28, 0.38 * fade))
+			# Starlit forest pool / enchanted puddle with expanding ripples and water sheen
+			var pr := 26.0 * sc
+			draw_set_transform(fp, 0.0, Vector2(1.0, 0.58))
+			# Shoreline depth ring
+			draw_circle(Vector2.ZERO, pr * 1.15, Color(0.04, 0.12, 0.15, 0.45 * fade))
+			# Crystalline pool surface
+			draw_circle(Vector2.ZERO, pr, Color(0.12, 0.38, 0.45, 0.40 * fade))
+			draw_circle(Vector2.ZERO, pr * 0.72, Color(0.22, 0.62, 0.75, 0.28 * fade))
+			# Animated gentle water ripples
+			var rip_t := fposmod(_anim_time * 12.0 + fp.x * 0.08 + fp.y * 0.06, pr)
+			var rip_a := (1.0 - rip_t / pr) * 0.32 * fade
+			draw_arc(Vector2.ZERO, rip_t, 0.0, TAU, 24, Color(0.65, 0.95, 1.0, rip_a), 1.2)
+			# Starlight glint on water surface
+			var glint_p := Vector2(-pr * 0.28, -pr * 0.22)
+			var glint_a := (0.45 + 0.35 * sin(_anim_time * 2.0 + fp.x)) * fade
+			draw_circle(glint_p, 2.2 * sc, Color(1.0, 1.0, 0.92, glint_a))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		else:
 			var spec: Dictionary = DECOR_KINDS.get(fkind, {})
 			if fkind >= BLOOM_KIND_MIN:
@@ -1541,14 +1567,18 @@ func _draw() -> void:
 				var breathe := 0.82 + 0.18 * sin(_anim_time * 1.4 + fp.x * 0.011 + fp.y * 0.007)
 				for gi in range(3):
 					var gr := (26.0 + 15.0 * float(gi)) * sc * breathe
-					draw_circle(fp, gr, Color(1.0, 0.86, 0.52, (0.030 - 0.008 * float(gi)) * fade))
+					draw_circle(fp, gr, Color(1.0, 0.86, 0.52, (0.022 - 0.006 * float(gi)) * fade))
 			_draw_ground_shadow(fp, float(spec.get("shadow", 19.0)) * sc, 0.20 * fade)
 
-	# Narrow passage floor rune markers (reacts to player size for instant tactical clarity!)
+	# Narrow passage floor rune glow (soft threshold mist instead of a hard wire circle)
 	var p_node: PlayerSlime = get_parent().get("player") if get_parent() != null else null
 	for gate: Dictionary in narrow_gates:
 		var gc: Vector2 = gate["center"]
-		if gc.distance_to(p) > DRAW_RADIUS:
+		var gd := gc.distance_to(p)
+		if gd > DRAW_RADIUS:
+			continue
+		var gfade := _fog_fade(gd)
+		if gfade <= 0.01:
 			continue
 		var hgap: float = float(gate["half_gap"])
 		var fits_walk := true
@@ -1556,9 +1586,14 @@ func _draw() -> void:
 		if p_node != null:
 			fits_walk = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, false)
 			fits_dash = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, true)
-		var gcol := Color(0.48, 1.0, 0.84) if fits_walk else (Color(1.0, 0.84, 0.36) if fits_dash else Color(1.0, 0.38, 0.44))
-		draw_circle(gc, 26.0, Color(gcol.r, gcol.g, gcol.b, 0.14))
-		draw_arc(gc, 26.0, 0.0, TAU, 24, Color(gcol.r, gcol.g, gcol.b, 0.48), 2.5)
+		var gcol := Color(0.42, 1.0, 0.84) if fits_walk else (Color(1.0, 0.84, 0.36) if fits_dash else Color(1.0, 0.38, 0.44))
+		var gpulse := 0.80 + 0.20 * sin(_anim_time * 1.8 + gc.x * 0.01)
+		draw_circle(gc, 36.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.055 * gfade))
+		draw_circle(gc, 20.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.095 * gfade))
+		for mi in range(3):
+			var ma := _anim_time * 1.1 + float(mi) * (TAU / 3.0)
+			var mp := gc + Vector2(cos(ma) * 14.0, sin(ma) * 9.0)
+			draw_circle(mp, 2.4, Color(gcol.r, gcol.g, gcol.b, 0.34 * gpulse * gfade))
 
 	# Physical Obstacles (Rune Stones, Mana Crystals, Root Pillars). The painted
 	# sprite is a child node, so this pass only adds the contact shadow — and a

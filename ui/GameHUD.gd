@@ -99,10 +99,12 @@ func _build_layout() -> void:
 	stats_col.add_theme_constant_override("separation", 6)
 	row1.add_child(stats_col)
 
+	var bar_text_outline := Color(0.02, 0.06, 0.08, 0.95)
+
 	_hp_bar = ProgressBar.new()
-	_hp_bar.custom_minimum_size = Vector2(0, 22)
+	_hp_bar.custom_minimum_size = Vector2(0, 24)
 	_hp_bar.show_percentage = false
-	_hp_bar.add_theme_stylebox_override("fill", UIThemeBuilder.make_box(Color(0.95, 0.34, 0.44), Color.TRANSPARENT, 8, 0, 2, 2))
+	_hp_bar.add_theme_stylebox_override("fill", UIThemeBuilder.make_box(Color(0.94, 0.32, 0.44), Color(1.0, 0.68, 0.74, 0.45), 10, 1, 2, 2))
 	stats_col.add_child(_hp_bar)
 
 	_hp_label = Label.new()
@@ -110,6 +112,9 @@ func _build_layout() -> void:
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_hp_label.add_theme_font_size_override("font_size", 14)
+	_hp_label.add_theme_constant_override("outline_size", 4)
+	_hp_label.add_theme_color_override("font_outline_color", bar_text_outline)
+	_hp_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.99, 0.98))
 	_hp_bar.add_child(_hp_label)
 
 	# The top bar is the growth meter, not the mutation XP meter. Growth is the
@@ -118,7 +123,7 @@ func _build_layout() -> void:
 	# strip. Its fill is recoloured from the stage palette every time the stage
 	# moves, so the bar itself travels the ladder.
 	_evo_bar = ProgressBar.new()
-	_evo_bar.custom_minimum_size = Vector2(0, 22)
+	_evo_bar.custom_minimum_size = Vector2(0, 24)
 	_evo_bar.show_percentage = false
 	_evo_bar.max_value = 1.0
 	_evo_bar.value = 0.0
@@ -129,6 +134,9 @@ func _build_layout() -> void:
 	_mass_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_mass_label.add_theme_font_size_override("font_size", 14)
+	_mass_label.add_theme_constant_override("outline_size", 4)
+	_mass_label.add_theme_color_override("font_outline_color", bar_text_outline)
+	_mass_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.99, 0.98))
 	_evo_bar.add_child(_mass_label)
 
 	var right_info := VBoxContainer.new()
@@ -396,15 +404,12 @@ func _refresh_evo_label() -> void:
 	# slime does. A full bar at stage 15 stays full and gold.
 	var look := EvolutionStages.look_at(EvolutionStages.t_for_mass(arena.player.mass))
 	var col: Color = look.get("body_c", Color(0.2, 0.82, 0.66))
-	var fill := col.lerp(Color.WHITE, 0.15)
+	var fill := col.lerp(Color.WHITE, 0.12)
 	_evo_bar.add_theme_stylebox_override("fill",
-		UIThemeBuilder.make_box(fill, Color.TRANSPARENT, 8, 0, 2, 2))
-	# The label sits on the fill, and the fill follows the stage: by stage 13 it is
-	# pale gold and white text on it is unreadable. Flip the label to dark ink once
-	# the fill is light, instead of keeping one colour for the whole ladder.
-	var ink := Color(0.09, 0.13, 0.12, 0.92) if fill.get_luminance() > 0.55 \
-		else Color(1.0, 1.0, 1.0, 0.95)
-	_mass_label.add_theme_color_override("font_color", ink)
+		UIThemeBuilder.make_box(fill, Color(1.0, 1.0, 1.0, 0.28), 10, 1, 2, 2))
+	# White ink with a 4 px dark outline stays 100% readable both when the bar is
+	# empty (dark background at Stage 1) and when the bar is full of pale gold (Stage 15).
+	_mass_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.99, 0.98))
 
 
 func _sync_joystick_skill_guard() -> void:

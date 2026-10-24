@@ -186,12 +186,10 @@ void fragment() {
 		col *= mix(1.0, biome_brt, biome_strength * biome_lift_amount);
 	}
 
-	// Sunbeams through the canopy. They start as a faint cool wash and become the
-	// main light source of the late stages: by stage 15 the floor is read as
-	// sunlit rather than as a cave, which is the single cheapest way to say "the
-	// forest woke up" without adding geometry.
+	// Sunbeams through the canopy. They start as a faint cool wash and become a
+	// warm golden veil in the late stages without clipping the moss highlights.
 	vec3 beam_col = mix(canopy_glow.rgb, beam_warm, growth);
-	col += beam_col * beam * (0.30 + growth * 0.55);
+	col += beam_col * beam * (0.18 + growth * 0.24);
 
 	if (floor_strength > 0.001) {
 		vec2 fuv = world_px / floor_tile_px;
@@ -204,14 +202,15 @@ void fragment() {
 		float fine = (fine_rgb.r + fine_rgb.g + fine_rgb.b) / 3.0 / max(0.001, floor_mean);
 		float macro = (macro_rgb.r + macro_rgb.g + macro_rgb.b) / 3.0 / max(0.001, floor_mean);
 
-		float detail = mix(1.0, clamp(fine, 0.35, 2.0), 0.62 * floor_strength);
-		float broad = mix(1.0, clamp(macro, 0.55, 1.6), 0.40 * floor_strength);
+		// Harmonized detail and broad modulation: maintains organic moss grain
+		// while eliminating harsh military-camouflage splotches and dirty dark blotches.
+		float detail = mix(1.0, clamp(fine, 0.72, 1.34), 0.42 * floor_strength);
+		float broad = mix(1.0, clamp(macro, 0.82, 1.22), 0.26 * floor_strength);
 
 		col *= detail * broad;
 
-		// A hint of the tile's own green in the lit moss keeps the floor from
-		// looking like grey noise on top of a teal wash.
-		col = mix(col, col * vec3(0.92, 1.10, 0.98), clamp(fine - 1.0, 0.0, 1.0) * 0.5 * floor_strength);
+		// Rich velvety emerald-gold moss tinting in the highlights
+		col = mix(col, col * vec3(0.95, 1.14, 0.96), clamp(fine - 1.0, 0.0, 1.0) * 0.62 * floor_strength);
 
 		if (floor_relief > 0.01) {
 			// The baked slopes are gentle (the height field is smooth), so they
@@ -225,7 +224,7 @@ void fragment() {
 			vec3 light_dir = normalize(FLOOR_LIGHT);
 			// Divided by L.z so flat ground comes out at exactly 1.0.
 			float lambert = dot(nrm, light_dir) / light_dir.z;
-			col *= mix(1.0, clamp(lambert, 0.55, 1.45), 0.72 * floor_strength);
+			col *= mix(1.0, clamp(lambert, 0.60, 1.35), 0.68 * floor_strength);
 
 			// A wet sheen on the moss: cheap Blinn-Phong against the same light.
 			vec3 half_dir = normalize(light_dir + vec3(0.0, 0.0, 1.0));
@@ -234,10 +233,10 @@ void fragment() {
 		}
 
 		if (floor_occlusion > 0.01) {
-			// Also normalised around its mean, so the grooves darken without the
-			// whole floor losing brightness.
+			// Also normalised around its mean, so the grooves darken softly without
+			// cutting harsh dark channels across the moss cushions.
 			float ao = texture(floor_ao, fuv).r;
-			col *= mix(1.0, clamp(ao / max(0.05, floor_ao_mean), 0.45, 1.5), floor_occlusion * floor_strength);
+			col *= mix(1.0, clamp(ao / max(0.05, floor_ao_mean), 0.72, 1.25), floor_occlusion * floor_strength);
 		}
 
 		if (floor_dapple > 0.01) {
@@ -250,17 +249,13 @@ void fragment() {
 			float lit = texture(floor_light, luv).r;
 			// Divided by the tile's mean so the average light level is unchanged and
 			// only the variation is added; clamped so the darkest gaps stay readable.
-			col *= mix(1.0, clamp(lit / max(0.05, floor_light_mean), 0.34, 1.75),
+			col *= mix(1.0, clamp(lit / max(0.05, floor_light_mean), 0.52, 1.38),
 				floor_dapple * floor_strength);
 
 			if (floor_mist > 0.01) {
-				// Haze in the shade, from the same mask. A forest floor never goes
-				// black between the light patches: humidity catches the ambient light
-				// there. Lifting the darkest areas with a cool tint instead of a plain
-				// multiply is what stops the dapple reading as dirt stains, and it also
-				// keeps small creatures visible in the shadows.
-				float shade = 1.0 - clamp(lit / max(0.05, floor_light_mean), 0.0, 1.0);
-				col += mist_tint.rgb * shade * floor_mist * floor_strength;
+				// Soft ambient fill in the canopy shade.
+				float shade = smoothstep(1.0, 0.15, clamp(lit / max(0.05, floor_light_mean), 0.0, 1.0));
+				col += mist_tint.rgb * shade * floor_mist * 0.45 * floor_strength;
 			}
 		}
 	}
@@ -293,9 +288,8 @@ void fragment() {
 		vec2 cuv = world_px / (floor_tile_px * max(0.05, floor_caustics_scale));
 		float c1 = texture(floor_caustics, cuv + vec2(TIME * 0.012, TIME * 0.007)).r;
 		float c2 = texture(floor_caustics, cuv * 1.37 - vec2(TIME * 0.009, TIME * 0.015)).r;
-		// Multiply the two layers rather than averaging: caustics are where two
-		// wavefronts cross, so their intersection is what should be bright.
-		float caust = clamp(c1 * c2 * 1.9, 0.0, 1.0);
+		// Smooth filtering: removes baking zero-pixel noise while preserving crystalline light filaments
+		float caust = smoothstep(0.06, 0.85, c1 * c2 * 1.85);
 		col += caustics_tint * caust * floor_caustics_amount;
 	}
 
@@ -320,12 +314,16 @@ void fragment() {
 		// Warm the moss, then let the lit patches carry a little of the slime's
 		// own light. The glow term is scaled by `patch` so it follows the ground's
 		// tonal structure instead of fogging the whole screen evenly.
-		col *= mix(vec3(1.0), growth_warm, growth * 0.85);
-		col += growth_glow * patch * growth * 0.060;
+		col *= mix(vec3(1.0), growth_warm, growth * 0.65);
+		col += growth_glow * patch * growth * 0.042;
 		// The vignette opens up as the forest awakens: a growing slime should not
 		// still be standing in a dark tunnel.
 		vig = mix(vig, 1.0 - dot(vuv, vuv) * 0.22, growth);
 	}
+
+	// Smooth filmic shoulder so stacked sunbeams + dapple + Amber Grove tint roll
+	// off into rich velvet gold-green instead of hard-clipping against foreground sprites.
+	col = col / (vec3(1.0) + col * 0.72);
 
 	COLOR = vec4(col * clamp(vig, 0.68, 1.0), 1.0);
 }

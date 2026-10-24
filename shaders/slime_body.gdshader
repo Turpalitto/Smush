@@ -1,5 +1,7 @@
 shader_type canvas_item;
 
+uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear_mipmap;
+
 uniform vec4 body_color : source_color = vec4(0.13, 0.82, 0.66, 0.90);
 uniform vec4 core_color : source_color = vec4(1.0, 0.94, 0.50, 0.95);
 uniform vec4 rim_color : source_color = vec4(0.65, 1.0, 0.91, 1.0);
@@ -14,6 +16,8 @@ uniform float evolution_glow : hint_range(0.0, 1.0) = 0.0;
 // reads as "richer" at every step even where no ornament is drawn yet.
 uniform float stage_glow : hint_range(0.0, 1.0) = 0.0;
 uniform float stage_t : hint_range(0.0, 1.0) = 0.0;
+
+const vec3 LIGHT_DIR = vec3(-0.45, -0.65, 0.62);
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -52,75 +56,85 @@ void fragment() {
 		COLOR = vec4(0.0);
 	} else {
 		float edge = smoothstep(0.95, 0.84, r);
-		// Two separate bands. A bright rim *inside* the silhouette and a thin dark
-		// contour at the very edge: the glass-bead read. The old code mixed straight
-		// toward rim_color up to r=0.90, which at stages 13-15 (near-white rim, pale
-		// gold body) meant the slime had no outline at all and dissolved into the
-		// moss. Measured on reports/growth-ladder before this change.
+
+		// --- 3D Spherical Normal Reconstruction ---------------------------------
+		// Turn the 2D quad into a volumetric hemisphere. Normal z is reconstructed
+		// from distance to the wobbly edge, giving genuine curved 3D lighting.
+		float norm_r = clamp(r / 0.95, 0.0, 1.0);
+		float nz = sqrt(max(0.001, 1.0 - norm_r * norm_r));
+		vec3 normal = normalize(vec3(centered.x, centered.y, nz * 1.25));
+
+		// Spherical directional lighting
+		vec3 ldir = normalize(LIGHT_DIR);
+		float NdotL = dot(normal, ldir);
+		float wrap_light = pow(clamp(NdotL * 0.5 + 0.5, 0.0, 1.0), 1.25);
+
+		// True Fresnel rim curve (peaks at silhouette edge, zero at apex)
+		float fresnel = pow(1.0 - nz, 2.4);
+
+		// Screen-space refraction: fluid gel displaces the ground underneath it
+		vec2 refract_offset = normal.xy * (0.012 * (1.0 - nz * 0.5));
+		vec3 bg = texture(screen_tex, SCREEN_UV - refract_offset).rgb;
+
+		// Two edge bands: bright inner rim and crisp outer contour
 		float rim = smoothstep(0.52, 0.72, r) * smoothstep(0.835, 0.775, r);
 		float contour = smoothstep(0.795, 0.858, r) * smoothstep(0.928, 0.882, r);
 		float core_pulse = 0.34 + 0.05 * sin(TIME * 3.8 + pulse_phase);
 		float core_mask = smoothstep(core_pulse + 0.22, 0.04, length(centered - vec2(0.0, 0.05)));
 
-		// Body luminance decides which way "detail" goes. On a dark jelly the
-		// interior reads as light, and every term here used to add light. On the
-		// cream stages that meant the spiral bands, the nucleus and the membrane
-		// halo were all white-on-cream: the body measured as a flat disc with two
-		// eyes, which is what the stage-15 gameplay frame showed. So the detail
-		// colour flips to a deeper shade of the body's own hue on light bodies, and
-		// the terms MIX toward it instead of adding to it, so the same code reads as
-		// "currents inside the jelly" at both ends of the ladder.
+		// Body luminance decides which way "detail" goes
 		float body_lum = dot(body_color.rgb, vec3(0.2126, 0.7152, 0.0722));
 		float light_body = smoothstep(0.58, 0.82, body_lum);
-		vec3 detail = mix(core_color.rgb, body_color.rgb * 0.52, light_body);
 
-		// Top-left glossy jelly highlight
-		float spec = smoothstep(0.28, 0.08, length(centered - vec2(-0.28, -0.32))) * 0.42;
+		// Opalescent subsurface hue for pale/celestial stages
+		vec3 opal_tint = mix(
+			body_color.rgb * vec3(0.68, 0.52, 0.85),
+			vec3(0.92, 0.62, 0.32),
+			0.5 + 0.5 * sin(angle * 2.0 - TIME * 0.7)
+		);
+		vec3 detail = mix(core_color.rgb, opal_tint, light_body);
 
-		vec3 col = mix(body_color.rgb, rim_color.rgb, rim * 0.60);
-		col = mix(col, body_color.rgb * 0.40, contour * 0.62);
+		// Deep volumetric gel: shaded lower hemisphere with rich undertones
+		vec3 deep_gel = mix(body_color.rgb * vec3(0.36, 0.52, 0.70), opal_tint * 0.75, light_body);
+
+		// Base body with refracted background showing through translucent jelly
+		vec3 col = mix(bg * body_color.rgb * 1.55, body_color.rgb, clamp(body_color.a * 0.65 + 0.35 * nz, 0.0, 1.0));
+
+		// Apply volumetric spherical shading (light wraps around the blob)
+		col = mix(deep_gel, col, wrap_light * 0.55 + 0.45);
+
+		// Specular glint + secondary internal caustic bounce
+		vec3 vdir = vec3(0.0, 0.0, 1.0);
+		vec3 hdir = normalize(ldir + vdir);
+		float spec = pow(max(0.0, dot(normal, hdir)), 28.0) * 0.58;
+		vec3 bdir = normalize(vec3(0.48, 0.58, 0.35) + vdir);
+		float sub_bounce = pow(max(0.0, dot(normal, bdir)), 12.0) * 0.22;
+
+		// Composite features
+		col = mix(col, rim_color.rgb, rim * 0.52 + fresnel * 0.35);
+		col = mix(col, deep_gel * 0.62, contour * 0.68);
 		col = mix(col, detail, core_mask * 0.72);
-		col += vec3(spec);
+		col += rim_color.rgb * sub_bounce;
+		col += vec3(1.0, 0.98, 0.92) * spec;
 		col = mix(col, vec3(1.0, 0.32, 0.38), hurt_flash * 0.75);
 		col += vec3(0.35, 1.0, 0.82) * evolution_glow * 0.55;
 
-		// Growth detail. A slow spiral of soft bands inside the jelly: at stage 1 it
-		// is invisible, by stage 15 the body looks like it has currents running
-		// through it. Kept low-contrast on purpose — the slime must still read as
-		// one clean silhouette at a glance during a fight.
+		// Growth detail spiral currents
 		float spiral = sin(angle * 2.0 + dist * 14.0 - TIME * 1.1) * 0.5 + 0.5;
 		float bands = smoothstep(0.35, 0.95, spiral) * smoothstep(0.92, 0.35, r);
-		col = mix(col, detail, bands * stage_glow * 0.26);
+		col = mix(col, detail, bands * stage_glow * 0.30);
 
-		// Outer halo hugging the membrane, so the body glows instead of being
-		// outlined. This is the cheap part of the "magical" read. It is additive, so
-		// on a light body it can only brighten something that is already bright;
-		// there it is faded out and the contour does the work instead.
+		// Outer halo hugging the membrane
 		float halo = smoothstep(0.95, 0.62, r) * smoothstep(0.55, 0.90, r);
-		col += rim_color.rgb * halo * stage_glow * 0.20 * (1.0 - 0.9 * light_body);
+		col += rim_color.rgb * halo * stage_glow * 0.22 * (1.0 - 0.8 * light_body);
 
 		// --- inner cosmos ---------------------------------------------------------
-		// Two parallax layers of stars inside the jelly. The body is the one thing on
-		// screen the player never stops looking at, so the "magical" read has to come
-		// from inside it and not only from the aura around it. The near layer is
-		// larger, brighter and drifts faster than the far one; that difference is the
-		// whole effect — one scrolling layer reads as a texture, two read as depth.
-		//
-		// Anchored to the body's own frame (centered), so the sky turns with the
-		// slime instead of sliding across it, and faded in with stage_glow: at stage
-		// 1 there is no cosmos, by stage 8 the body is a small window.
 		vec2 sky = centered * 1.55;
 		float near_stars = star_layer(sky * 2.35 + vec2(TIME * 0.055, TIME * 0.021), 0.34);
 		float far_stars = star_layer(sky * 1.05 - vec2(TIME * 0.018, TIME * 0.030), 0.20);
 		float cosmos = (near_stars * 0.85 + far_stars * 0.55)
 			* smoothstep(0.94, 0.50, r) * smoothstep(0.10, 0.42, stage_glow);
-		// Mixed, not added: an additive star is invisible on the cream stages, so the
-		// star colour has to flip to a deep shade of the body's own hue there and the
-		// constellation reads as dark pinpricks instead. The flip is keyed on the
-		// body's luminance and not on `light_body`: that ramp starts at 0.58, and the
-		// stage-11 lavender body measures 0.56 — it fell on the "dark" side and got
-		// white stars, which is why the first version of this block was invisible on
-		// exactly the stages it was written for.
+
 		float star_dark = smoothstep(0.36, 0.50, body_lum);
 		vec3 star_col = mix(vec3(1.0, 0.99, 0.92), body_color.rgb * 0.18, star_dark);
 		col = mix(col, star_col, cosmos * 0.95);

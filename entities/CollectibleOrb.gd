@@ -114,30 +114,38 @@ func _draw_sparks() -> void:
 	for s: Dictionary in _sparks:
 		var k := clampf(1.0 - float(s["age"]) / SPARK_LIFE, 0.0, 1.0)
 		var local: Vector2 = (s["pos"] as Vector2) - global_position
-		draw_circle(local, 1.1 + 2.0 * k,
-			Color(orb_color.r, orb_color.g, orb_color.b, k * k * 0.85), true, -1.0, true)
+		var sz := 1.2 + 2.4 * k
+		var scol := Color(orb_color.r, orb_color.g, orb_color.b, k * k * 0.88)
+		# Twinkling starlight cross
+		draw_line(local - Vector2(sz, 0.0), local + Vector2(sz, 0.0), scol, 1.2)
+		draw_line(local - Vector2(0.0, sz), local + Vector2(0.0, sz), scol, 1.2)
+		draw_circle(local, sz * 0.45, Color(1.0, 1.0, 0.95, k * 0.95), true, -1.0, true)
 
 
 func _draw() -> void:
 	var pulse := 1.0 + 0.12 * sin(_bob_phase)
 	if orb_type == "essence":
-		_draw_glow(13.0 * pulse, 0.26)
+		_draw_glow(14.5 * pulse, 0.32)
 		var pts := PackedVector2Array([
-			Vector2(0, -10.0 * pulse),
-			Vector2(8.0 * pulse, -2.0),
-			Vector2(5.5 * pulse, 9.5 * pulse),
-			Vector2(-5.5 * pulse, 9.5 * pulse),
-			Vector2(-8.0 * pulse, -2.0)
+			Vector2(0, -10.5 * pulse),
+			Vector2(8.5 * pulse, -2.0),
+			Vector2(5.8 * pulse, 10.0 * pulse),
+			Vector2(-5.8 * pulse, 10.0 * pulse),
+			Vector2(-8.5 * pulse, -2.0)
 		])
 		draw_colored_polygon(pts, orb_color)
-		draw_circle(Vector2(-2, -3), 2.5, Color(1, 1, 1, 0.85))
+		draw_circle(Vector2(-2.2, -3.0), 2.8, Color(1.0, 1.0, 1.0, 0.92))
+		# Arcane diamond facet line
+		draw_line(Vector2(0.0, -10.5 * pulse), Vector2(0.0, 10.0 * pulse), Color(1.0, 1.0, 1.0, 0.45), 1.2)
 	elif orb_type == "dew":
-		_draw_glow(13.5 * pulse, 0.30)
-		draw_circle(Vector2.ZERO, 7.8 * pulse, orb_color)
-		draw_line(Vector2(-3.5, 0.0), Vector2(3.5, 0.0), Color(1.0, 1.0, 0.90, 0.92), 2.0)
-		draw_line(Vector2(0.0, -3.5), Vector2(0.0, 3.5), Color(1.0, 1.0, 0.90, 0.92), 2.0)
+		_draw_glow(15.0 * pulse, 0.35)
+		draw_circle(Vector2.ZERO, 8.2 * pulse, orb_color)
+		draw_line(Vector2(-3.8, 0.0), Vector2(3.8, 0.0), Color(1.0, 1.0, 0.92, 0.95), 2.2)
+		draw_line(Vector2(0.0, -3.8), Vector2(0.0, 3.8), Color(1.0, 1.0, 0.92, 0.95), 2.2)
+		draw_circle(Vector2(-2.4, -2.4), 2.2, Color(1.0, 1.0, 1.0, 0.92))
 	else:
-		_draw_glow(9.5 * pulse, 0.24)
-		draw_circle(Vector2.ZERO, 5.8 * pulse, orb_color)
-		draw_circle(Vector2(-1.6, -1.8), 2.0, Color(1, 1, 1, 0.8))
+		_draw_glow(11.0 * pulse, 0.28)
+		draw_circle(Vector2.ZERO, 6.0 * pulse, orb_color)
+		draw_circle(Vector2(-1.6, -1.8), 2.4, Color(1.0, 1.0, 1.0, 0.92))
+		draw_circle(Vector2(1.2, 1.2), 1.2, Color(orb_color.r * 0.7, orb_color.g * 0.7, orb_color.b * 0.7, 0.65))
 	_draw_sparks()

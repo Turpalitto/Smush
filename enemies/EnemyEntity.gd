@@ -210,11 +210,15 @@ func _physics_process(delta: float) -> void:
 		_absorb_elapsed += delta
 		if _absorb_target != null and is_instance_valid(_absorb_target):
 			var to_mouth := _absorb_target.global_position - global_position
-			_pull_lean = to_mouth.limit_length(12.0)
-			global_position = global_position.lerp(_absorb_target.global_position, clampf(delta * 18.0, 0.0, 1.0))
-			var shrink := clampf(1.0 - _absorb_elapsed * 4.8, 0.14, 1.0)
-			scale = Vector2(shrink * 1.18, shrink * 0.82).rotated(to_mouth.angle()) if to_mouth.length() > 2.0 else Vector2.ONE * shrink
-		if _absorb_elapsed >= 0.18:
+			_pull_lean = to_mouth.limit_length(16.0)
+			global_position = global_position.lerp(_absorb_target.global_position, clampf(delta * 16.0, 0.0, 1.0))
+			var shrink := clampf(1.0 - _absorb_elapsed * 4.2, 0.08, 1.0)
+			# Teardrop fluid elongation toward player's mouth
+			if to_mouth.length() > 2.0:
+				scale = Vector2(shrink * 1.28, shrink * 0.74).rotated(to_mouth.angle())
+			else:
+				scale = Vector2.ONE * shrink
+		if _absorb_elapsed >= 0.22:
 			fsm.transition_to(EnemyFSM.State.DEAD)
 			if arena_ref != null and arena_ref.has_method("finalize_enemy_suction"):
 				arena_ref.call("finalize_enemy_suction", self)
@@ -429,17 +433,37 @@ func _draw_sprite_body(center: Vector2, r: float, bounce: float, face: Vector2) 
 		return
 	var side := r * SPRITE_SIDE_MULT
 	var half := side * 0.5
-	# Squash & stretch keeps the single painted frame alive while hopping.
-	var sy := bounce
-	var sx := 1.0 / sqrt(maxf(0.85, bounce))
+	# Dynamic organic animation: gentle breathing when idle, elastic hop squash & stretch when moving
+	var spd := velocity.length()
+	var spd_ratio := clampf(spd / maxf(25.0, move_speed), 0.0, 1.6)
+	var idle_breath := 1.0 + 0.038 * sin(_anim_phase * 0.5)
+	var move_hop := 1.0 + 0.14 * sin(_anim_phase * 1.5)
+	var sy := lerpf(idle_breath, move_hop, spd_ratio)
+	var sx := 1.0 / sqrt(maxf(0.75, sy))
 	if face.x < -0.15:
 		sx = -sx # Mirror instead of shipping a second facing.
+	var lean_tilt := clampf((velocity.x / maxf(1.0, move_speed)) * 0.06, -0.12, 0.12)
 	var tint := Color.WHITE
 	if freeze_timer > 0.0:
 		tint = Color(0.62, 0.88, 1.0)
 	elif poison_timer > 0.0:
 		tint = Color(0.74, 1.0, 0.58)
-	draw_set_transform(center, 0.0, Vector2(sx, sy))
+
+	if fsm.state == EnemyFSM.State.BEING_ABSORBED:
+		var dt := clampf(_absorb_elapsed / 0.22, 0.0, 1.0)
+		tint = tint.lerp(Color(1.0, 0.96, 0.70), dt * 0.85)
+		tint.a = 1.0 - dt * 0.72
+		# Luminous dissolve aura around the creature as it dissolves
+		draw_circle(center, r * (1.15 + dt * 0.75), Color(0.62, 1.0, 0.86, (1.0 - dt) * 0.48))
+		draw_circle(center, r * (0.80 + dt * 0.40), Color(1.0, 0.96, 0.75, (1.0 - dt) * 0.72))
+		if _absorb_target != null and is_instance_valid(_absorb_target):
+			var to_mouth := to_local(_absorb_target.global_position)
+			for mi in range(3):
+				var mote_t := fposmod(dt * 2.4 + float(mi) * 0.33, 1.0)
+				var mp := center.lerp(to_mouth, mote_t) + Vector2(sin(_anim_phase * 2.4 + float(mi)) * 5.0, cos(_anim_phase * 2.4 + float(mi)) * 3.5)
+				draw_circle(mp, 2.4 * (1.0 - mote_t), Color(0.95, 1.0, 0.72, (1.0 - mote_t) * 0.85))
+
+	draw_set_transform(center, lean_tilt, Vector2(sx, sy))
 	draw_texture_rect(sprite_tex, Rect2(-half, -half, side, side), false, tint)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# Multiply-tinting cannot exceed white, so a hit is a soft flash laid on top.
@@ -459,30 +483,35 @@ func _draw() -> void:
 	elif poison_timer > 0.0:
 		col = col.lerp(Color(0.62, 1.0, 0.30), 0.42)
 
-	# Diegetic absorption & danger readability indicator (instant visual clarity without UI clutter!)
-	if fsm.state != EnemyFSM.State.BEING_ABSORBED and _readability_mode >= 0:
-		if _readability_mode == 0:
-			var pulse := 0.40 + 0.22 * sin(_anim_phase * 1.4)
-			draw_arc(center, r + 5.5, 0.0, TAU, 28, Color(0.36, 1.0, 0.76, pulse), 2.3)
-		elif _readability_mode == 1:
-			for seg in range(6):
-				var sa := float(seg) * (TAU / 6.0) + _anim_phase * 0.08
-				draw_arc(center, r + 5.0, sa, sa + 0.68, 8, Color(0.70, 0.84, 0.98, 0.82), 3.2)
-		elif _readability_mode == 2:
-			for seg in range(8):
-				var sa := float(seg) * (TAU / 8.0) - _anim_phase * 0.18
-				draw_arc(center, r + 5.5, sa, sa + 0.42, 6, Color(1.0, 0.84, 0.34, 0.74), 2.4)
-		elif _readability_mode == 3:
-			var warn_r := r + 6.0 + 1.4 * sin(_anim_phase * 1.7)
-			for seg in range(4):
-				var ca := float(seg) * (PI * 0.5) + PI * 0.25
-				var tip := center + Vector2.from_angle(ca) * (warn_r + 4.5)
-				var b1 := center + Vector2.from_angle(ca - 0.18) * warn_r
-				var b2 := center + Vector2.from_angle(ca + 0.18) * warn_r
-				draw_colored_polygon(PackedVector2Array([b1, tip, b2]), Color(1.0, 0.28, 0.40, 0.78))
+	# Soft multi-layered ground contact shadow (drawn first so ground aura illuminates around it)
+	var sh_pos := center + Vector2(0.0, r * 0.38)
+	draw_circle(sh_pos, r * 1.16, Color(0.01, 0.03, 0.04, 0.14))
+	draw_circle(sh_pos, r * 0.86, Color(0.01, 0.03, 0.04, 0.24))
 
-	# Ground shadow
-	draw_circle(center + Vector2(0, r * 0.42), r * 0.82, Color(0, 0, 0, 0.30))
+	# Diegetic absorption & danger ground aura (soft bioluminescent ground glow instead of CAD wire rings)
+	if fsm.state != EnemyFSM.State.BEING_ABSORBED and _readability_mode >= 0:
+		var halo_pos := center + Vector2(0.0, r * 0.18)
+		var pulse := 0.78 + 0.22 * sin(_anim_phase * 1.4)
+		var hcol := Color(0.32, 1.0, 0.76)
+		var h_alpha := 0.09
+		if _readability_mode == 1:
+			hcol = Color(0.64, 0.84, 1.0)
+			h_alpha = 0.08
+		elif _readability_mode == 2:
+			hcol = Color(1.0, 0.82, 0.32)
+			h_alpha = 0.08
+		elif _readability_mode == 3:
+			hcol = Color(1.0, 0.28, 0.42)
+			h_alpha = 0.11
+			pulse = 0.75 + 0.25 * sin(_anim_phase * 2.1)
+		draw_circle(halo_pos, (r + 14.0) * pulse, Color(hcol.r, hcol.g, hcol.b, h_alpha * 0.48))
+		draw_circle(halo_pos, (r + 6.5) * pulse, Color(hcol.r, hcol.g, hcol.b, h_alpha))
+		if _readability_mode == 0:
+			# Two tiny rising bioluminescent motes signify "ready to absorb" organically
+			for mi in range(2):
+				var ma := _anim_phase * 0.9 + float(mi) * PI
+				var mp := center + Vector2(cos(ma) * (r * 0.78), sin(ma * 1.3) * (r * 0.35) - r * 0.18)
+				draw_circle(mp, 2.1, Color(0.62, 1.0, 0.88, 0.46 * pulse))
 
 	# Ambush / Lunge telegraph showing FULL body-width collision corridor & travel distance
 	if fsm.state == EnemyFSM.State.TELEGRAPH and behavior != "zap_striker":

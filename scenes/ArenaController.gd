@@ -12,21 +12,21 @@ const MAX_ACTIVE_HAZARDS: int = 48
 ## The mean is baked into the material so the shader can normalise the tile's
 ## luminance into a shading modulation instead of a brightness offset.
 const FLOOR_TEXTURE_PATH: String = "res://resources/art/environment/forest_floor.png"
-const FLOOR_TEXTURE_MEAN: float = 0.0916
+const FLOOR_TEXTURE_MEAN: float = 0.0910
 ## Relief and occlusion come from the same height field: the normal map is
 ## derived from it by the generator, the AO map is ray-traced from it in Blender
 ## (tools/bake_floor_ao.py). Both are optional — the floor still renders without.
 const FLOOR_NORMAL_PATH: String = "res://resources/art/environment/forest_floor_normal.png"
 const FLOOR_AO_PATH: String = "res://resources/art/environment/forest_floor_ao.png"
-const FLOOR_AO_MEAN: float = 0.6977
-const FLOOR_RELIEF: float = 3.0
-const FLOOR_OCCLUSION: float = 0.55
+const FLOOR_AO_MEAN: float = 0.6808
+const FLOOR_RELIEF: float = 1.4
+const FLOOR_OCCLUSION: float = 0.20
 ## The canopy's own shadow, baked from a leaf canopy under the same sun by
 ## tools/bake_canopy_light.py. Not part of the floor tile: it repeats every few
 ## tiles and sways, so the light moves across the ground.
 const FLOOR_LIGHT_PATH: String = "res://resources/art/environment/forest_canopy_light.png"
-const FLOOR_LIGHT_MEAN: float = 0.5140
-const FLOOR_DAPPLE: float = 0.50
+const FLOOR_LIGHT_MEAN: float = 0.5596
+const FLOOR_DAPPLE: float = 0.46
 const FLOOR_LIGHT_SCALE: float = 1.45
 ## Caustics, baked by tools/bake_caustics.py: the net of light that water throws.
 ## It is the one layer of the floor that is not the forest — it is the magic under
@@ -51,7 +51,7 @@ const TRAIL_MIN_STEP_PX: float = 6.0
 ## Haze that pools in the canopy's shade, so the gaps read as light and the shade
 ## reads as humid air rather than as dirt. The shade cools down at stage 1 and
 ## warms up with the slime, which is why the pair lives here and not in the shader.
-const FLOOR_MIST: float = 0.6
+const FLOOR_MIST: float = 0.18
 const MIST_TINT_COLD: Color = Color(0.055, 0.105, 0.115)
 const MIST_TINT_WARM: Color = Color(0.108, 0.112, 0.060)
 
@@ -62,6 +62,7 @@ var tutorial: TutorialManager
 var canopy_bg: CanvasLayer
 var canopy_rect: ColorRect
 var canopy_mat: ShaderMaterial
+var canopy_fg: CanopyForeground
 ## Screen-space grade driven by growth. One fullscreen pass, see ui/WorldMood.gd.
 var mood: WorldMood
 
@@ -111,6 +112,12 @@ var _enemy_spawn_timer: float = 0.5
 var _orb_spawn_timer: float = 0.3
 var _narrow_toast_cd: float = 0.0
 var _boss_ram_cd: float = 0.0
+## Smooth camera offset in the direction the player is moving, so the player can
+## see where they are going. Lerped toward `velocity.normalized() * LOOK_AHEAD_PX`
+## every physics frame; kept small and portrait-friendly.
+var _camera_look_ahead: Vector2 = Vector2.ZERO
+const LOOK_AHEAD_PX: float = 48.0
+const LOOK_AHEAD_SPEED: float = 2.8
 var _tracked_miniboss: EnemyEntity = null
 
 # --- game feel -------------------------------------------------------------------
@@ -166,6 +173,10 @@ func _ready() -> void:
 	player = PlayerSlime.new()
 	player.name = "PlayerSlime"
 	_entities_layer.add_child(player)
+
+	# Foreground canopy parallax & bokeh layer (layer 4, below WorldMood at 5)
+	canopy_fg = CanopyForeground.new()
+	add_child(canopy_fg)
 
 	# After the player exists: the grade needs a target to light.
 	mood = WorldMood.new()
@@ -247,6 +258,7 @@ func _reset_game_feel() -> void:
 	_shake_duration = 0.0
 	Engine.time_scale = 1.0
 	_last_boss_phase = 0
+	_camera_look_ahead = Vector2.ZERO
 	_vignette_alpha = 0.0
 	if _vignette_rect != null:
 		_vignette_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)
@@ -332,6 +344,8 @@ func _apply_env_growth(env: float) -> void:
 	Audio.set_grove_env(v)
 	if world != null:
 		world.set_growth(v)
+	if canopy_fg != null:
+		canopy_fg.set_growth(v)
 	if mood != null:
 		mood.set_growth(v)
 	if canopy_mat != null:
@@ -555,6 +569,14 @@ func _physics_process(delta: float) -> void:
 	if camera != null:
 		var target_zoom_f := lerpf(1.04, 0.80, clampf((player.mass - 10.0) / 110.0, 0.0, 1.0))
 		camera.zoom = camera.zoom.lerp(Vector2(target_zoom_f, target_zoom_f), 1.0 - exp(-3.0 * delta))
+		# Camera leads gently in the direction of travel so the player sees where
+		# they are going. The offset settles back to zero when the slime idles.
+		var vel := player.velocity
+		var target_ahead := Vector2.ZERO
+		if vel.length() > 35.0:
+			target_ahead = vel.normalized() * LOOK_AHEAD_PX
+		_camera_look_ahead = _camera_look_ahead.lerp(target_ahead, 1.0 - exp(-LOOK_AHEAD_SPEED * delta))
+		camera.position = _camera_look_ahead
 
 	if canopy_mat != null:
 		# The world point at the centre of the screen, not the player's position. The
@@ -566,6 +588,8 @@ func _physics_process(delta: float) -> void:
 		if camera != null:
 			view_centre = camera.get_screen_center_position()
 			canopy_mat.set_shader_parameter("camera_zoom", camera.zoom.x)
+		if canopy_fg != null:
+			canopy_fg.set_camera_center(view_centre)
 		canopy_mat.set_shader_parameter("world_offset", view_centre)
 		canopy_mat.set_shader_parameter("view_size", get_viewport_rect().size)
 		_update_trail(delta)
@@ -1458,6 +1482,13 @@ func _awaken_grove() -> void:
 		# read as a reward rather than as the red damage flash.
 		mood.flash(Color(1.0, 0.88, 0.52), 1.4)
 	Audio.play_evolution(EvolutionStages.COUNT)
+	Audio.play_wonder_chime((ascension_loop - 1) % 3)
+	if player != null:
+		var ppos := player.global_position
+		for i in range(6):
+			var a := (TAU / 6.0) * float(i)
+			var offset: Vector2 = Vector2.from_angle(a) * (player.get_radius() + 35.0)
+			_spawn_burst(ppos + offset, Color(1.0, 0.90, 0.48), 10, 36.0)
 	Events.toast_requested.emit(Loc.t("hud.grove_awakened", {"n": str(ascension_loop)}),
 		Color(1.0, 0.88, 0.52))
 	Events.boss_awakening.emit(ascension_loop)

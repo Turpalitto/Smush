@@ -340,9 +340,15 @@ func _draw() -> void:
 	var core_pos := Vector2(0.0, r * 0.18)
 	var core_r := r * (0.42 if is_vulnerable() else 0.26)
 	var core_col := Color(0.45, 1.0, 0.74) if is_vulnerable() else (Color(1.0, 0.82, 0.35) if phase < 3 else Color(1.0, 0.34, 0.46))
-	draw_circle(core_pos, core_r * 1.32, Color(core_col.r, core_col.g, core_col.b, 0.32))
-	draw_circle(core_pos, core_r, core_col)
-	draw_circle(core_pos + Vector2(-core_r * 0.24, -core_r * 0.24), core_r * 0.32, Color(1.0, 1.0, 0.92, 0.85))
+	if sprite_tex != null:
+		# Diegetic pulsating aura behind/around the painted chest heart
+		var pulse_a := 0.45 if is_vulnerable() else (0.22 + 0.08 * sin(_anim_time * 4.2))
+		draw_circle(core_pos, core_r * 1.25, Color(core_col.r, core_col.g, core_col.b, pulse_a))
+		draw_circle(core_pos, core_r * 0.65, Color(1.0, 0.98, 0.88, pulse_a * 0.65))
+	else:
+		draw_circle(core_pos, core_r * 1.32, Color(core_col.r, core_col.g, core_col.b, 0.32))
+		draw_circle(core_pos, core_r, core_col)
+		draw_circle(core_pos + Vector2(-core_r * 0.24, -core_r * 0.24), core_r * 0.32, Color(1.0, 1.0, 0.92, 0.85))
 
 	# High-contrast fierce dark-socket eyes above the heart core (the art has its own)
 	if sprite_tex == null:
