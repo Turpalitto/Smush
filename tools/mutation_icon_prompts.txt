@@ -1,0 +1,34 @@
+# FLUX.1-schnell prompts for the mutation badge icons in resources/icons/mutations.
+# Regenerate with:
+#   python3 /Users/turpal/Documents/WORK/cf-flux/cf_flux.py --batch-file tools/mutation_icon_prompts.txt --out-dir /tmp/flux_icons --steps 8
+#   python3 tools/process_mutation_icons.py /tmp/flux_icons resources/icons/mutations
+# Order: magnet, speed_boost, spikes, poison_trail, split, shield, regeneration,
+#        dash, ranged_absorb, electro_discharge, freeze, mimicry
+#
+# Each prompt keeps the mutation's gameplay colour identity from
+# generate_assets.py (primary + accent), so the HUD strip and draft cards still
+# read as the same power at a glance.
+
+a glowing horseshoe magnet motif, polished cyan-steel magnet pulling three small golden spark orbs toward it, mint-teal energy shimmer, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a swirling motion-trail motif, three curved mint-green speed streaks wrapping around a small pale starburst, fresh mint and pale-mint palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a crown of rose-pink crystal spikes bursting outward from the center, cream-gold highlight edges on each shard, rose-pink and warm cream palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a dripping venom trail motif, a fat acid-green droplet leaving a wavy poison trail, tiny violet magic wisps rising from the drops, acid-green and soft violet palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a slime-splitting motif, one round aqua slime caught mid-split into two half-droplets with a thin pale-gold energy seam between them, aqua and pale-gold palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a round bulging shield motif, sky-blue shield face with a pale-ice crest highlight and a small gleam at the upper rim, sky-blue and pale-ice palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a regeneration motif, a small green sprout with two plump leaves growing from a soft glowing pale-lime heart shape, spring-green and pale-lime palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a comet-dash motif, a bold orange arrow-shaped comet streaking diagonally with a long cream trailing wake and tiny spark dots, warm orange and cream palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a siphon-tendril motif, a violet translucent tendril curling toward and pulling in a small glowing teal orb, gentle suction sparkles between them, violet and teal palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+an electric-discharge motif, a jagged golden lightning bolt splitting a glowing cyan energy ring, tiny cyan arcs around the bolt, electric-cyan and golden-yellow palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a frost motif, a single six-armed ice-blue snowflake crystal with pale-white inner glow and two tiny frost sparkles, ice-blue and near-white palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size
+
+a mimicry motif, one round moss-green slime wearing a tiny leaf cap, a second pair of playful eyes appearing on its flank, moss-green and soft lime palette, hand-painted 2D game ability icon, circular badge composition, vibrant magical glow, soft rim light, centered, emblem fills the circle, flat solid magenta background outside the circle, no text, no letters, no numbers, no frame ring, crisp readable silhouette at small size

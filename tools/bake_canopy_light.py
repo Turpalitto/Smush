@@ -56,10 +56,23 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--leaf-size", type=float, default=0.028, help="in tile units")
     ap.add_argument("--canopy-height", type=float, default=0.42, help="in tile units")
     ap.add_argument("--canopy-spread", type=float, default=0.22)
-    ap.add_argument("--sun-angle", type=float, default=3.0, help="sun angular diameter, degrees")
+    ap.add_argument("--sun-angle", type=float, default=11.0, help="sun angular diameter, degrees")
+    ap.add_argument("--bokeh-sigma", type=float, default=10.0, help="periodic Gaussian bokeh blur in texels")
     ap.add_argument("--samples", type=int, default=48)
     ap.add_argument("--cpu", action="store_true")
     return ap.parse_args(argv)
+
+
+def periodic_gaussian_blur(plane: np.ndarray, sigma: float) -> np.ndarray:
+    """Wrap-around Gaussian blur in frequency domain so the 1024x1024 tile stays strictly periodic."""
+    if sigma <= 0.1:
+        return plane
+    h, w = plane.shape
+    fy = np.fft.fftfreq(h) * float(h)
+    fx = np.fft.fftfreq(w) * float(w)
+    ky, kx = np.meshgrid(fy, fx, indexing="ij")
+    kernel_fft = np.exp(-2.0 * (np.pi ** 2) * (sigma ** 2) * (kx ** 2 / float(w ** 2) + ky ** 2 / float(h ** 2)))
+    return np.real(np.fft.ifft2(np.fft.fft2(plane) * kernel_fft)).astype(np.float32)
 
 
 def seam_report(plane: np.ndarray) -> dict:
@@ -284,10 +297,16 @@ def main() -> None:
     light = bake_light(ground, args)
     print("CANOPY_LIGHT bake %.1fs" % (time.time() - t0))
 
-    peak = float(light.max())
-    if peak <= 1e-5:
-        raise SystemExit("canopy light bake came back black")
-    light = np.clip(light / peak, 0.0, 1.0)
+    if args.bokeh_sigma > 0.1:
+        light = periodic_gaussian_blur(light, args.bokeh_sigma)
+
+    lo = float(np.percentile(light, 1.5))
+    hi = float(np.percentile(light, 99.2))
+    if hi - lo <= 1e-5:
+        raise SystemExit("canopy light bake came back flat")
+    light = np.clip((light - lo) / (hi - lo), 0.0, 1.0)
+    # Gentle gamma curve keeps dappled pockets soft while preserving full 0..1 dynamic range
+    light = np.power(light, 1.08).astype(np.float32)
 
     mean = float(light.mean())
     p02, p10, p50, p90, p98 = (float(v) for v in np.percentile(light, [2, 10, 50, 90, 98]))
