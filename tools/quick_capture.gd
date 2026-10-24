@@ -151,6 +151,13 @@ func _enter_arena() -> void:
 		push_warning("quick_capture: arena did not start (attempt %d), retrying" % (attempt + 1))
 
 	if App.state != App.State.PLAYING:
+		main._start_run("standard")
+		for _i in range(12):
+			await get_tree().process_frame
+			if App.state == App.State.PLAYING:
+				break
+
+	if App.state != App.State.PLAYING:
 		push_error("quick_capture: could not enter the arena; refusing to capture the menu")
 		get_tree().quit(5)
 		return

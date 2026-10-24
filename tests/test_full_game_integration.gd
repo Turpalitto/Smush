@@ -248,7 +248,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	var floor_tex := AssetRegistry.get_texture(ArenaController.FLOOR_TEXTURE_PATH)
 	assert_true(floor_tex != null, "Floor tile loads")
 	if floor_tex != null:
-		assert_eq(floor_tex.get_width(), 1024, "Floor tile is 1024 px")
+		assert_eq(floor_tex.get_width(), 2048, "Floor tile is 2048 px")
 		var fimg := floor_tex.get_image()
 		assert_true(fimg != null and not fimg.is_empty(), "Floor tile has readable pixels")
 		if fimg != null and not fimg.is_empty():
@@ -280,7 +280,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	var normal_tex := AssetRegistry.get_texture(ArenaController.FLOOR_NORMAL_PATH)
 	assert_true(normal_tex != null, "Floor normal map loads")
 	if normal_tex != null:
-		assert_eq(normal_tex.get_width(), 1024, "Floor normal map is 1024 px")
+		assert_eq(normal_tex.get_width(), 2048, "Floor normal map is 2048 px")
 		var nimg := normal_tex.get_image()
 		# A tangent-space normal map of a mostly-flat surface sits near (0.5, 0.5, 1):
 		# blue close to 1 and the red/green centred on 0.5 with a little spread.
@@ -300,7 +300,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	var ao_tex := AssetRegistry.get_texture(ArenaController.FLOOR_AO_PATH)
 	assert_true(ao_tex != null, "Floor AO map loads")
 	if ao_tex != null:
-		assert_eq(ao_tex.get_width(), 1024, "Floor AO map is 1024 px")
+		assert_eq(ao_tex.get_width(), 2048, "Floor AO map is 2048 px")
 		var aimg := ao_tex.get_image()
 		# A failed bake would come back flat; real occlusion always has spread.
 		var amin := 1.0
@@ -322,7 +322,7 @@ func _test_full_run_enemies_mutations_and_boss_victory(tree: SceneTree, main: Ma
 	var light_tex := AssetRegistry.get_texture(ArenaController.FLOOR_LIGHT_PATH)
 	assert_true(light_tex != null, "Canopy light map loads")
 	if light_tex != null:
-		assert_eq(light_tex.get_width(), 1024, "Canopy light map is 1024 px")
+		assert_eq(light_tex.get_width(), 2048, "Canopy light map is 2048 px")
 		var limg := light_tex.get_image()
 		var lmin := 1.0
 		var lmax := 0.0
@@ -1766,6 +1766,17 @@ func _test_glass_draft_and_breathing_hud(tree: SceneTree, main: MainRoot) -> voi
 	# The quad itself must be opaque: what survives of the world is `transmission`,
 	# not the quad's alpha. An alpha-blended tint would let sharp detail through.
 	assert_approx(glass.color.a, 1.0, 0.001, "The pane quad is opaque; the world shows through the shader")
+
+	# --- overlay backdrops (pause, victory, defeat) also carry frosted glass ------
+	for overlay_root in [main.overlays._pause_root, main.overlays._result_root]:
+		var bg := overlay_root.get_child(0) as ColorRect
+		assert_true(bg != null, "Overlay backdrop has a ColorRect")
+		var bg_mat := bg.material as ShaderMaterial
+		assert_true(bg_mat != null and bg_mat.shader != null, "Overlay backdrop carries a ShaderMaterial")
+		assert_true(bg_mat.shader.code.contains("hint_screen_texture"), "Overlay backdrop blurs the screen")
+		assert_approx(bg_mat.get_shader_parameter("transmission"), OverlaysController.GLASS_TRANSMISSION, 0.001, "Overlay backdrop transmission matches")
+		assert_eq(bg_mat.get_shader_parameter("glass_tint"), OverlaysController.GLASS_TINT, "Overlay backdrop tint matches")
+		assert_approx(bg.color.a, 1.0, 0.001, "Overlay backdrop quad is opaque")
 
 	# --- the cards stay readable on top of it -------------------------------------
 	# The brightest the pane can get: the milky term is the blurred frame * 0.82,
