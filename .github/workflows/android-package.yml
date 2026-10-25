@@ -48,7 +48,13 @@ jobs:
         run: |
           DEBUG_KEY="$RUNNER_TEMP/smush-debug.keystore"
           keytool -genkeypair -keystore "$DEBUG_KEY" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 3650
+          # All three debug-keystore values must travel together. Godot overrides the
+          # editor settings from the environment, so exporting only the path leaves the
+          # user and password empty and the export aborts with
+          # "Either Debug Keystore, Debug User AND Debug Password ... OR none of them".
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$DEBUG_KEY" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
       - name: Test and export APK
         run: ./scripts/build_android.sh offline
       - name: Verify package signature
