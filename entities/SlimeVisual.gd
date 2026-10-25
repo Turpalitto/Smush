@@ -25,6 +25,13 @@ var mutation_levels: Dictionary = {}
 var active_synergies: Dictionary = {}
 var active_tendril_targets: Array[Vector2] = []
 
+# Experimental organic-style switches (GLM visual lab). All default to false, so the
+# shipped game renders exactly as before; SlimeVisualOrganic sets them when its own
+# organic variants of these three visuals take over the drawing.
+var organic_tendrils: bool = false
+var organic_shield: bool = false
+var organic_electro: bool = false
+
 var _jelly_rect: ColorRect
 var _fg_overlay: Node2D
 var _shader_mat: ShaderMaterial
@@ -295,7 +302,8 @@ func _draw() -> void:
 		draw_circle(jet_dir * eff_r * 1.05, eff_r * 0.45, Color(1.0, 0.78, 0.32, 0.72))
 
 	# 4. Ranged Absorb pseudopod tendrils anchored on outer membrane (never crossing eyes)
-	if not active_tendril_targets.is_empty():
+	# Skipped when the organic style owns tendrils (SlimeVisualOrganic sets organic_tendrils).
+	if not organic_tendrils and not active_tendril_targets.is_empty():
 		var t_col := Color(0.76, 0.48, 1.0, 0.84) if not bool(active_synergies.get("bio_vampirism", false)) else Color(1.0, 0.30, 0.58, 0.90)
 		var idx := 0
 		for world_t in active_tendril_targets:
@@ -338,7 +346,7 @@ func _draw_foreground() -> void:
 		var sp := Vector2.from_angle(sa) * (eff_r * 0.52)
 		_fg_overlay.draw_circle(sp, eff_r * 0.19, Color(1.0, 0.98, 0.72, 0.90 * alpha_mult))
 
-	if int(mutation_levels.get("electro_discharge", 0)) > 0:
+	if int(mutation_levels.get("electro_discharge", 0)) > 0 and not organic_electro:
 		for i in range(3):
 			var ea := _anim_time * 6.5 + float(i) * 2.1
 			var p_a := Vector2.from_angle(ea) * (eff_r * 0.74)
@@ -384,7 +392,9 @@ func _draw_foreground() -> void:
 				_fg_overlay.draw_circle(ep + Vector2(eye_r * 0.24, eye_r * 0.26), eye_r * 0.16, Color(0.75, 1.0, 0.95, 0.85 * alpha_mult))
 
 	# 7. Shield dome & Evolution burst ring
-	if shield_active:
+	# The static dome is skipped when the organic style owns the shield
+	# (SlimeVisualOrganic sets organic_shield); the burst ring stays for both styles.
+	if shield_active and not organic_shield:
 		var sh_col := Color(0.45, 0.88, 1.0, 0.78 * alpha_mult)
 		if bool(active_synergies.get("ice_armor", false)):
 			sh_col = Color(0.80, 0.97, 1.0, 0.90 * alpha_mult)

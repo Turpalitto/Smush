@@ -11,6 +11,7 @@ const IntegrationSuite = preload("res://tests/test_full_game_integration.gd")
 const GrowthSuite = preload("res://tests/test_growth_ladder.gd")
 const ModesSuite = preload("res://tests/test_modes.gd")
 const ChimesSuite = preload("res://tests/test_audio_chimes.gd")
+const VisualLabSuite = preload("res://tests/test_visual_lab.gd")
 const TestSuiteBase = preload("res://tests/TestSuiteBase.gd")
 
 
@@ -61,6 +62,10 @@ func _execute_all() -> void:
 	var s5 := IntegrationSuite.new()
 	await s5.run_async(get_tree())
 	suites.append(s5)
+
+	var s6 := VisualLabSuite.new()
+	await s6.run_async(get_tree())
+	suites.append(s6)
 
 	var total_pass: int = 0
 	var total_fail: int = 0
