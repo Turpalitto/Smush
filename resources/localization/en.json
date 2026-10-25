@@ -120,6 +120,8 @@
     "settings.fx.low": "Low",
     "settings.fx.medium": "Medium",
     "settings.fx.high": "High",
+    "settings.organic_style": "Organic style (experimental)",
+    "settings.organic_style_hint": "Changes only how the slime looks: balance, stats, progression and saves are untouched. Restarting returns to the original style.",
     "settings.language": "Language / Язык",
     "settings.consent": "Allow Privacy-Friendly Analytics",
     "settings.restore_iap": "Restore Purchases",

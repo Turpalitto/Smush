@@ -120,6 +120,8 @@
     "settings.fx.low": "Низкое",
     "settings.fx.medium": "Среднее",
     "settings.fx.high": "Высокое",
+    "settings.organic_style": "Органический стиль (эксперимент)",
+    "settings.organic_style_hint": "Меняет только внешний вид слизи: баланс, характеристики, прогресс и сохранения не затрагиваются. После перезапуска возвращается исходный стиль.",
     "settings.language": "Язык / Language",
     "settings.consent": "Разрешить обезличенную аналитику",
     "settings.restore_iap": "Восстановить покупки",

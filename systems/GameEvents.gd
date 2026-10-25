@@ -4,6 +4,9 @@ extends Node
 signal game_state_changed(old_state: int, new_state: int)
 signal locale_changed(new_locale: String)
 signal settings_changed()
+## The experimental organic look was switched on/off at runtime. Visual only: no
+## stat, save field or balance value depends on it (see systems/VisualStyle.gd).
+signal visual_style_changed(organic: bool)
 
 # Gameplay & Slime signals
 signal player_mass_changed(current_mass: float, radius: float)

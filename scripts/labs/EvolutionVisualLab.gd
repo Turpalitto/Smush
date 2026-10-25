@@ -100,6 +100,11 @@ func _ready() -> void:
 	cam.name = "LabCamera"
 	cam.position = _home + Vector2(0.0, 150.0)
 	cam.zoom = Vector2(DEMO_ZOOM, DEMO_ZOOM)
+	# The project runs with physics interpolation on, so a Camera2D left on the idle
+	# callback gets force-switched to physics by the engine and prints a warning every
+	# run. Ask for physics explicitly: same behaviour, no warning, and the camera still
+	# tracks the slime that moves in _physics_process.
+	cam.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	cam.enabled = true
 	add_child(cam)
 

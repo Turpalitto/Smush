@@ -112,6 +112,43 @@ func apply_cosmetics() -> void:
 	_recompute_look()
 
 
+## Copy every presentation-only field onto another SlimeVisual.
+##
+## Used when the experimental style is switched mid-run (PlayerSlime.apply_visual_style)
+## and by the acceptance capture tool, which swaps the class on a frozen frame: the
+## body must not jump in size, squash, blink phase, mutation set or trail, otherwise
+## the two frames would not be the same moment.
+func copy_presentation_to(next: SlimeVisual) -> void:
+	if next == null:
+		return
+	next.radius = radius
+	next.look_dir = look_dir
+	next.velocity_vec = velocity_vec
+	next.squash_stretch = squash_stretch
+	next.gulp_bulge = gulp_bulge
+	next.hurt_flash = hurt_flash
+	next.evolution_flash = evolution_flash
+	next.stealth_alpha = stealth_alpha
+	next.shield_active = shield_active
+	next.slipstream_active = slipstream_active
+	next.compass_dir = compass_dir
+	next.compass_color = compass_color
+	next.is_dashing = is_dashing
+	next.is_dying = is_dying
+	next.death_progress = death_progress
+	next.mutation_levels = mutation_levels.duplicate()
+	next.active_synergies = active_synergies.duplicate()
+	next.active_tendril_targets = active_tendril_targets.duplicate()
+	next.growth_t = growth_t
+	next.mass = mass
+	next.stage = stage
+	next.ascension_stars = ascension_stars
+	next._trail_points = _trail_points.duplicate()
+	next._blink_timer = _blink_timer
+	next._blink_open = _blink_open
+	next._anim_time = _anim_time
+
+
 func set_growth(p_mass: float) -> void:
 	## Called by the player whenever mass changes. Cheap enough to run on every
 	## absorption: it only does arithmetic and touches the shader when the palette

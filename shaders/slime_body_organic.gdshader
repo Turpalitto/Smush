@@ -43,6 +43,14 @@ uniform vec2 absorb_dir = vec2(0.0, 1.0); // local-space direction of the last s
 uniform float organelles = 0.0;
 uniform float membrane_w = 0.0;
 uniform float nucleus_w = 0.0;
+// Core placement, size and opacity. Tuned by comparing real arena frames (stages 6-9,
+// four candidates), not by guessing: at y=0.16/r=0.30 the core's top edge
+// (0.16 - 0.84*0.30 = -0.09) landed on the eyes, whose discs run from -0.28r to
+// +0.08r, so the core read as a dark mouth between them. Chosen variant keeps a
+// visible organ low in the body with a real gap: 0.34 - 0.84*0.29 = 0.096 > 0.08.
+uniform float nucleus_y = 0.34;
+uniform float nucleus_r = 0.29;
+uniform float nucleus_mix = 1.15;
 uniform float veins_w = 0.0;
 uniform float flow_w = 0.0;
 uniform float inner_glow = 0.0;
@@ -95,7 +103,7 @@ float organelle_layer(vec2 p, float density, float par_amt, vec2 par, vec2 drift
 	// side. Without this the organelles read as flat dots glued onto the gel.
 	vec2 ln = normalize(off + vec2(0.0001));
 	rim_shade = clamp(0.55 + 0.75 * dot(ln, vec2(0.42, -0.88)), 0.0, 1.4);
-	return smoothstep(0.30, 0.13, d);
+	return smoothstep(0.34, 0.15, d);
 }
 
 void fragment() {
@@ -111,7 +119,10 @@ void fragment() {
 	if (quality >= 1) {
 		vec2 wp = vec2(cos(angle), sin(angle)) * 1.6;
 		float n = fbm2(wp * 2.2 + vec2(u_time * 0.11, -u_time * 0.07) + centered * 0.9);
-		wave += (n - 0.5) * wobble_amount * (1.6 + 4.5 * silhouette_w);
+		// ACCEPTANCE FIX (arena pass): 4.5 pushed bulges ~16% past the collision
+		// radius, so the organic slime looked bigger than the mass it had. 2.8
+		// keeps the living contour while staying inside ~11% of the true size.
+		wave += (n - 0.5) * wobble_amount * (1.6 + 2.8 * silhouette_w);
 	}
 
 	// Acceleration & braking live in lag_vec: pushing forward makes the body trail
@@ -150,7 +161,10 @@ void fragment() {
 	if (quality >= 1) {
 		vec2 refract_offset = normal.xy * (0.014 * (1.0 - nz * 0.5));
 		vec3 bg = texture(screen_tex, SCREEN_UV - refract_offset).rgb;
-		col = mix(bg * body_color.rgb * 1.55, body_color.rgb, clamp(body_color.a * 0.55 + 0.42 * nz, 0.0, 1.0));
+		// ACCEPTANCE FIX (arena pass): 0.55/0.42 let so much forest green through
+		// that the body read as milky and desaturated next to the original, which
+		// uses 0.65/0.35. The refraction is a hint, not the material.
+		col = mix(bg * body_color.rgb * 1.55, body_color.rgb, clamp(body_color.a * 0.66 + 0.34 * nz, 0.0, 1.0));
 	} else {
 		// Low: no screen read. Depth shading alone still sells the volume.
 		col = body_color.rgb * clamp(0.55 + 0.45 * nz, 0.0, 1.0);
@@ -202,13 +216,16 @@ void fragment() {
 	if (organelles > 0.02) {
 		float shade0 = 0.0;
 		float shade1 = 0.0;
-		float dens = clamp(0.18 + 0.72 * organelles, 0.0, 0.92);
+		// ACCEPTANCE FIX (arena pass): density ran to 0.92 at stage 15 and the
+		// near lattice turned the cream body into sand — grain, not anatomy. Fewer,
+		// larger, softer organelles read as tissue at every size.
+		float dens = clamp(0.16 + 0.58 * organelles, 0.0, 0.74);
 		// Near layer: big, strong parallax, follows lag almost fully.
-		float o0 = organelle_layer(centered * 3.1, dens, 0.55, normal.xy, swirl + lag, shade0);
+		float o0 = organelle_layer(centered * 2.35, dens, 0.55, normal.xy, swirl + lag, shade0);
 		// Deep layer: fine, weak parallax, lags only half as much (it sits "further back").
 		float o1 = 0.0;
 		if (quality >= 1) {
-			o1 = organelle_layer(centered * 5.2 + vec2(7.3, 2.9), dens * 0.8, 0.22, normal.xy, swirl * 1.6 + lag * 0.5, shade1);
+			o1 = organelle_layer(centered * 4.6 + vec2(7.3, 2.9), dens * 0.62, 0.22, normal.xy, swirl * 1.6 + lag * 0.5, shade1);
 		}
 		// Organelle tissue is DARKER and more saturated than the gel on dark bodies
 		// (deeper tissue seen through a translucent membrane) and amber-dark on the
@@ -216,8 +233,8 @@ void fragment() {
 		// cotton instead of anatomy. Only the small glow-cell motes stay core-bright.
 		vec3 fill0 = mix(body_color.rgb * 0.62, body_color.rgb * vec3(0.62, 0.44, 0.30), light_body);
 		vec3 fill1 = mix(body_color.rgb * 0.44, body_color.rgb * vec3(0.44, 0.32, 0.24), light_body);
-		float o0a = o0 * (0.30 + 0.28 * shade0) * organelles;
-		float o1a = o1 * (0.24 + 0.24 * shade1) * organelles;
+		float o0a = o0 * (0.38 + 0.30 * shade0) * organelles;
+		float o1a = o1 * (0.30 + 0.26 * shade1) * organelles;
 		col = mix(col, fill1 * shade1, clamp(o1a, 0.0, 1.0));
 		col = mix(col, fill0 * shade0, clamp(o0a, 0.0, 1.0));
 		// A fraction of cells are luminous: tiny mitochondria that carry the
@@ -231,27 +248,29 @@ void fragment() {
 
 	// --- nucleus ----------------------------------------------------------------
 	if (nucleus_w > 0.02) {
-		// Drifts with the current and lags behind acceleration; sits slightly above
-		// centre so the face (eyes live at -0.10r) stays clear.
-		vec2 nuc_c = vec2(0.0, 0.16) + swirl * 2.2 + lag * 1.4
+		// Drifts with the current and lags behind acceleration. It sits BELOW the eyes
+		// (eye discs span -0.28r..+0.08r) with a clear gap: nucleus_y - 0.84*nucleus_r
+		// stays above the eye bottoms at every stage, so the core reads as an inner
+		// organ rather than a mouth. Placement is a uniform pair, tuned on real frames.
+		vec2 nuc_c = vec2(0.0, nucleus_y) + swirl * 2.2 + lag * 1.4
 			+ vec2(sin(u_time * 0.5), cos(u_time * 0.37)) * 0.045;
 		vec2 nd = (centered - nuc_c) / vec2(1.0, 0.84);
 		float dn = length(nd);
-		float nuc = smoothstep(0.30, 0.24, dn);
-		float nuc_rim = smoothstep(0.34, 0.29, dn) * smoothstep(0.24, 0.29, dn);
+		float nuc = smoothstep(nucleus_r, nucleus_r - 0.06, dn);
+		float nuc_rim = smoothstep(nucleus_r + 0.04, nucleus_r - 0.01, dn) * smoothstep(nucleus_r - 0.06, nucleus_r - 0.01, dn);
 		// Chromatin: a faint rotating two-arm spiral inside the nucleus appears in
 		// the Predator phase and refines through Apex. Two sine arms, no texture.
 		float chromatin = 0.0;
 		if (nucleus_w > 0.55) {
 			float na = atan(nd.y, nd.x) + u_time * 0.4;
-			chromatin = (0.5 + 0.5 * sin(na * 2.0 + dn * 16.0)) * smoothstep(0.30, 0.10, dn) * 0.35;
+			chromatin = (0.5 + 0.5 * sin(na * 2.0 + dn * 16.0)) * smoothstep(nucleus_r, nucleus_r * 0.33, dn) * 0.35;
 		}
 		vec3 nuc_fill = mix(body_color.rgb * vec3(0.34, 0.44, 0.52), body_color.rgb * vec3(0.50, 0.38, 0.30), light_body);
 		vec3 nuc_lit = mix(core_color.rgb, vec3(1.0, 0.93, 0.72), light_body * 0.6);
-		col = mix(col, nuc_fill + nuc_lit * chromatin, nuc * (0.55 + 0.35 * nucleus_w));
-		col = mix(col, nuc_lit, nuc_rim * 0.45 * nucleus_w);
+		col = mix(col, nuc_fill + nuc_lit * chromatin, nuc * (0.55 + 0.35 * nucleus_w) * nucleus_mix);
+		col = mix(col, nuc_lit, nuc_rim * 0.45 * nucleus_w * nucleus_mix);
 		// Nucleolus: one bright dot, the anchor the swallowed prey drifts toward.
-		float nucleolus = smoothstep(0.085, 0.035, length(centered - nuc_c - vec2(0.05, -0.04)));
+		float nucleolus = smoothstep(nucleus_r * 0.28, nucleus_r * 0.12, length(centered - nuc_c - vec2(0.05, -0.04)));
 		col += nuc_lit * nucleolus * (0.55 + 0.45 * inner_glow) * nucleus_w;
 	}
 
@@ -278,8 +297,11 @@ void fragment() {
 	// "double membrane" of the Apex phases).
 	float rim = smoothstep(0.52, 0.72, r) * smoothstep(0.835, 0.775, r);
 	float contour = smoothstep(0.795, 0.858, r) * smoothstep(0.928, 0.882, r);
+	// ACCEPTANCE FIX (arena pass): the contour was 0.45 against the original's
+	// 0.68, and on the forest floor the organic body lost its edge — it smeared
+	// into the undergrowth while the original stayed a crisp drop.
 	col = mix(col, rim_color.rgb, rim * (0.30 + 0.30 * membrane_w) + fresnel * (0.22 + 0.20 * membrane_w));
-	col = mix(col, deep_gel * 0.62, contour * (0.45 + 0.25 * membrane_w));
+	col = mix(col, deep_gel * 0.62, contour * (0.64 + 0.14 * membrane_w));
 	if (membrane_w > 0.5) {
 		float inner_band = smoothstep(0.58, 0.66, r) * smoothstep(0.74, 0.66, r);
 		col = mix(col, rim_color.rgb * 0.85, inner_band * (membrane_w - 0.5) * 0.55);
@@ -297,10 +319,13 @@ void fragment() {
 
 	// --- electro discharge burst -------------------------------------------------
 	if (electro_flash > 0.01) {
-		// The moment of discharge: the whole cytoplasm flares, the filaments blow
-		// out to white-yellow, and the membrane flickers.
+		// The moment of discharge: the cytoplasm flares and the filaments blow out.
+		// ACCEPTANCE FIX (arena pass): at 0.80 the whole body clipped to white for
+		// the 0.22 s of the burst and the anatomy vanished — the player could not
+		// see their own slime at the exact moment they needed to. The flare now
+		// lights the body instead of erasing it.
 		float flare = electro_flash * (0.55 + 0.45 * sin(u_time * 47.0 + angle * 3.0));
-		col += vec3(1.0, 0.95, 0.55) * flare * smoothstep(0.95, 0.30, r) * 0.8;
+		col += vec3(1.0, 0.95, 0.55) * flare * smoothstep(0.95, 0.30, r) * 0.38;
 	}
 
 	// --- growth detail + outer halo (compat with the original's stage language) --
@@ -315,8 +340,12 @@ void fragment() {
 	// A wide soft radial emission plus a lifted base: the body glows by itself and
 	// the light pool drawn by SlimeAura completes the effect without any post pass.
 	float glow_falloff = smoothstep(0.92, 0.12, r);
-	col += core_color.rgb * glow_falloff * inner_glow * (0.30 + 0.10 * sin(u_time * 1.9 + pulse_phase));
-	col *= 1.0 + inner_glow * 0.16;
+	// ACCEPTANCE FIX (arena pass): the additive core glow was 0.30 * inner_glow —
+	// at stage 8 (0.68) that is +0.20 of cream over the whole body, and under the
+	// arena's warm grade it flattened the anatomy into milk. The body keeps a
+	// lifted base so it still glows without bloom, but the tissue stays readable.
+	col += core_color.rgb * glow_falloff * inner_glow * (0.17 + 0.06 * sin(u_time * 1.9 + pulse_phase));
+	col *= 1.0 + inner_glow * 0.09;
 
 	// --- status composites --------------------------------------------------------
 	col = mix(col, vec3(1.0, 0.32, 0.38), hurt_flash * 0.62);

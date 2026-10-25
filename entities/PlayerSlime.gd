@@ -58,9 +58,45 @@ func _ready() -> void:
 	collision_shape.shape = circle_shape
 	add_child(collision_shape)
 
-	visual = SlimeVisual.new()
+	visual = VisualStyle.make_visual()
 	add_child(visual)
+	if visual is SlimeVisualOrganic:
+		(visual as SlimeVisualOrganic).set_quality(VisualStyle.quality_from_settings())
+	Events.visual_style_changed.connect(_on_visual_style_changed)
 	_sync_mass_metrics()
+
+
+## --- experimental style switch ------------------------------------------------
+## Visual only. The physics body, mass, HP, mutations and the HUD are owned by this
+## node, not by the visual, so replacing the visual cannot change balance or
+## progression — and switching back does not restart the run.
+
+func _on_visual_style_changed(organic: bool) -> void:
+	apply_visual_style(organic)
+
+
+func apply_visual_style(want_organic: bool) -> void:
+	if visual == null or not is_instance_valid(visual):
+		return
+	if (visual is SlimeVisualOrganic) == want_organic:
+		return
+	var old := visual
+	var next: SlimeVisual = SlimeVisualOrganic.new() if want_organic else SlimeVisual.new()
+	next.name = "SlimeVisual"
+	# Carry the current look over before the swap: without this the body would
+	# visibly jump (size, squash, blink phase, mutation attachments).
+	old.copy_presentation_to(next)
+	remove_child(old)
+	old.queue_free()
+	visual = next
+	add_child(next)
+	if next is SlimeVisualOrganic:
+		(next as SlimeVisualOrganic).set_quality(VisualStyle.quality_from_settings())
+	next.apply_cosmetics()
+	_sync_mass_metrics()
+	next.queue_redraw()
+	if next._fg_overlay != null:
+		next._fg_overlay.queue_redraw()
 
 
 func initialize_for_run(p_arena: Node) -> void:

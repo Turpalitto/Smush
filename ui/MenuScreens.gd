@@ -726,6 +726,24 @@ func _build_settings_page() -> void:
 	)
 	list.add_child(fx_btn)
 
+	# Experimental organic style (GLM visual lab). Runtime-only on purpose: it writes
+	# nothing to SaveData, so the experiment cannot touch balance, stats or
+	# progression, and the hint says so — a restart returns to the shipped look.
+	var org_chk := CheckButton.new()
+	org_chk.text = Loc.t("settings.organic_style")
+	org_chk.button_pressed = VisualStyle.organic_enabled
+	org_chk.toggled.connect(func(on: bool) -> void:
+		Audio.play_sfx("button_click")
+		VisualStyle.set_enabled(on)
+	)
+	list.add_child(org_chk)
+	var org_hint := Label.new()
+	org_hint.text = Loc.t("settings.organic_style_hint")
+	org_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	org_hint.add_theme_font_size_override("font_size", 15)
+	org_hint.modulate = Color(1, 1, 1, 0.66)
+	list.add_child(org_hint)
+
 	# Language RU / EN switch
 	var cur_loc := Loc.current_locale
 	var lang_btn := Button.new()
