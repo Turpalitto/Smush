@@ -31,6 +31,15 @@ var active_tendril_targets: Array[Vector2] = []
 var organic_tendrils: bool = false
 var organic_shield: bool = false
 var organic_electro: bool = false
+## Presentation hooks for a style that owns the whole face and ground contact
+## (SlimeVisualClaude). Same contract as the three flags above: default false, so the
+## shipped game and the original style render exactly as before.
+var custom_face: bool = false
+var custom_burst: bool = false
+var custom_ground: bool = false
+## When true, the subclass owns ALL mutation visuals (spikes, dash, regen, etc.)
+## and the base class skips its flat draws for them. Set by SlimeVisualClaude.
+var organic_all_mutations: bool = false
 
 var _jelly_rect: ColorRect
 var _fg_overlay: Node2D
@@ -291,22 +300,24 @@ func _draw() -> void:
 		draw_circle(local_p, tr, Color(_trail_color.r, _trail_color.g, _trail_color.b, 0.26 * t * alpha_mult))
 
 	# 2. 2.5D angled ground shadow + bioluminescent ground light pool
-	var sh_rot := velocity_vec.angle() if velocity_vec.length() > 15.0 else 0.0
-	draw_set_transform(Vector2(0.0, eff_r * 0.40), sh_rot, Vector2(squash_stretch.x * 0.92, squash_stretch.y * 0.74))
-	draw_circle(Vector2.ZERO, eff_r * 1.42, Color(_body_color.r, _body_color.g, _body_color.b, 0.085 * alpha_mult))
-	draw_circle(Vector2.ZERO, eff_r * 1.14, Color(0.01, 0.04, 0.06, 0.18 * alpha_mult))
-	draw_circle(Vector2.ZERO, eff_r * 0.92, Color(0.01, 0.04, 0.06, 0.30 * alpha_mult))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# (skipped when a style draws its own contact shadow: custom_ground)
+	if not custom_ground:
+		var sh_rot := velocity_vec.angle() if velocity_vec.length() > 15.0 else 0.0
+		draw_set_transform(Vector2(0.0, eff_r * 0.40), sh_rot, Vector2(squash_stretch.x * 0.92, squash_stretch.y * 0.74))
+		draw_circle(Vector2.ZERO, eff_r * 1.42, Color(_body_color.r, _body_color.g, _body_color.b, 0.085 * alpha_mult))
+		draw_circle(Vector2.ZERO, eff_r * 1.14, Color(0.01, 0.04, 0.06, 0.18 * alpha_mult))
+		draw_circle(Vector2.ZERO, eff_r * 0.92, Color(0.01, 0.04, 0.06, 0.30 * alpha_mult))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# 3. Behind-body / perimeter Mutation visuals
-	if int(mutation_levels.get("magnet", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("magnet", 0)) > 0:
 		var mag_col := Color(0.35, 0.88, 1.0, 0.30 * alpha_mult)
 		if bool(active_synergies.get("em_storm", false)):
 			mag_col = Color(1.0, 0.92, 0.35, 0.48 * alpha_mult)
 		draw_arc(Vector2.ZERO, eff_r * 1.45, _anim_time * 2.0, _anim_time * 2.0 + PI * 1.3, 24, mag_col, 2.2)
 		draw_arc(Vector2.ZERO, eff_r * 1.25, -_anim_time * 2.4, -_anim_time * 2.4 + PI * 1.1, 20, mag_col, 1.8)
 
-	if int(mutation_levels.get("speed_boost", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("speed_boost", 0)) > 0:
 		var back_ang := (velocity_vec.angle() + PI) if velocity_vec.length() > 15.0 else -PI * 0.5
 		var fin_col := Color(0.45, 1.0, 0.94, 0.88 * alpha_mult) if slipstream_active else Color(0.55, 1.0, 0.88, 0.68 * alpha_mult)
 		for side: float in [-0.55, 0.55]:
@@ -318,7 +329,7 @@ func _draw() -> void:
 		if slipstream_active:
 			draw_arc(Vector2.ZERO, eff_r * 1.15, back_ang + PI - 0.85, back_ang + PI + 0.85, 16, Color(0.55, 1.0, 0.95, 0.72 * alpha_mult), 2.6)
 
-	if int(mutation_levels.get("spikes", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("spikes", 0)) > 0:
 		var spike_cnt: int = 6 + int(mutation_levels.get("spikes", 1))
 		var sp_col := Color(1.0, 0.42, 0.52, 0.94 * alpha_mult)
 		var tip_col := Color(1.0, 0.82, 0.88, 0.96 * alpha_mult)
@@ -334,7 +345,7 @@ func _draw() -> void:
 			draw_colored_polygon(PackedVector2Array([base - tang, tip, base + tang]), sp_col)
 			draw_line(base, tip, tip_col, 1.4)
 
-	if int(mutation_levels.get("dash", 0)) > 0 and is_dashing:
+	if not organic_all_mutations and int(mutation_levels.get("dash", 0)) > 0 and is_dashing:
 		var jet_dir := (-velocity_vec.normalized()) if velocity_vec.length() > 1.0 else Vector2.UP
 		draw_circle(jet_dir * eff_r * 1.05, eff_r * 0.45, Color(1.0, 0.78, 0.32, 0.72))
 
@@ -366,19 +377,19 @@ func _draw_foreground() -> void:
 	var alpha_mult := stealth_alpha * (1.0 - death_progress)
 
 	# 5. Internal & crown Mutation visuals rendered cleanly above jelly shader
-	if int(mutation_levels.get("regeneration", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("regeneration", 0)) > 0:
 		for i in range(3):
 			var oa := _anim_time * 1.6 + float(i) * (TAU / 3.0)
 			var op := Vector2.from_angle(oa) * (eff_r * 0.44)
 			_fg_overlay.draw_circle(op, 3.8, Color(0.58, 1.0, 0.56, 0.88 * alpha_mult))
 
-	if int(mutation_levels.get("poison_trail", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("poison_trail", 0)) > 0:
 		for i in range(4):
 			var pa := -_anim_time * 1.4 + float(i) * (TAU / 4.0)
 			var pp := Vector2.from_angle(pa) * (eff_r * 0.68)
 			_fg_overlay.draw_circle(pp, 3.6, Color(0.72, 1.0, 0.28, 0.82 * alpha_mult))
 
-	if int(mutation_levels.get("split", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("split", 0)) > 0:
 		var sa := _anim_time * 2.8
 		var sp := Vector2.from_angle(sa) * (eff_r * 0.52)
 		_fg_overlay.draw_circle(sp, eff_r * 0.19, Color(1.0, 0.98, 0.72, 0.90 * alpha_mult))
@@ -391,13 +402,13 @@ func _draw_foreground() -> void:
 			var p_b := Vector2.from_angle(ea + 0.36) * (eff_r * 1.10)
 			_fg_overlay.draw_polyline(PackedVector2Array([p_a, p_m, p_b]), Color(1.0, 0.95, 0.42, 0.92 * alpha_mult), 2.2)
 
-	if int(mutation_levels.get("freeze", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("freeze", 0)) > 0:
 		for i in range(4):
 			var fa := _anim_time * 1.2 + float(i) * (PI * 0.5)
 			var fp := Vector2.from_angle(fa) * (eff_r * 1.12)
 			_fg_overlay.draw_circle(fp, 3.6, Color(0.80, 0.97, 1.0, 0.88 * alpha_mult))
 
-	if int(mutation_levels.get("mimicry", 0)) > 0:
+	if not organic_all_mutations and int(mutation_levels.get("mimicry", 0)) > 0:
 		var top := Vector2(0.0, -eff_r * 0.90)
 		var leaf := PackedVector2Array([
 			top,
@@ -409,7 +420,8 @@ func _draw_foreground() -> void:
 		_fg_overlay.draw_line(top, top + Vector2(0.0, -16.0), Color(0.85, 1.0, 0.82, 0.85 * alpha_mult), 1.6)
 
 	# 6. Expressive High-Contrast Eyes & Specular Catchlights (drawn crisp over cytoplasm!)
-	if not is_dying:
+	# (skipped when a style renders its own face: custom_face)
+	if not is_dying and not custom_face:
 		var look_off := look_dir.normalized() * (eff_r * 0.16)
 		var eye_sep := eff_r * 0.33
 		var eye_y := -eff_r * 0.10
@@ -438,7 +450,7 @@ func _draw_foreground() -> void:
 		_fg_overlay.draw_circle(Vector2.ZERO, eff_r * 1.18, Color(sh_col.r, sh_col.g, sh_col.b, 0.14))
 		_fg_overlay.draw_arc(Vector2.ZERO, eff_r * 1.18, 0.0, TAU, 36, sh_col, 2.8)
 
-	if evolution_flash > 0.02:
+	if evolution_flash > 0.02 and not custom_burst:
 		var er := eff_r * (1.1 + (1.0 - evolution_flash) * 1.4)
 		_fg_overlay.draw_arc(Vector2.ZERO, er, 0.0, TAU, 36, Color(0.55, 1.0, 0.82, evolution_flash), 3.5)
 
