@@ -210,6 +210,10 @@ func _boot() -> void:
 	if not mut_env.is_empty():
 		for mid in mut_env.split(","):
 			player.mutations.levels[mid.strip_edges()] = mlevel
+	var syn_env := OS.get_environment("SWAP_SYN")
+	if not syn_env.is_empty():
+		for sid in syn_env.split(","):
+			player.mutations.active_synergies[sid.strip_edges()] = true
 	player._sync_mass_metrics()
 
 	_swap_visual()
@@ -319,7 +323,7 @@ func _swap_visual() -> void:
 	var old: SlimeVisual = player.visual
 	var next: SlimeVisual
 	if organic:
-		next = SlimeVisualOrganic.new()
+		next = SlimeVisualClaude.new()
 	else:
 		next = SlimeVisual.new()
 	next.name = "SlimeVisual"
@@ -329,8 +333,8 @@ func _swap_visual() -> void:
 	old.queue_free()
 	player.visual = next
 	player.add_child(next)
-	if organic:
-		(next as SlimeVisualOrganic).set_quality(quality)
+	if organic and next.has_method("set_quality"):
+		next.call("set_quality", quality)
 	player._sync_mass_metrics()
 	_apply_nucleus_override()
 	print("SWAP visual=%s mutations=%s mass=%.1f" % [
@@ -348,13 +352,10 @@ func _wire_organic_hooks() -> void:
 	set_process(true)
 
 
-func _on_entity_absorbed(_entity_id: String, _mass_gained: float, _xp: float, world_pos: Vector2) -> void:
+func _on_entity_absorbed(_entity_id: String, _mass_gained: float, _xp: float, _world_pos: Vector2) -> void:
 	if not organic or main == null or main.arena == null:
 		return
-	var vis := main.arena.player.visual
-	if vis is SlimeVisualOrganic:
-		var entry := world_pos - main.arena.player.global_position
-		(vis as SlimeVisualOrganic).trigger_swallow(entry, Color(0.72, 0.92, 0.80), 9.0)
+	# Phagocytosis is already dispatched cleanly by PlayerSlime.complete_absorption
 	if _at == "swallow":
 		_arm()
 
@@ -363,12 +364,12 @@ func _on_shield_triggered() -> void:
 	if not organic or main == null or main.arena == null:
 		return
 	var vis := main.arena.player.visual
-	if vis is SlimeVisualOrganic:
+	if vis != null and vis.has_method("trigger_shield_impact"):
 		var dir := Vector2.RIGHT
 		var near: Node2D = main.arena.enemy_grid.query_nearest(main.arena.player.global_position, 320.0)
 		if near != null:
 			dir = (near.global_position - main.arena.player.global_position).normalized()
-		(vis as SlimeVisualOrganic).trigger_shield_impact(dir)
+		vis.call("trigger_shield_impact", dir)
 	if _at == "impact":
 		_arm()
 
@@ -593,7 +594,7 @@ func _max_frame_delta(a: Image, b: Image) -> int:
 func _swap_preserving(want_organic: bool) -> void:
 	var player := main.arena.player
 	var old: SlimeVisual = player.visual
-	var next: SlimeVisual = SlimeVisualOrganic.new() if want_organic else SlimeVisual.new()
+	var next: SlimeVisual = SlimeVisualClaude.new() if want_organic else SlimeVisual.new()
 	next.name = "SlimeVisual"
 	# One shared copy routine with the in-game switch (PlayerSlime.apply_visual_style):
 	# the acceptance frames must carry exactly the state the game carries.
@@ -602,8 +603,8 @@ func _swap_preserving(want_organic: bool) -> void:
 	old.queue_free()
 	player.visual = next
 	player.add_child(next)
-	if want_organic:
-		(next as SlimeVisualOrganic).set_quality(quality)
+	if want_organic and next.has_method("set_quality"):
+		next.call("set_quality", quality)
 	# One zero-delta tick: sizes the shader rect, flushes palette/quality uniforms
 	# and pushes the aura state, without advancing a single animation.
 	next._process(0.0)
@@ -632,7 +633,7 @@ func _save_png(path: String) -> int:
 	print("SWAP_SHOT %s %dx%d style=%s stage=%d mass=%.1f err=%d" % [
 		path, img.get_width(), img.get_height(),
 		# The real class, not the tool's own flag: after a live switch they differ.
-		"organic" if vis is SlimeVisualOrganic else "original",
+		"organic" if (vis is SlimeVisualClaude or vis is SlimeVisualOrganic) else "original",
 		vis.stage if vis != null else -1, main.arena.player.mass, err])
 	return err
 
@@ -653,7 +654,7 @@ func _capture_now() -> void:
 ## stays the default, switching changes nothing but the look, and switching back works
 ## without restarting the run. So this asserts, in the live arena:
 ##   * default state is the original visual;
-##   * enabling turns the player's visual into SlimeVisualOrganic;
+##   * enabling turns the player's visual into SlimeVisualClaude / organic;
 ##   * disabling turns it back, mid-run, with the game still PLAYING;
 ##   * mass, HP and absorbed count are identical before/after — the switch is visual.
 func _run_toggle_check() -> void:
@@ -661,11 +662,11 @@ func _run_toggle_check() -> void:
 	var mass0 := player.mass
 	var hp0 := player.hp
 	var absorbed0 := player.absorbed_count
-	var default_original := not (player.visual is SlimeVisualOrganic)
+	var default_original := not (player.visual is SlimeVisualClaude or player.visual is SlimeVisualOrganic)
 
 	VisualStyle.set_enabled(true)
 	await _wait_frames(4)
-	var on_ok := player.visual is SlimeVisualOrganic
+	var on_ok := (player.visual is SlimeVisualClaude or player.visual is SlimeVisualOrganic)
 	if on_ok and not _out_path.is_empty():
 		await _save_png(_out_path + "_toggle_on.png")
 	# Let the organic body run a few real frames: a swap that only looks right in the
@@ -675,7 +676,7 @@ func _run_toggle_check() -> void:
 
 	VisualStyle.set_enabled(false)
 	await _wait_frames(4)
-	var off_ok := not (player.visual is SlimeVisualOrganic)
+	var off_ok := not (player.visual is SlimeVisualClaude or player.visual is SlimeVisualOrganic)
 	if off_ok and not _out_path.is_empty():
 		await _save_png(_out_path + "_toggle_off.png")
 

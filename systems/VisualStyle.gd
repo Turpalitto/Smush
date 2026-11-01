@@ -11,14 +11,14 @@ extends RefCounted
 ## PlayerSlime.apply_visual_style(): same body, same physics, same HUD — the run
 ## keeps going and switching back is instant.
 
-static var organic_enabled: bool = false
+static var organic_enabled: bool = true
 
 
 ## The single place that decides which visual class the player gets. Both the
 ## shipped path and the experiment go through here, so there is one architecture.
 static func make_visual() -> SlimeVisual:
 	if organic_enabled:
-		return SlimeVisualOrganic.new()
+		return SlimeVisualClaude.new()
 	return SlimeVisual.new()
 
 

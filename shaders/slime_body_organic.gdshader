@@ -36,21 +36,22 @@ uniform float stage_t : hint_range(0.0, 1.0) = 0.0;
 // --- organic-only controls (set by SlimeVisualOrganic) ---
 uniform float u_time = 0.0;
 uniform int quality = 2; // 0 = Low, 1 = Medium, 2 = High
-uniform vec2 lag_vec = vec2(0.0); // velocity minus its smoothed self, in local units; drives inertia
+uniform vec2 lag_vec = vec2(0.0); // fallback / general inertia
+uniform vec2 lag_membrane = vec2(0.0); // fast elastic response for outer contour
+uniform vec2 lag_nucleus = vec2(0.0); // heavy viscoelastic lag for inner nucleus
+uniform vec2 lag_organelles = vec2(0.0); // intermediate phase-shifted lag for lattices
 uniform float absorb_pulse : hint_range(0.0, 1.0) = 0.0; // decaying envelope while swallowing
 uniform vec2 absorb_dir = vec2(0.0, 1.0); // local-space direction of the last swallow
 // Six-phase anatomy weights, 0..1, from the per-stage table in SlimeVisualOrganic.
 uniform float organelles = 0.0;
 uniform float membrane_w = 0.0;
 uniform float nucleus_w = 0.0;
-// Core placement, size and opacity. Tuned by comparing real arena frames (stages 6-9,
-// four candidates), not by guessing: at y=0.16/r=0.30 the core's top edge
-// (0.16 - 0.84*0.30 = -0.09) landed on the eyes, whose discs run from -0.28r to
-// +0.08r, so the core read as a dark mouth between them. Chosen variant keeps a
-// visible organ low in the body with a real gap: 0.34 - 0.84*0.29 = 0.096 > 0.08.
-uniform float nucleus_y = 0.34;
-uniform float nucleus_r = 0.29;
-uniform float nucleus_mix = 1.15;
+// Core placement, size and opacity. Tuned to ensure the nucleus sits deep in the
+// lower hemisphere as a translucent visceral organ, with generous breathing room
+// below the eyes (-0.28r..+0.08r) to completely eliminate mouth/beak pareidolia.
+uniform float nucleus_y = 0.40;
+uniform float nucleus_r = 0.24;
+uniform float nucleus_mix = 0.60;
 uniform float veins_w = 0.0;
 uniform float flow_w = 0.0;
 uniform float inner_glow = 0.0;
@@ -125,11 +126,17 @@ void fragment() {
 		wave += (n - 0.5) * wobble_amount * (1.6 + 2.8 * silhouette_w);
 	}
 
-	// Acceleration & braking live in lag_vec: pushing forward makes the body trail
-	// and the contents lean back; a hard stop throws them forward. One signal, no
-	// separate accel/brake state on the CPU.
-	float lag_amt = clamp(length(lag_vec), 0.0, 0.30);
-	wave += dot(normalize(centered + vec2(0.0001)), normalize(lag_vec + vec2(0.0001))) * lag_amt * 0.10;
+	// Membrane elasticity: uses lag_membrane spring with fallback to lag_vec
+	vec2 m_lag = dot(lag_membrane, lag_membrane) > 0.00001 ? lag_membrane : lag_vec;
+	float lag_amt = clamp(length(m_lag), 0.0, 0.35);
+	wave += dot(normalize(centered + vec2(0.0001)), normalize(m_lag + vec2(0.0001))) * lag_amt * 0.12;
+
+	// Local entry cupping deformation during phagocytosis
+	if (absorb_pulse > 0.003) {
+		float absorb_align = dot(normalize(centered + vec2(0.0001)), normalize(absorb_dir + vec2(0.0001)));
+		float local_deform = sin(absorb_pulse * 3.14159 * 2.0) * exp(-pow(1.0 - absorb_align, 2.0) * 3.5) * 0.045 * absorb_pulse;
+		wave -= local_deform;
+	}
 
 	float r = dist + wave;
 
@@ -220,12 +227,13 @@ void fragment() {
 		// near lattice turned the cream body into sand — grain, not anatomy. Fewer,
 		// larger, softer organelles read as tissue at every size.
 		float dens = clamp(0.16 + 0.58 * organelles, 0.0, 0.74);
-		// Near layer: big, strong parallax, follows lag almost fully.
-		float o0 = organelle_layer(centered * 2.35, dens, 0.55, normal.xy, swirl + lag, shade0);
+		// Near layer: big, strong parallax, follows organelle lag.
+		vec2 o_lag = dot(lag_organelles, lag_organelles) > 0.00001 ? -lag_organelles * 0.9 : -lag_vec * 0.9;
+		float o0 = organelle_layer(centered * 2.35, dens, 0.55, normal.xy, swirl + o_lag, shade0);
 		// Deep layer: fine, weak parallax, lags only half as much (it sits "further back").
 		float o1 = 0.0;
 		if (quality >= 1) {
-			o1 = organelle_layer(centered * 4.6 + vec2(7.3, 2.9), dens * 0.62, 0.22, normal.xy, swirl * 1.6 + lag * 0.5, shade1);
+			o1 = organelle_layer(centered * 4.6 + vec2(7.3, 2.9), dens * 0.62, 0.22, normal.xy, swirl * 1.6 + o_lag * 0.5, shade1);
 		}
 		// Organelle tissue is DARKER and more saturated than the gel on dark bodies
 		// (deeper tissue seen through a translucent membrane) and amber-dark on the
@@ -241,47 +249,54 @@ void fragment() {
 		// bioluminescence without any bloom pass.
 		float glow_cells = 0.0;
 		if (quality >= 1) {
-			glow_cells = organelle_layer(centered * 4.1 + vec2(13.7, 5.1), dens * 0.35, 0.4, normal.xy, swirl * 1.2 + lag * 0.7, shade0);
+			glow_cells = organelle_layer(centered * 4.1 + vec2(13.7, 5.1), dens * 0.35, 0.4, normal.xy, swirl * 1.2 + o_lag * 0.7, shade0);
 		}
 		col += core_color.rgb * glow_cells * (0.35 + 0.75 * inner_glow) * smoothstep(0.9, 0.3, r) * (0.5 + 0.5 * sin(u_time * 2.3 + centered.x * 9.0));
 	}
 
 	// --- nucleus ----------------------------------------------------------------
 	if (nucleus_w > 0.02) {
-		// Drifts with the current and lags behind acceleration. It sits BELOW the eyes
-		// (eye discs span -0.28r..+0.08r) with a clear gap: nucleus_y - 0.84*nucleus_r
-		// stays above the eye bottoms at every stage, so the core reads as an inner
-		// organ rather than a mouth. Placement is a uniform pair, tuned on real frames.
-		vec2 nuc_c = vec2(0.0, nucleus_y) + swirl * 2.2 + lag * 1.4
-			+ vec2(sin(u_time * 0.5), cos(u_time * 0.37)) * 0.045;
-		vec2 nd = (centered - nuc_c) / vec2(1.0, 0.84);
+		// Drifts with the current and lags behind acceleration. It sits comfortably in the
+		// lower hemisphere (eye discs span -0.28r..+0.08r), providing generous clearance
+		// (nucleus_y - 0.88*nucleus_r >= 0.18r > 0.08r) so the core reads unambiguously as
+		// a deep internal organ, never as a mouth or beak.
+		vec2 n_lag = dot(lag_nucleus, lag_nucleus) > 0.00001 ? -lag_nucleus : -lag_vec * 0.9;
+		// Dampen upward lag so braking never pulls the nucleus into the facial zone
+		n_lag.y = min(n_lag.y, 0.05);
+		vec2 nuc_c = vec2(0.0, nucleus_y) + swirl * 1.6 + n_lag * 1.1
+			+ vec2(sin(u_time * 0.5), cos(u_time * 0.37)) * 0.035;
+		nuc_c.y = max(nuc_c.y, 0.38);
+		vec2 nd = (centered - nuc_c) / vec2(1.05, 0.88);
 		float dn = length(nd);
-		float nuc = smoothstep(nucleus_r, nucleus_r - 0.06, dn);
-		float nuc_rim = smoothstep(nucleus_r + 0.04, nucleus_r - 0.01, dn) * smoothstep(nucleus_r - 0.06, nucleus_r - 0.01, dn);
-		// Chromatin: a faint rotating two-arm spiral inside the nucleus appears in
-		// the Predator phase and refines through Apex. Two sine arms, no texture.
+		// Soft volumetric falloff without razor-sharp cutoffs
+		float nuc = smoothstep(nucleus_r, nucleus_r * 0.25, dn);
+		float nuc_core = smoothstep(nucleus_r * 0.60, 0.0, dn);
+		// Chromatin: faint rotating arms inside the deeper core
 		float chromatin = 0.0;
-		if (nucleus_w > 0.55) {
-			float na = atan(nd.y, nd.x) + u_time * 0.4;
-			chromatin = (0.5 + 0.5 * sin(na * 2.0 + dn * 16.0)) * smoothstep(nucleus_r, nucleus_r * 0.33, dn) * 0.35;
+		if (nucleus_w > 0.45) {
+			float na = atan(nd.y, nd.x) + u_time * 0.35;
+			chromatin = (0.5 + 0.5 * sin(na * 2.0 + dn * 14.0)) * smoothstep(nucleus_r * 0.85, nucleus_r * 0.20, dn) * 0.28;
 		}
-		vec3 nuc_fill = mix(body_color.rgb * vec3(0.34, 0.44, 0.52), body_color.rgb * vec3(0.50, 0.38, 0.30), light_body);
-		vec3 nuc_lit = mix(core_color.rgb, vec3(1.0, 0.93, 0.72), light_body * 0.6);
-		col = mix(col, nuc_fill + nuc_lit * chromatin, nuc * (0.55 + 0.35 * nucleus_w) * nucleus_mix);
-		col = mix(col, nuc_lit, nuc_rim * 0.45 * nucleus_w * nucleus_mix);
-		// Nucleolus: one bright dot, the anchor the swallowed prey drifts toward.
-		float nucleolus = smoothstep(nucleus_r * 0.28, nucleus_r * 0.12, length(centered - nuc_c - vec2(0.05, -0.04)));
-		col += nuc_lit * nucleolus * (0.55 + 0.45 * inner_glow) * nucleus_w;
+		// Natural organic tinting: translucent deep gel + core bioluminescence
+		vec3 nuc_deep = mix(deep_gel * 0.85, core_color.rgb * 0.70, 0.35);
+		vec3 nuc_glow_col = mix(core_color.rgb, vec3(1.0, 0.95, 0.82), light_body * 0.5);
+		float blend_amt = nuc * (0.35 + 0.35 * nucleus_w) * nucleus_mix;
+		col = mix(col, nuc_deep + nuc_glow_col * (chromatin * 0.4), blend_amt);
+		// Soft inner bioluminescent radiance rather than a cartoon outline
+		col += nuc_glow_col * nuc_core * (0.25 + 0.35 * inner_glow) * nucleus_w * nucleus_mix;
+		// Nucleolus: soft, pearl-like focal anchor
+		float nucleolus = smoothstep(nucleus_r * 0.35, 0.0, length(centered - nuc_c - vec2(0.03, -0.02)));
+		col += nuc_glow_col * nucleolus * (0.45 + 0.45 * inner_glow) * nucleus_w;
 	}
 
-	// --- absorption ripple ------------------------------------------------------
+	// --- absorption ripple & reflex glint ---------------------------------------
 	if (absorb_pulse > 0.003) {
 		// One ring travelling inward from the membrane while the envelope decays,
 		// biased toward the side the prey entered from. Low quality keeps one ring;
 		// High adds a faint second one trailing behind.
 		float prog = 1.0 - absorb_pulse;
 		float ring_r = mix(0.93, 0.18, prog);
-		float dir_bias = 0.55 + 0.45 * dot(normalize(centered + vec2(0.0001)), normalize(absorb_dir));
+		float dir_bias = 0.55 + 0.45 * dot(normalize(centered + vec2(0.0001)), normalize(absorb_dir + vec2(0.0001)));
 		float ring = exp(-pow((r - ring_r) * 8.5, 2.0)) * absorb_pulse * dir_bias;
 		col += rim_color.rgb * ring * 0.85;
 		col = mix(col, core_color.rgb, ring * 0.25);
@@ -289,6 +304,10 @@ void fragment() {
 			float ring2 = exp(-pow((r - (ring_r + 0.10)) * 10.0, 2.0)) * absorb_pulse * 0.4 * dir_bias;
 			col += rim_color.rgb * ring2;
 		}
+		// Local reflex glint at entry point
+		float glint_align = dot(normal.xy, normalize(absorb_dir + vec2(0.0001)));
+		float glint = pow(max(0.0, glint_align), 8.0) * absorb_pulse * 0.40;
+		col += vec3(1.0, 0.98, 0.92) * glint;
 	}
 
 	// --- membrane ---------------------------------------------------------------

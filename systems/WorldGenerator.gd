@@ -1091,6 +1091,7 @@ func _add_decor_sprite(d: Dictionary, root: Node2D, key: Vector2i) -> void:
 			"bend": 0.0,
 			"bend_vel": 0.0,
 			"dust_cd": 0.0,
+			"base_scale": sp.scale,
 		})
 	_fogged.append({"node": sp, "base": base_col, "chunk": key, "biome": bcol})
 	if kind == 6:
@@ -1277,9 +1278,20 @@ func _process(delta: float) -> void:
 		var dist2 := rel.length_squared()
 		if dist2 > DECOR_RADIUS * DECOR_RADIUS:
 			continue
-		node.rotation = float(swayer["base_rotation"]) \
-			+ sin(_anim_time * 1.6 + float(swayer["phase"])) * float(swayer["amount"]) \
-			+ _step_bend(swayer, rel, dist2, delta)
+		# Traveling atmospheric wind waves + gust through the canopy
+		var wind_wave := sin(_anim_time * 1.15 + node.position.x * 0.0032 + node.position.y * 0.0018) * 0.45
+		var wind_gust := pow(maxf(0.0, sin(_anim_time * 0.32 + node.position.x * 0.0009 + node.position.y * 0.0006)), 2.6) * 0.55
+		var total_wind := (sin(_anim_time * 1.6 + float(swayer["phase"])) * 0.50 + wind_wave + wind_gust) * (float(swayer["amount"]) * 0.65)
+		node.rotation = float(swayer["base_rotation"]) + total_wind + _step_bend(swayer, rel, dist2, delta)
+
+		# Physical stepping squish: when close to player, plant compresses and springs back
+		var base_s: Vector2 = swayer.get("base_scale", node.scale)
+		if dist2 < (BEND_RANGE * 0.65) * (BEND_RANGE * 0.65):
+			var dist := sqrt(dist2)
+			var squish_k := (1.0 - dist / (BEND_RANGE * 0.65))
+			node.scale = Vector2(base_s.x * (1.0 + squish_k * 0.12), base_s.y * (1.0 - squish_k * 0.18))
+		elif node.scale != base_s:
+			node.scale = node.scale.lerp(base_s, clampf(delta * 6.0, 0.0, 1.0))
 	if profile_enabled:
 		perf_us["sway"] += Time.get_ticks_usec() - t_part
 		perf_us["process"] += Time.get_ticks_usec() - t_all
@@ -1552,6 +1564,16 @@ func _draw() -> void:
 			var rip_t := fposmod(_anim_time * 12.0 + fp.x * 0.08 + fp.y * 0.06, pr)
 			var rip_a := (1.0 - rip_t / pr) * 0.32 * fade
 			draw_arc(Vector2.ZERO, rip_t, 0.0, TAU, 24, Color(0.65, 0.95, 1.0, rip_a), 1.2)
+			# Interactive water wake when player slides across pool
+			var pl_dist := p.distance_to(fp)
+			if pl_dist < pr * 1.35:
+				var pl_rel := (p - fp) * Vector2(1.0, 1.0 / 0.58)
+				var pl_rip1 := fposmod(_anim_time * 26.0, pr * 0.90)
+				var pl_rip2 := fposmod(_anim_time * 26.0 + pr * 0.45, pr * 0.90)
+				var pl_a1 := (1.0 - pl_rip1 / (pr * 0.90)) * 0.46 * fade
+				var pl_a2 := (1.0 - pl_rip2 / (pr * 0.90)) * 0.46 * fade
+				draw_arc(pl_rel, pl_rip1, 0.0, TAU, 28, Color(0.72, 1.0, 0.95, pl_a1), 1.4)
+				draw_arc(pl_rel, pl_rip2, 0.0, TAU, 28, Color(0.72, 1.0, 0.95, pl_a2), 1.2)
 			# Starlight glint on water surface
 			var glint_p := Vector2(-pr * 0.28, -pr * 0.22)
 			var glint_a := (0.45 + 0.35 * sin(_anim_time * 2.0 + fp.x)) * fade
@@ -1568,7 +1590,20 @@ func _draw() -> void:
 				for gi in range(3):
 					var gr := (26.0 + 15.0 * float(gi)) * sc * breathe
 					draw_circle(fp, gr, Color(1.0, 0.86, 0.52, (0.022 - 0.006 * float(gi)) * fade))
+			elif fkind == 6:
+				# Glow mushrooms: soft bioluminescent cyan cap radiance illuminating the ground
+				var shroom_pulse := 0.82 + 0.18 * sin(_anim_time * 2.0 + fp.x * 0.015 + fp.y * 0.012)
+				# Proximity reaction: mushrooms brighten as the slime approaches
+				var prox_d := fp.distance_to(p)
+				var prox_k := 1.0 + smoothstep(120.0, 20.0, prox_d) * 1.8
+				for gi in range(3):
+					var gr := (20.0 + 14.0 * float(gi)) * sc * shroom_pulse * (1.0 + (prox_k - 1.0) * 0.35)
+					var ga := (0.040 - 0.011 * float(gi)) * fade * prox_k
+					draw_circle(fp + Vector2(0.0, -8.0 * sc), gr, Color(0.28, 0.88, 0.98, ga))
 			_draw_ground_shadow(fp, float(spec.get("shadow", 19.0)) * sc, 0.20 * fade)
+		# Rising wisps from puddles and blooming flora
+		if (fkind == 1 or (fkind >= BLOOM_KIND_MIN and bloom_f > 0.1)) and fd < DECOR_RADIUS * 0.7:
+			_draw_rising_wisps(fp, fkind, sc, fade if fkind == 1 else fade * bloom_f)
 
 	# Narrow passage floor rune glow (soft threshold mist instead of a hard wire circle)
 	var p_node: PlayerSlime = get_parent().get("player") if get_parent() != null else null
@@ -1608,10 +1643,14 @@ func _draw() -> void:
 		var okind: String = str(ob["kind"])
 		# Drawn before the sprite (children render on top), so this becomes a halo
 		# behind the crystal or the monolith instead of a wash over it.
-		_draw_prop_glow(op, r, okind, ofade)
+		_draw_prop_glow(op, r, okind, ofade, p)
 		_draw_ground_shadow(op, r * 1.02, 0.34 * ofade)
 		if _prop_texture(okind) == null:
 			_draw_prop_fallback(op, r, okind)
+
+	# Drifting mist patches: large translucent volumes of humid forest air
+	if str(SaveData.get_setting("fx_quality", "high")) != "low":
+		_draw_mist_patches(p)
 
 	# Drifting ambient bioluminescent spores
 	if str(SaveData.get_setting("fx_quality", "high")) != "low":
@@ -1645,6 +1684,8 @@ func _draw() -> void:
 	if growth > 0.02:
 		_draw_growth_life(p)
 
+	_draw_wild_fireflies(p)
+
 
 func _draw_growth_life(p: Vector2) -> void:
 	## Fireflies and the grove aura. Both are pure functions of index and time, so
@@ -1677,6 +1718,114 @@ func _draw_growth_life(p: Vector2) -> void:
 		draw_circle(pos, 1.2 + 0.7 * tw, Color(1.0, 1.0, 0.92, 0.85 * a))
 
 
+func _draw_wild_fireflies(p: Vector2) -> void:
+	## Clusters of timid bioluminescent fireflies inhabiting magical flora and ancient stones.
+	## When the player slides close, they startle and flutter into the undergrowth before returning.
+	if str(SaveData.get_setting("fx_quality", "high")) == "low":
+		return
+
+	# 1. Fireflies around glowing mushroom clusters (decor kind 6)
+	for fl: Dictionary in decor_flora:
+		if int(fl["kind"]) != 6:
+			continue
+		var fp: Vector2 = fl["pos"]
+		var fd := fp.distance_to(p)
+		if fd > DECOR_RADIUS:
+			continue
+		var fade := _fog_fade(fd)
+		if fade <= 0.01:
+			continue
+		_draw_firefly_cluster(fp, 2, Color(0.40, 0.95, 0.98), p, fade)
+
+	# 2. Fireflies around mana crystals and rune stones
+	for ob: Dictionary in obstacles:
+		var okind: String = str(ob["kind"])
+		if okind != "mana_crystal" and okind != "rune_stone":
+			continue
+		var op: Vector2 = ob["pos"]
+		var od := op.distance_to(p)
+		if od > DECOR_RADIUS:
+			continue
+		var fade := _fog_fade(od)
+		if fade <= 0.01:
+			continue
+		var col := Color(0.45, 0.88, 1.0) if okind == "mana_crystal" else Color(0.48, 1.0, 0.78)
+		_draw_firefly_cluster(op, 3, col, p, fade)
+
+
+func _draw_firefly_cluster(center: Vector2, count: int, tint: Color, player_p: Vector2, fade: float) -> void:
+	for i in range(count):
+		var h := fmod(sin(float(i) * 19.34 + center.x * 0.023 + center.y * 0.037) * 43758.5453, 1.0)
+		var spd := 0.95 + absf(h) * 0.85
+		var ang := _anim_time * spd + float(i) * 2.2 + absf(h) * TAU
+		var orb_r := 26.0 + absf(h) * 22.0
+		var fpos := center + Vector2(cos(ang) * orb_r, sin(ang * 0.85) * (orb_r * 0.65))
+		fpos.y += sin(_anim_time * 1.5 + float(i)) * 6.0
+
+		# Startle behavior: scatter outwards if player approaches within 85 px
+		var to_p := fpos - player_p
+		var p_dist := to_p.length()
+		if p_dist < 85.0 and p_dist > 1.0:
+			var flee_k := (1.0 - p_dist / 85.0)
+			fpos += (to_p / p_dist) * (flee_k * 48.0)
+			fpos.y += sin(_anim_time * 9.0 + float(i) * 3.0) * 8.0 * flee_k
+
+		var tw := 0.45 + 0.55 * sin(_anim_time * 3.2 + float(i) * 1.9 + absf(h) * 4.0)
+		var a := tw * fade
+		if a <= 0.02:
+			continue
+		draw_circle(fpos, 3.4, Color(tint.r, tint.g, tint.b, 0.16 * a))
+		draw_circle(fpos, 1.3, Color(1.0, 1.0, 0.94, 0.86 * a))
+
+
+func _draw_mist_patches(player: Vector2) -> void:
+	## Stateless drifting fog volumes: large translucent circles that drift on sine
+	## curves around the player, simulating humid air pockets between tree trunks.
+	for i in range(6):
+		var fi := float(i)
+		var ox := sin(_anim_time * (0.035 + fi * 0.008) + fi * 2.1) * (320.0 + fi * 80.0)
+		var oy := cos(_anim_time * (0.028 + fi * 0.006) + fi * 1.7) * (280.0 + fi * 60.0)
+		var offset := Vector2(ox, oy)
+		var od := offset.length()
+		if od > DRAW_RADIUS:
+			continue
+		var fog_a := _fog_fade(od)
+		if fog_a <= 0.01:
+			continue
+		var pulse := 0.7 + 0.3 * sin(_anim_time * 0.5 + fi * 1.3)
+		var outer_r := 280.0 + fi * 20.0
+		var inner_r := 150.0 + fi * 14.0
+		var base_a := (0.020 + fi * 0.002) * pulse * fog_a
+		var mpos := player + offset
+		draw_circle(mpos, outer_r, Color(fog_tint.r * 0.9, fog_tint.g * 1.15, fog_tint.b * 1.05, base_a * 0.6))
+		draw_circle(mpos, inner_r, Color(fog_tint.r * 0.85, fog_tint.g * 1.2, fog_tint.b * 1.1, base_a))
+
+
+func _draw_rising_wisps(center: Vector2, kind: int, sc: float, fade: float) -> void:
+	## Stateless ascending luminous wisps from water and flowers.
+	## Pure function of position + time — no stored state, stable across chunk streaming.
+	var count := 2 if kind == 1 else 1
+	var is_water := (kind == 1)
+	for i in range(count):
+		var h := fmod(sin(center.x * 0.037 + center.y * 0.051 + float(i) * 7.13) * 43758.5453, 1.0)
+		var cycle := 3.5 + absf(h) * 2.5
+		var t := fmod(_anim_time + absf(h) * cycle, cycle)
+		var life_frac := t / cycle
+		var a := minf(1.0, life_frac / 0.15) * (1.0 - smoothstep(0.7, 1.0, life_frac))
+		if a <= 0.02:
+			continue
+		var rise_y := life_frac * 65.0 * sc
+		var drift_x := sin(t * 1.8 + float(i) * 2.1) * 12.0 * sc
+		var wpos := center + Vector2(drift_x + (h - 0.5) * 18.0 * sc, -rise_y - 6.0 * sc)
+		var col: Color
+		if is_water:
+			col = Color(0.55, 0.92, 1.0, a * fade * 0.52)
+		else:
+			col = Color(1.0, 0.88, 0.55, a * fade * 0.48)
+		draw_circle(wpos, 2.4 * sc, Color(col.r, col.g, col.b, col.a * 0.3))
+		draw_circle(wpos, 1.1 * sc, col)
+
+
 func _draw_ground_shadow(center: Vector2, radius: float, alpha: float) -> void:
 	# A squashed ellipse, nudged "south" so the prop reads as standing on the floor
 	# rather than lying on it.
@@ -1700,21 +1849,31 @@ func _draw_prop_fallback(p: Vector2, r: float, kind: String) -> void:
 	draw_arc(p, r * 0.94, 0.0, TAU, 22, rim, 2.0)
 
 
-func _draw_prop_glow(p: Vector2, r: float, kind: String, fade: float = 1.0) -> void:
-	## Slow pulsing halo behind the two magical props. Three cheap circles instead of
-	## a shader: at 26-44 px radius the banding is invisible, and it costs no extra
-	## draw call on the mobile renderer.
+func _draw_prop_glow(pos: Vector2, r: float, kind: String, fade: float = 1.0, player_pos: Vector2 = Vector2.INF) -> void:
+	## Slow pulsing halo behind the two magical props, with proximity reactivity.
 	var glow_colour := Color(0.0, 0.0, 0.0, 0.0)
+	var core_colour := Color(1.0, 1.0, 1.0, 1.0)
 	if kind == "mana_crystal":
 		glow_colour = Color(0.35, 0.85, 1.0, 1.0)
+		core_colour = Color(0.85, 0.96, 1.0, 1.0)
 	elif kind == "rune_stone":
-		glow_colour = Color(0.40, 1.0, 0.80, 1.0)
+		glow_colour = Color(0.36, 1.0, 0.76, 1.0)
+		core_colour = Color(0.88, 1.0, 0.94, 1.0)
 	else:
 		return
-	var pulse := 0.5 + 0.5 * sin(_anim_time * 1.7 + p.x * 0.013 + p.y * 0.011)
+	var pulse := 0.5 + 0.5 * sin(_anim_time * 1.7 + pos.x * 0.013 + pos.y * 0.011)
+	var pulse2 := 0.5 + 0.5 * sin(_anim_time * 2.8 + pos.x * 0.021 + pos.y * 0.019)
+	# Proximity boost: props glow brighter when the slime is nearby
+	var prox_boost := 1.0
+	if player_pos != Vector2.INF:
+		var pd := pos.distance_to(player_pos)
+		prox_boost = 1.0 + smoothstep(140.0, 30.0, pd) * 1.5
 	for step in range(3):
 		var radius := r * (1.15 + 0.28 * float(step))
-		var alpha := (0.10 - 0.028 * float(step)) * (0.65 + 0.35 * pulse) * fade
+		var alpha := (0.10 - 0.028 * float(step)) * (0.65 + 0.35 * pulse) * fade * prox_boost
 		if alpha <= 0.0:
 			continue
-		draw_circle(p + Vector2(0.0, -r * 0.15), radius, Color(glow_colour.r, glow_colour.g, glow_colour.b, alpha))
+		draw_circle(pos + Vector2(0.0, -r * 0.15), radius, Color(glow_colour.r, glow_colour.g, glow_colour.b, alpha))
+	var c_alpha := 0.12 * pulse2 * fade * prox_boost
+	draw_circle(pos + Vector2(0.0, -r * 0.20), r * 0.45, Color(core_colour.r, core_colour.g, core_colour.b, c_alpha))
+

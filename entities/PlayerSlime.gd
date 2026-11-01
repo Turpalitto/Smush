@@ -60,8 +60,8 @@ func _ready() -> void:
 
 	visual = VisualStyle.make_visual()
 	add_child(visual)
-	if visual is SlimeVisualOrganic:
-		(visual as SlimeVisualOrganic).set_quality(VisualStyle.quality_from_settings())
+	if visual.has_method("set_quality"):
+		visual.call("set_quality", VisualStyle.quality_from_settings())
 	Events.visual_style_changed.connect(_on_visual_style_changed)
 	_sync_mass_metrics()
 
@@ -78,10 +78,11 @@ func _on_visual_style_changed(organic: bool) -> void:
 func apply_visual_style(want_organic: bool) -> void:
 	if visual == null or not is_instance_valid(visual):
 		return
-	if (visual is SlimeVisualOrganic) == want_organic:
+	var is_current_organic: bool = (visual is SlimeVisualClaude) or (visual is SlimeVisualOrganic)
+	if is_current_organic == want_organic:
 		return
 	var old := visual
-	var next: SlimeVisual = SlimeVisualOrganic.new() if want_organic else SlimeVisual.new()
+	var next: SlimeVisual = VisualStyle.make_visual() if want_organic else SlimeVisual.new()
 	next.name = "SlimeVisual"
 	# Carry the current look over before the swap: without this the body would
 	# visibly jump (size, squash, blink phase, mutation attachments).
@@ -90,8 +91,8 @@ func apply_visual_style(want_organic: bool) -> void:
 	old.queue_free()
 	visual = next
 	add_child(next)
-	if next is SlimeVisualOrganic:
-		(next as SlimeVisualOrganic).set_quality(VisualStyle.quality_from_settings())
+	if next.has_method("set_quality"):
+		next.call("set_quality", VisualStyle.quality_from_settings())
 	next.apply_cosmetics()
 	_sync_mass_metrics()
 	next.queue_redraw()
@@ -291,10 +292,11 @@ func _process_movement(delta: float) -> void:
 	elif input_vec.length() > 0.04:
 		var accel := base_accel * (1.0 + float(spd_lv) * 0.14) * mass_maneuver
 		var pre_move_spd := velocity.length()
+		var input_dir := input_vec.normalized()
 		var sharp_turn := false
 		# Counter-traction turn assist: responsive direction reversals without losing organic glide
 		if pre_move_spd > 25.0:
-			var align := velocity.normalized().dot(input_vec.normalized())
+			var align := velocity.normalized().dot(input_dir)
 			if align < 0.35:
 				sharp_turn = true
 				if slipstream_active and align < -0.25 and _slipstream_wave_cd <= 0.0 and arena_ref != null and arena_ref.has_method("trigger_slipstream_wave"):
@@ -303,14 +305,37 @@ func _process_movement(delta: float) -> void:
 					arena_ref.call("trigger_slipstream_wave", global_position, 120.0, 16.0 + float(spd_lv) * 8.0)
 				accel *= lerpf(1.95, 1.0, clampf((align + 0.5) / 0.85, 0.0, 1.0))
 		var target_vel := input_vec * max_spd
-		velocity = velocity.move_toward(target_vel, accel * delta)
+
+		# Modern fluid arc steering:
+		# When carving curves at speed (pre_move_spd > 28.0 and not sharp_turn), rotate existing velocity
+		# towards input direction preserving tangential speed along the arc (no chord-cut slowdown).
+		# For sharp reversals (sharp_turn), use direct acceleration for snappy responsive braking.
+		if pre_move_spd > 28.0 and not sharp_turn:
+			var cur_dir := velocity / pre_move_spd
+			var ang_diff := cur_dir.angle_to(input_dir)
+			var turn_rate := 13.5 * mass_maneuver * (1.0 + float(spd_lv) * 0.12)
+			var max_step := turn_rate * delta
+			var new_dir := cur_dir.rotated(clampf(ang_diff, -max_step, max_step))
+			var target_scalar_spd := input_vec.length() * max_spd
+			var new_spd := move_toward(pre_move_spd, target_scalar_spd, accel * delta)
+			velocity = new_dir * new_spd
+		else:
+			velocity = velocity.move_toward(target_vel, accel * delta)
+
 		if visual != null:
-			visual.look_dir = input_vec.normalized()
+			if visual.look_dir.length_squared() < 0.01:
+				visual.look_dir = input_dir
+			else:
+				var look_blend := 1.0 - exp(-22.0 * delta)
+				visual.look_dir = visual.look_dir.lerp(input_dir, look_blend).normalized()
+
 		if (pre_move_spd < 38.0 or sharp_turn) and Audio._move_cooldown > 0.38:
 			Audio._move_cooldown = 0.38
 		Audio.play_sfx("move", lerpf(1.15, 0.82, clampf((mass - 10.0) / 90.0, 0.0, 1.0)))
 	else:
-		velocity = velocity.move_toward(Vector2.ZERO, base_friction * delta)
+		var cur_spd := velocity.length()
+		var fric_mult := 0.75 + 0.25 * clampf(cur_spd / 180.0, 0.0, 1.0)
+		velocity = velocity.move_toward(Vector2.ZERO, base_friction * fric_mult * delta)
 
 	# Build or decay Speed Boost slipstream state
 	if spd_lv > 0 and velocity.length() >= max_spd * 0.68:
@@ -325,8 +350,11 @@ func _process_movement(delta: float) -> void:
 	if get_slide_collision_count() > 0:
 		var col := get_slide_collision(0)
 		if col != null and visual != null:
-			visual.trigger_wall_bump(col.get_normal())
-			velocity = pre_vel.bounce(col.get_normal()) * 0.35
+			var n := col.get_normal()
+			var impact_spd := maxf(0.0, pre_vel.dot(-n))
+			visual.trigger_wall_bump(n, impact_spd)
+			velocity = pre_vel.bounce(n) * 0.35
+			visual.apply_wall_contact(n, col.get_depth(), delta)
 
 	# Clamp inside Enchanted Forest arena bounds & check narrow root corridors
 	if arena_ref != null:
@@ -456,9 +484,14 @@ func complete_absorption(entity_id: String, mass_gain: float, xp_gain: float, es
 	SaveData.increment_stat("total_absorbed", 1.0)
 	SaveData.record_creature_seen(entity_id, 1)
 
-	# 1 & 2. Slime deformation bulge
+	# 1 & 2. Slime deformation & phagocytosis (single visual dispatch point)
 	if visual != null:
-		visual.trigger_gulp()
+		if visual.has_method("trigger_swallow"):
+			var local_entry: Vector2 = visual.to_local(world_pos)
+			var look: Dictionary = fallback_prey_look(entity_id)
+			visual.call("trigger_swallow", local_entry, look["color"], look["size"])
+		else:
+			visual.trigger_gulp()
 
 	# 3. Non-linear mass increase
 	var eff_mass := MassSystem.effective_gain(mass, mass_gain)
@@ -594,3 +627,23 @@ func revive_player() -> bool:
 		visual.trigger_evolution()
 	Events.player_hp_changed.emit(hp, max_hp)
 	return true
+
+
+static func fallback_prey_look(entity_id: String) -> Dictionary:
+	match entity_id:
+		"spore_orb":
+			return {"color": Color(0.48, 1.0, 0.76), "size": 7.5}
+		"essence_crystal", "essence":
+			return {"color": Color(0.40, 0.98, 0.85), "size": 9.0}
+		"dew":
+			return {"color": Color(0.58, 1.0, 0.52), "size": 8.0}
+		"umbral_crawler":
+			return {"color": Color(0.85, 0.35, 0.45), "size": 14.0}
+		"umbral_floater":
+			return {"color": Color(0.75, 0.45, 0.90), "size": 16.0}
+		"spore_spitter":
+			return {"color": Color(0.95, 0.75, 0.35), "size": 18.0}
+		"crystal_behemoth", "stone_slug":
+			return {"color": Color(0.50, 0.85, 0.95), "size": 22.0}
+		_:
+			return {"color": Color(0.65, 0.92, 0.78), "size": 10.0}

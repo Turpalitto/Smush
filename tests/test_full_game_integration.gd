@@ -898,6 +898,8 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 	for p_stream in Audio._sfx_players:
 		p_stream.stop()
 
+	arena.enemy_pool.release_all()
+	player.global_position = Vector2.ZERO
 	Audio._move_cooldown = 0.0
 	player.move_input = Vector2.RIGHT
 	player.velocity = Vector2(180.0, 0.0)

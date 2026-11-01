@@ -1,5 +1,0 @@
-Android export blocked by missing toolchain components:
-  - ANDROID_HOME or ANDROID_SDK_ROOT
-  - JAVA_HOME (JDK 17+ required for Gradle)
-See RELEASE_CHECKLIST.md. SDK license acceptance requires the owner.
-ANDROID_PREFLIGHT_EXIT_CODE=2

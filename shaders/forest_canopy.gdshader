@@ -147,13 +147,14 @@ void fragment() {
 	float n2 = value_noise(wp * 2.3 + vec2(4.2, -1.7));
 	float patch = smoothstep(0.28, 0.78, n1 * 0.65 + n2 * 0.35);
 
-	// Soft diagonal enchanted sunbeams. One broad sine was the first attempt and it
-	// read as a yellow blob at high growth: a shaft has to be a narrow streak, and
-	// it has to be broken up by the canopy, so the pattern is sharpened (pow 5) and
-	// then masked by a slow noise field.
-	float beam_raw = sin((wp.x * 1.55 + wp.y * 0.55) + TIME * 0.10);
-	float beam = pow(max(beam_raw, 0.0), 5.0);
-	beam *= 0.12 + 0.88 * smoothstep(0.34, 0.86, value_noise(wp * 1.25 + vec2(TIME * 0.015, 0.0)));
+	// Soft diagonal enchanted sunbeams: dual intersecting crepuscular shafts
+	// that drift gently as if filtered through high swaying canopy branches.
+	float beam_raw1 = sin((wp.x * 1.55 + wp.y * 0.55) + TIME * 0.085);
+	float beam_raw2 = sin((wp.x * 1.15 - wp.y * 0.42) - TIME * 0.055);
+	float beam1 = pow(max(beam_raw1, 0.0), 5.0);
+	float beam2 = pow(max(beam_raw2, 0.0), 5.5) * 0.38;
+	float beam = beam1 + beam2;
+	beam *= 0.12 + 0.88 * smoothstep(0.32, 0.86, value_noise(wp * 1.25 + vec2(TIME * 0.015, 0.0)));
 
 	vec3 col = mix(moss_dark.rgb, moss_mid.rgb, patch);
 

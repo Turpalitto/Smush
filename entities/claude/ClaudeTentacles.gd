@@ -47,7 +47,8 @@ func update_state(targets: Array[Vector2], r0: float, time: float, dt: float, al
 	_accent = accent
 	_level = level
 	_vampire = vampire
-	var count := mini(targets.size(), MAX_SLOTS)
+	var max_allowed := clampi(1 + mini(_level, 3), 1, MAX_SLOTS)
+	var count := mini(targets.size(), max_allowed)
 	while _slots.size() < count:
 		var a := (targets[_slots.size()]).angle()
 		_slots.append({
@@ -176,15 +177,23 @@ func _draw_one(s: Dictionary, idx: int, base: Color, accent: Color, segs: int) -
 	draw_polyline(hl, Color(1.0, 0.98, 1.0, 0.38 * a), maxf(_r0 * 0.045, 1.2), true)
 
 	# 4. inner vein with nutrients travelling toward the body
-	draw_polyline(centre, Color(1.0, 0.88, 0.72, 0.30 * a), maxf(_r0 * 0.05, 1.3), true)
-	for k in range(3):
-		var bu := 1.0 - fposmod(_time * 0.85 + float(k) / 3.0 + phase * 0.1, 1.0)
+	var vein_col := Color(1.0, 0.40, 0.65, 0.50 * a) if _vampire else Color(1.0, 0.88, 0.72, 0.30 * a)
+	draw_polyline(centre, vein_col, maxf(_r0 * 0.05, 1.3), true)
+	var node_cnt := 4 if _vampire else 3
+	for k in range(node_cnt):
+		var speed_mult := 1.4 if _vampire else 0.85
+		var bu := 1.0 - fposmod(_time * speed_mult + float(k) / float(node_cnt) + phase * 0.1, 1.0)
 		var bi := clampi(int(bu * float(segs)), 0, segs)
 		var fade := sin(bu * PI)
-		draw_circle(centre[bi], widths[bi] * 0.55, Color(1.0, 0.93, 0.78, 0.70 * a * fade))
+		var node_col := Color(1.0, 0.25, 0.50, 0.90 * a * fade) if _vampire else Color(1.0, 0.93, 0.78, 0.70 * a * fade)
+		draw_circle(centre[bi], widths[bi] * (0.65 if _vampire else 0.55), node_col)
 
 	# 5. sucker tip
 	var tr := _r0 * 0.085
+	if _vampire:
+		# Pulsing siphon corona at prey contact point
+		var siphon_r := tr * (2.2 + 0.5 * sin(_time * 6.5 + phase))
+		draw_circle(tip, siphon_r, Color(1.0, 0.20, 0.45, 0.30 * a * ext))
 	draw_circle(tip, tr * 1.9, Color(accent.r, accent.g, accent.b, 0.20 * a * ext))
 	draw_circle(tip, tr * 1.22, Color(0.10, 0.04, 0.24, 0.65 * a * ext))
 	draw_circle(tip, tr, Color(accent.r, accent.g, accent.b, 0.95 * a * ext))
