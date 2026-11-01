@@ -21,7 +21,7 @@ const MOOD_KEYS: Array[float] = [0.0, 0.34, 0.68, 1.0]
 const MOOD_TINT: Array[String] = ["#6bf5d8", "#8ef2c8", "#ffd88a", "#fff0c4"]
 const MOOD_WARM: Array[String] = ["#8fffd8", "#b6ffd0", "#ffcf82", "#fff2c8"]
 const MOOD_TINT_AMOUNT: Array[float] = [0.00, 0.10, 0.20, 0.26]
-const MOOD_WARM_AMOUNT: Array[float] = [0.00, 0.22, 0.55, 0.78]
+const MOOD_WARM_AMOUNT: Array[float] = [0.06, 0.22, 0.55, 0.78]
 const MOOD_AURA_RADIUS: Array[float] = [0.42, 0.46, 0.52, 0.58]
 const MOOD_SATURATION: Array[float] = [1.00, 1.06, 1.14, 1.20]
 const MOOD_LIFT: Array[float] = [0.000, 0.010, 0.030, 0.046]
@@ -29,7 +29,7 @@ const MOOD_VIGNETTE: Array[float] = [0.34, 0.30, 0.24, 0.18]
 ## Dream bloom strength. Non-zero at stage 1 on purpose: the brief asks for a magical
 ## forest, not for magic that switches on halfway. It stays low at the bottom (0.14)
 ## so the early game still reads as a damp cave, and opens up as the slime grows.
-const MOOD_BLOOM: Array[float] = [0.14, 0.26, 0.44, 0.60]
+const MOOD_BLOOM: Array[float] = [0.18, 0.28, 0.44, 0.60]
 
 var _rect: ColorRect
 var _mat: ShaderMaterial

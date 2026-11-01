@@ -104,6 +104,10 @@ func _ready() -> void:
 	Events.locale_changed.connect(func(_l: String) -> void: show_page(current_page))
 	Billing.purchase_succeeded.connect(func(_s: String) -> void: show_page(current_page))
 	Billing.purchases_restored.connect(func(_r: Array[String]) -> void: show_page(current_page))
+	Events.visual_style_changed.connect(func(_on: bool) -> void:
+		if current_page == Page.HOME:
+			show_page(Page.HOME)
+	)
 
 	show_page(Page.HOME)
 
@@ -186,8 +190,12 @@ func _build_home_page() -> void:
 	_hero_slime_holder = Control.new()
 	_hero_slime_holder.custom_minimum_size = Vector2(0, 175)
 	vb.add_child(_hero_slime_holder)
-	_hero_slime = SlimeVisual.new()
+	_hero_slime = VisualStyle.make_visual()
 	_hero_slime.radius = 48.0
+	_hero_slime.set_growth(40.0)
+	if _hero_slime.has_method("set_quality"):
+		_hero_slime.call("set_quality", VisualStyle.quality_from_settings())
+	_hero_slime.apply_cosmetics()
 	_hero_slime_holder.add_child(_hero_slime)
 	_hero_slime_holder.resized.connect(func() -> void:
 		if is_instance_valid(_hero_slime):

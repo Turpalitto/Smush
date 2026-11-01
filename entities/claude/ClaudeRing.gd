@@ -100,6 +100,29 @@ func clear_bumps() -> void:
 		bumps[i] = 0.0
 
 
+func dent_and_spread(contact_angle: float, dent_depth: float, spread_width: float = 2.0) -> void:
+	## Inward dent at impact point, with volume-preserving lateral bulging along the obstacle face.
+	var d := clampf(dent_depth, 0.0, 0.40)
+	push(contact_angle, -d, spread_width)
+	impulse(contact_angle, -d * 4.5, spread_width)
+	# Lateral bulges at +/- 90 degrees (tangent to surface)
+	var t1 := contact_angle + PI * 0.5
+	var t2 := contact_angle - PI * 0.5
+	push(t1, d * 0.55, 1.8)
+	push(t2, d * 0.55, 1.8)
+	impulse(t1, d * 2.2, 1.8)
+	impulse(t2, d * 2.2, 1.8)
+
+
+func apply_contact_flatten(contact_angle: float, flatten_amount: float, width_nodes: float = 2.2) -> void:
+	## Sustained shape flattening and wrapping while sliding against an obstacle.
+	var f := clampf(flatten_amount, 0.0, 0.32)
+	set_bump(contact_angle, -f, width_nodes)
+	# Lateral extrusion to wrap around obstacle
+	set_bump(contact_angle + PI * 0.5, f * 0.52, 1.8)
+	set_bump(contact_angle - PI * 0.5, f * 0.52, 1.8)
+
+
 ## accel_world: acceleration already scaled to body-radius units (|a| ~ 0..1).
 ## swim: 0..1 how hard the body is swimming (drives a faint travelling ripple).
 func step(delta: float, accel_world: Vector2, swim: float, t: float) -> void:

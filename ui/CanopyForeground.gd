@@ -15,6 +15,7 @@ var _time: float = 0.0
 var _motes: Array[Dictionary] = []
 var _leaves: Array[Dictionary] = []
 var _butterflies: Array[Dictionary] = []
+var _stardust: Array[Dictionary] = []
 
 var _tex_broadleaf: Texture2D = null
 var _tex_fern: Texture2D = null
@@ -22,6 +23,7 @@ var _tex_fern: Texture2D = null
 const MOTE_COUNT: int = 10
 const LEAF_COUNT: int = 14
 const BUTTERFLY_COUNT: int = 5
+const STARDUST_COUNT: int = 12
 const PARALLAX_BOUGH: float = 0.28
 const PARALLAX_MOTE: float = 1.42
 const PARALLAX_LEAF: float = 0.88
@@ -37,6 +39,7 @@ func _ready() -> void:
 	_init_motes()
 	_init_leaves()
 	_init_butterflies()
+	_init_stardust()
 
 	_painter = Control.new()
 	_painter.name = "ForegroundPainter"
@@ -113,6 +116,22 @@ func _init_butterflies() -> void:
 		})
 
 
+func _init_stardust() -> void:
+	_stardust.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0xD057BEAD
+	for i in range(STARDUST_COUNT):
+		_stardust.append({
+			"pos": Vector2(rng.randf_range(-600.0, 600.0), rng.randf_range(-900.0, 900.0)),
+			"phase": rng.randf_range(0.0, TAU),
+			"blink_spd": rng.randf_range(2.5, 5.5),
+			"size": rng.randf_range(1.3, 2.2),
+			"drift_x": rng.randf_range(-8.0, 8.0),
+			"drift_y": rng.randf_range(-12.0, -3.0),
+			"warm": rng.randf() < 0.3,
+		})
+
+
 func set_camera_center(world_pos: Vector2) -> void:
 	_camera_pos = world_pos
 
@@ -148,19 +167,30 @@ func _process(delta: float) -> void:
 			lp.x = randf_range(-half_span, half_span)
 		lf["pos"] = lp
 
-	# Update harmless wandering butterflies
+	# Update harmless wandering butterflies with reactive evasion
 	for b: Dictionary in _butterflies:
 		var bp: Vector2 = b["pos"]
 		var b_turn: float = float(b["turn_timer"]) - delta
-		if b_turn <= 0.0:
+		var dist_to_player := bp.length()
+		var is_startled := dist_to_player < 175.0
+		var flap_speed := 14.0
+
+		if is_startled:
+			# Player proximity reaction: turn directly away from player center with a burst of speed
+			b["target_angle"] = bp.angle() + randf_range(-0.35, 0.35)
+			b_turn = randf_range(1.2, 2.0)
+			flap_speed = 34.0
+		elif b_turn <= 0.0:
 			b["target_angle"] = randf_range(0.0, TAU)
 			b_turn = randf_range(1.5, 3.5)
 		b["turn_timer"] = b_turn
 
+		var cruise_spd := 92.0 if is_startled else 42.0
+		var steer_k := 4.5 if is_startled else 2.0
 		var cur_vel: Vector2 = b["vel"]
-		var target_vel := Vector2.from_angle(float(b["target_angle"])) * 42.0
-		# Steer smoothly toward wandering target angle
-		cur_vel = cur_vel.lerp(target_vel, 2.0 * delta)
+		var target_vel := Vector2.from_angle(float(b["target_angle"])) * cruise_spd
+		# Steer smoothly toward target angle
+		cur_vel = cur_vel.lerp(target_vel, steer_k * delta)
 		bp += cur_vel * delta
 
 		# Keep butterflies meandering around the camera field
@@ -169,7 +199,19 @@ func _process(delta: float) -> void:
 
 		b["vel"] = cur_vel
 		b["pos"] = bp
-		b["wing_phase"] = float(b["wing_phase"]) + 14.0 * delta
+		b["wing_phase"] = float(b["wing_phase"]) + flap_speed * delta
+
+	# Update twinkling star dust
+	for sd: Dictionary in _stardust:
+		var sp: Vector2 = sd["pos"]
+		sp.x += float(sd["drift_x"]) * delta
+		sp.y += float(sd["drift_y"]) * delta
+		if sp.y < -950.0:
+			sp.y = 950.0
+			sp.x = randf_range(-600.0, 600.0)
+		if sp.x < -650.0 or sp.x > 650.0:
+			sp.x = -sp.x * 0.9
+		sd["pos"] = sp
 
 	if _painter != null:
 		_painter.queue_redraw()
@@ -199,6 +241,10 @@ func _draw_foreground() -> void:
 	# 4. Large out-of-focus foreground bokeh motes drifting between camera and ground
 	if not is_low_fx:
 		_draw_bokeh_motes(vp, half_span)
+
+	# 5. Twinkling magical star dust motes
+	if not is_low_fx:
+		_draw_star_dust(vp)
 
 
 func _draw_canopy_corners(vp: Vector2) -> void:
@@ -311,9 +357,9 @@ func _draw_butterflies(vp: Vector2) -> void:
 		var hue: Color = b["hue"]
 		var wing_span := maxf(0.12, absf(flap))
 
-		# Faint bioluminescent aura around the creature
-		_painter.draw_circle(screen_p, sz * 2.2, Color(hue.r, hue.g, hue.b, 0.08))
-		_painter.draw_circle(screen_p, sz * 1.3, Color(hue.r, hue.g, hue.b, 0.16))
+		# Luminous bioluminescent aura around the fluttering creature
+		_painter.draw_circle(screen_p, sz * 2.5, Color(hue.r, hue.g, hue.b, 0.09))
+		_painter.draw_circle(screen_p, sz * 1.5, Color(hue.r, hue.g, hue.b, 0.18))
 
 		_painter.draw_set_transform(screen_p, flight_ang, Vector2(wing_span, 1.0))
 
@@ -380,3 +426,23 @@ func _draw_bokeh_motes(vp: Vector2, half_span: float) -> void:
 		_painter.draw_circle(screen_p, r, Color(mcol.r, mcol.g, mcol.b, a * 0.55))
 		_painter.draw_circle(screen_p, r * 0.68, Color(mcol.r, mcol.g, mcol.b, a))
 		_painter.draw_circle(screen_p, r * 0.34, Color(1.0, 0.99, 0.92, a * 0.85))
+
+
+func _draw_star_dust(vp: Vector2) -> void:
+	for sd: Dictionary in _stardust:
+		var sp: Vector2 = sd["pos"]
+		var screen_p := vp * 0.5 + sp
+		if screen_p.x < -5.0 or screen_p.x > vp.x + 5.0 or screen_p.y < -5.0 or screen_p.y > vp.y + 5.0:
+			continue
+		var blink := sin(_time * float(sd["blink_spd"]) + float(sd["phase"]))
+		var a := smoothstep(0.3, 1.0, blink) * 0.65
+		if a <= 0.01:
+			continue
+		var sz: float = float(sd["size"])
+		var col: Color
+		if bool(sd["warm"]):
+			col = Color(1.0, 0.92, 0.65, a)
+		else:
+			col = Color(0.75, 0.96, 1.0, a)
+		_painter.draw_circle(screen_p, sz * 2.8, Color(col.r, col.g, col.b, a * 0.18))
+		_painter.draw_circle(screen_p, sz, col)

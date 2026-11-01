@@ -189,7 +189,45 @@ func trigger_electro_discharge(local_targets: Array[Vector2]) -> void:
 	_core_energy = minf(_core_energy + 0.45, 1.2)
 	_ring.impulse_all(0.9)
 	if _bolts != null:
-		_bolts.fire(local_targets, _body_radius(), int(mutation_levels.get("electro_discharge", 1)))
+		var is_em := bool(active_synergies.get("em_storm", false))
+		_bolts.fire(local_targets, _body_radius(), int(mutation_levels.get("electro_discharge", 1)), is_em)
+
+
+func trigger_wall_bump(normal: Vector2, impact_speed: float = 0.0) -> void:
+	# Calculate contact angle on body (opposite to wall normal)
+	var contact_vec := -normal.normalized() if normal.length_squared() > 0.001 else Vector2.UP
+	var contact_ang := contact_vec.angle()
+
+	# Impact strength based on incoming normal velocity
+	var spd := impact_speed if impact_speed > 0.0 else velocity_vec.length()
+	var dent_depth := clampf(spd / 360.0, 0.12, 0.35)
+
+	# 1. Physical spring deformation: dent inward at contact, bulge sideways along obstacle
+	_ring.dent_and_spread(contact_ang, dent_depth)
+
+	# 2. Visceral nucleus & organelle inertia: contents slam forward into the wall
+	_lag_v += contact_vec * (dent_depth * 6.5)
+	_lag += contact_vec * (dent_depth * 0.35)
+	_lag = _lag.limit_length(0.34)
+
+	# 3. Surface impact shockwave ripple
+	_ripple_h = Vector4(contact_vec.x * 0.95, contact_vec.y * 0.95, 0.0, dent_depth * 1.35)
+
+	# 4. Core energy shimmer from impact pressure
+	_core_energy = minf(_core_energy + dent_depth * 0.6, 1.2)
+
+	# 5. Directional squash aligned with collision
+	squash_stretch = Vector2(1.0 - dent_depth * 0.52, 1.0 + dent_depth * 0.42)
+
+
+func apply_wall_contact(normal: Vector2, depth: float, delta: float) -> void:
+	# Continuous shape deformation while sliding along a wall / obstacle
+	var contact_vec := -normal.normalized() if normal.length_squared() > 0.001 else Vector2.UP
+	var contact_ang := contact_vec.angle()
+	var flat_amt := clampf(depth * 0.06 + 0.12, 0.08, 0.28)
+	_ring.apply_contact_flatten(contact_ang, flat_amt, 2.2)
+	# Push visceral lag slightly toward wall to keep nucleus pressed against sliding surface
+	_lag = _lag.lerp(contact_vec * (flat_amt * 0.25), clampf(delta * 14.0, 0.0, 1.0))
 
 
 ## --- per-frame ---------------------------------------------------------------------
@@ -468,157 +506,234 @@ func _draw_organic_mutations() -> void:
 	if a < 0.01:
 		return
 	var t := _u_time
+	var is_low_quality := quality < 1
 
-	# --- Spikes: membrane barbs (organic thorns that emerge from folds) ---
+	# --- 1. Spikes: membrane barbs (organic thorns emerging from folds) ---
 	var spike_lv := int(mutation_levels.get("spikes", 0))
 	if spike_lv > 0:
-		var spike_cnt: int = 6 + spike_lv
+		var spike_cnt: int = 6 + spike_lv * 2
 		var is_piercing := bool(active_synergies.get("piercing_strike", false))
-		# Organic barbs: soft pink/coral base, bright tip, slight curve
-		var base_col := Color(1.0, 0.55, 0.65, 0.85 * a) if not is_piercing else Color(1.0, 0.88, 0.42, 0.90 * a)
-		var tip_col := Color(1.0, 0.90, 0.95, 0.92 * a) if not is_piercing else Color(1.0, 1.0, 0.85, 0.95 * a)
+		var base_col := Color(1.0, 0.55, 0.65, 0.85 * a) if not is_piercing else Color(1.0, 0.88, 0.42, 0.92 * a)
+		var tip_col := Color(1.0, 0.92, 0.96, 0.95 * a) if not is_piercing else Color(1.0, 1.0, 0.88, 0.98 * a)
+		var forward_dir := velocity_vec.normalized() if velocity_vec.length() > 5.0 else Vector2.RIGHT
+
 		for i in range(spike_cnt):
-			var ang := (TAU / float(spike_cnt)) * float(i) + t * 0.3
+			var ang := (TAU / float(spike_cnt)) * float(i) + t * 0.35
 			var dir := Vector2.from_angle(ang)
 			var perp := dir.orthogonal()
-			# Curved organic barb shape (wider base, tapered tip with subtle bend)
-			var barb_len := eff_r * (0.32 + 0.08 * sin(t * 1.5 + float(i) * 1.7))
-			var b0 := dir * (eff_r * 0.88) - perp * (eff_r * 0.10)
-			var b1 := dir * (eff_r * 0.88) + perp * (eff_r * 0.10)
+
+			# Forward-facing elongation during piercing strike
+			var dot_fwd := maxf(0.0, dir.dot(forward_dir))
+			var pierce_mult := (1.0 + dot_fwd * 0.55) if (is_piercing and is_dashing) else (1.0 + dot_fwd * 0.20 if is_piercing else 1.0)
+			var len_scale := (0.30 + float(spike_lv) * 0.04) * pierce_mult
+			var barb_len := eff_r * (len_scale + 0.06 * sin(t * 1.8 + float(i) * 1.6))
+
+			var b0 := dir * (eff_r * 0.88) - perp * (eff_r * (0.08 + float(spike_lv) * 0.01))
+			var b1 := dir * (eff_r * 0.88) + perp * (eff_r * (0.08 + float(spike_lv) * 0.01))
 			var mid := dir * (eff_r * 0.88 + barb_len * 0.55) + perp * (eff_r * 0.03 * sin(t * 2.0 + float(i)))
 			var tip := dir * (eff_r * 0.88 + barb_len) + perp * (eff_r * 0.015 * sin(t * 3.0 + float(i) * 2.3))
-			# Draw as smooth polyline instead of harsh triangle
-			draw_colored_polygon(PackedVector2Array([b0, mid - perp * eff_r * 0.04, tip, mid + perp * eff_r * 0.04, b1]), base_col)
-			draw_line(mid, tip, tip_col, 1.8)
-			# Glow at base where barb emerges from membrane
-			draw_circle(dir * (eff_r * 0.90), eff_r * 0.045, Color(base_col.r, base_col.g, base_col.b, 0.3 * a))
 
-	# --- Dash: bioluminescent thrust bubble trail ---
-	if int(mutation_levels.get("dash", 0)) > 0 and is_dashing:
+			if is_low_quality:
+				draw_colored_polygon(PackedVector2Array([b0, tip, b1]), base_col)
+			else:
+				draw_colored_polygon(PackedVector2Array([b0, mid - perp * eff_r * 0.035, tip, mid + perp * eff_r * 0.035, b1]), base_col)
+				draw_line(mid, tip, tip_col, 1.8)
+				# Bulbous biological root anchor in membrane
+				draw_circle(dir * (eff_r * 0.90), eff_r * 0.045, Color(base_col.r, base_col.g, base_col.b, 0.35 * a))
+
+	# --- 2. Dash: hydrodynamic thrust & cavitation bubble wake ---
+	var dash_lv := int(mutation_levels.get("dash", 0))
+	if dash_lv > 0 and is_dashing:
 		var jet_dir := (-velocity_vec.normalized()) if velocity_vec.length() > 1.0 else Vector2.UP
-		# Instead of one flat circle: trail of luminous bubbles
-		for i in range(5):
+		var is_piercing := bool(active_synergies.get("piercing_strike", false))
+		var bubble_cnt := 3 if is_low_quality else (4 + mini(dash_lv, 3))
+
+		# Kinetic thrust bubbles trailing backward
+		for i in range(bubble_cnt):
 			var fi := float(i)
-			var off := jet_dir * (eff_r * (0.95 + fi * 0.28))
-			var bubble_r := eff_r * (0.22 - fi * 0.03)
-			var fade := (1.0 - fi * 0.18)
-			var col := Color(1.0, 0.82 + fi * 0.03, 0.45 + fi * 0.10, 0.65 * fade * a)
-			off += jet_dir.orthogonal() * sin(t * 12.0 + fi * 2.0) * eff_r * 0.06
+			var off := jet_dir * (eff_r * (0.95 + fi * (0.28 + float(dash_lv) * 0.03)))
+			var bubble_r := eff_r * (0.24 - fi * 0.025)
+			var fade := (1.0 - fi / float(bubble_cnt))
+			var col := Color(1.0, 0.82 + fi * 0.03, 0.45 + fi * 0.10, 0.70 * fade * a)
+			off += jet_dir.orthogonal() * sin(t * 14.0 + fi * 2.2) * eff_r * 0.07
 			draw_circle(off, bubble_r, col)
-			# Specular highlight on each bubble
-			draw_circle(off - jet_dir * bubble_r * 0.3, bubble_r * 0.25, Color(1.0, 1.0, 0.95, 0.5 * fade * a))
+			if not is_low_quality:
+				draw_circle(off - jet_dir * bubble_r * 0.35, bubble_r * 0.28, Color(1.0, 1.0, 0.95, 0.55 * fade * a))
 
-	# --- Magnet: organic field lines emanating from core ---
-	if int(mutation_levels.get("magnet", 0)) > 0:
+		# Piercing strike synergy: forward piercing lance shockwave
+		if is_piercing:
+			var fwd := -jet_dir
+			var p_tip := fwd * (eff_r * 1.55)
+			var p_l := fwd * (eff_r * 1.15) + fwd.orthogonal() * (eff_r * 0.40)
+			var p_r := fwd * (eff_r * 1.15) - fwd.orthogonal() * (eff_r * 0.40)
+			draw_polyline(PackedVector2Array([p_l, p_tip, p_r]), Color(1.0, 0.92, 0.45, 0.80 * a), 2.4)
+			draw_line(fwd * (eff_r * 0.90), p_tip, Color(1.0, 1.0, 0.90, 0.95 * a), 2.8)
+
+	# --- 3. Magnet: organic magnetic flux lines / EM Storm vortex ---
+	var mag_lv := int(mutation_levels.get("magnet", 0))
+	if mag_lv > 0:
 		var is_em := bool(active_synergies.get("em_storm", false))
-		var mag_col := Color(0.45, 0.92, 1.0, 0.25 * a) if not is_em else Color(1.0, 0.95, 0.50, 0.40 * a)
-		for i in range(8):
-			var fi := float(i)
-			var ang := (TAU / 8.0) * fi + t * 0.6
-			var start_p := Vector2.from_angle(ang) * (eff_r * 0.5)
-			var end_p := Vector2.from_angle(ang + 0.15 * sin(t * 2.0 + fi)) * (eff_r * 1.35)
-			var mid_p := (start_p + end_p) * 0.5 + Vector2.from_angle(ang).orthogonal() * eff_r * 0.15 * sin(t * 3.0 + fi * 1.5)
-			draw_polyline(PackedVector2Array([start_p, mid_p, end_p]), mag_col, 1.6)
+		var line_cnt := 4 if is_low_quality else (6 + mini(mag_lv, 4) if not is_em else 10)
+		var mag_col := Color(0.45, 0.92, 1.0, 0.26 * a) if not is_em else Color(1.0, 0.90, 0.42, 0.42 * a)
+		var rot_speed := (1.4 if is_em else 0.6)
 
-	# --- Speed boost: streamlined fin membranes ---
-	if int(mutation_levels.get("speed_boost", 0)) > 0:
+		for i in range(line_cnt):
+			var fi := float(i)
+			var ang := (TAU / float(line_cnt)) * fi + t * rot_speed
+			var reach := (1.45 if is_em else 1.32)
+			var start_p := Vector2.from_angle(ang) * (eff_r * 0.48)
+			var end_p := Vector2.from_angle(ang + 0.20 * sin(t * 2.5 + fi)) * (eff_r * reach)
+			var mid_p := (start_p + end_p) * 0.5 + Vector2.from_angle(ang).orthogonal() * eff_r * (0.18 if is_em else 0.12) * sin(t * 3.5 + fi * 1.8)
+			draw_polyline(PackedVector2Array([start_p, mid_p, end_p]), mag_col, (2.0 if is_em else 1.5))
+			if is_em and not is_low_quality and (i % 2 == 0):
+				# Sparking magnetic node
+				draw_circle(end_p, eff_r * 0.045, Color(1.0, 1.0, 0.85, 0.70 * a))
+
+	# --- 4. Speed boost: streamlined fin membranes with flutter ---
+	var spd_lv := int(mutation_levels.get("speed_boost", 0))
+	if spd_lv > 0:
 		var back_ang := (velocity_vec.angle() + PI) if velocity_vec.length() > 15.0 else -PI * 0.5
-		var fin_col := Color(0.50, 1.0, 0.90, 0.70 * a) if not slipstream_active else Color(0.60, 1.0, 0.95, 0.85 * a)
+		var fin_col := Color(0.50, 1.0, 0.90, 0.72 * a) if not slipstream_active else Color(0.60, 1.0, 0.96, 0.88 * a)
+		var fin_len := (1.28 + float(spd_lv) * 0.04) if not slipstream_active else (1.42 + float(spd_lv) * 0.05)
+
 		for side_f: float in [-0.50, 0.50]:
 			var fin_dir := Vector2.from_angle(back_ang + side_f)
 			var perp := fin_dir.orthogonal()
-			# Organic membrane fin: curved, translucent
-			var p0 := fin_dir * (eff_r * 0.80) + perp * (eff_r * 0.06)
-			var p1 := fin_dir * (eff_r * 0.80) - perp * (eff_r * 0.06)
-			var pm := fin_dir * (eff_r * 1.10) + perp * (eff_r * 0.18 * sin(t * 4.0 + side_f * 3.0))
-			var pt := fin_dir * (eff_r * (1.38 if slipstream_active else 1.26))
-			draw_colored_polygon(PackedVector2Array([p0, pm, pt, p1]), fin_col)
-			# Translucent membrane vein
-			draw_line(fin_dir * (eff_r * 0.82), pt, Color(fin_col.r, fin_col.g, fin_col.b, 0.4 * a), 1.2)
-		if slipstream_active:
-			# Wake turbulence bubbles
+			var p0 := fin_dir * (eff_r * 0.80) + perp * (eff_r * 0.065)
+			var p1 := fin_dir * (eff_r * 0.80) - perp * (eff_r * 0.065)
+			var pm := fin_dir * (eff_r * 1.10) + perp * (eff_r * 0.18 * sin(t * 4.5 + side_f * 3.0))
+			var pt := fin_dir * (eff_r * fin_len)
+			draw_colored_polygon(PackedVector2Array([p0, pm, pt]), fin_col)
+			draw_colored_polygon(PackedVector2Array([p0, pt, p1]), fin_col)
+			if not is_low_quality:
+				draw_line(fin_dir * (eff_r * 0.82), pt, Color(fin_col.r, fin_col.g, fin_col.b, 0.45 * a), 1.3)
+
+		if slipstream_active and not is_low_quality:
 			for i in range(3):
 				var fi := float(i)
-				var bp := Vector2.from_angle(back_ang + sin(t * 5.0 + fi * 2.0) * 0.3) * (eff_r * (1.20 + fi * 0.15))
-				draw_circle(bp, eff_r * 0.05, Color(0.55, 1.0, 0.95, 0.35 * a))
+				var bp := Vector2.from_angle(back_ang + sin(t * 5.0 + fi * 2.0) * 0.35) * (eff_r * (1.20 + fi * 0.16))
+				draw_circle(bp, eff_r * 0.05, Color(0.55, 1.0, 0.95, 0.38 * a))
 
-	# --- Regeneration: pulsing emerald organelles + healing aura ---
-	if int(mutation_levels.get("regeneration", 0)) > 0:
-		var regen_pulse := 0.5 + 0.5 * sin(t * 3.0)
-		for i in range(4):
+	# --- 5. Regeneration: pulsing emerald cellular organelles ---
+	var regen_lv := int(mutation_levels.get("regeneration", 0))
+	if regen_lv > 0:
+		var is_vampire := bool(active_synergies.get("bio_vampirism", false))
+		var organelle_cnt := 3 if is_low_quality else (3 + mini(regen_lv, 3))
+		var regen_pulse := 0.5 + 0.5 * sin(t * (4.2 if is_vampire else 3.0))
+
+		for i in range(organelle_cnt):
 			var fi := float(i)
-			var oa := t * 1.2 + fi * (TAU / 4.0)
+			var oa := t * 1.2 + fi * (TAU / float(organelle_cnt))
 			var orb := eff_r * (0.38 + 0.06 * sin(t * 1.8 + fi * 2.0))
 			var op := Vector2.from_angle(oa) * orb
 			var rv := eff_r * (0.055 + 0.015 * regen_pulse)
-			# Emerald vesicle with bright center
-			draw_circle(op, rv * 1.5, Color(0.35, 0.90, 0.40, 0.20 * a))
-			draw_circle(op, rv, Color(0.50, 1.0, 0.55, 0.75 * a))
-			draw_circle(op - Vector2(rv * 0.3, rv * 0.3), rv * 0.3, Color(0.85, 1.0, 0.85, 0.55 * a))
-		# Healing aura ring
-		var aura_a := 0.10 + 0.08 * regen_pulse
-		draw_arc(Vector2.ZERO, eff_r * 0.95, 0.0, TAU, 32, Color(0.45, 1.0, 0.55, aura_a * a), 1.5)
 
-	# --- Poison trail: dripping toxic vesicles on membrane underside ---
-	if int(mutation_levels.get("poison_trail", 0)) > 0:
-		for i in range(5):
+			var base_org_col := Color(0.50, 1.0, 0.55, 0.78 * a) if not is_vampire else Color(0.85, 0.45, 0.95, 0.85 * a)
+			var halo_org_col := Color(0.35, 0.90, 0.40, 0.22 * a) if not is_vampire else Color(0.95, 0.25, 0.65, 0.30 * a)
+
+			draw_circle(op, rv * 1.5, halo_org_col)
+			draw_circle(op, rv, base_org_col)
+			if not is_low_quality:
+				draw_circle(op - Vector2(rv * 0.3, rv * 0.3), rv * 0.3, Color(1.0, 1.0, 0.95, 0.60 * a))
+
+		# Healing bio-resonance halo ring
+		var aura_a := (0.12 + 0.08 * regen_pulse) * a
+		var aura_col := Color(0.45, 1.0, 0.55, aura_a) if not is_vampire else Color(1.0, 0.40, 0.75, aura_a * 1.2)
+		draw_arc(Vector2.ZERO, eff_r * 0.95, 0.0, TAU, (16 if is_low_quality else 32), aura_col, 1.6)
+
+	# --- 6. Poison trail: toxic vesicles & acid lipid droplets ---
+	var poison_lv := int(mutation_levels.get("poison_trail", 0))
+	if poison_lv > 0:
+		var has_toxic_clones := bool(active_synergies.get("toxic_clones", false))
+		var drop_cnt := 3 if is_low_quality else (4 + mini(poison_lv, 4))
+
+		for i in range(drop_cnt):
 			var fi := float(i)
-			var pa := fi * (TAU / 5.0) - t * 0.5
-			var drip_y := sin(t * 2.5 + fi * 1.7) * 0.1 + 0.08
-			var pp := Vector2.from_angle(pa) * (eff_r * 0.72) + Vector2(0, eff_r * drip_y)
-			var rv := eff_r * 0.04
-			draw_circle(pp, rv * 1.8, Color(0.55, 0.85, 0.15, 0.18 * a))
-			draw_circle(pp, rv, Color(0.65, 1.0, 0.20, 0.70 * a))
-			# Drip trail
-			var drip_end := pp + Vector2(0, eff_r * 0.10 * (0.5 + 0.5 * sin(t * 3.0 + fi)))
-			draw_line(pp, drip_end, Color(0.65, 1.0, 0.20, 0.35 * a), 1.2)
+			var pa := fi * (TAU / float(drop_cnt)) - t * 0.5
+			var drip_y := sin(t * 2.6 + fi * 1.8) * 0.11 + 0.09
+			var pp := Vector2.from_angle(pa) * (eff_r * 0.74) + Vector2(0, eff_r * drip_y)
+			var rv := eff_r * (0.040 + float(poison_lv) * 0.005)
 
-	# --- Split: mitotic groove with budding daughter nucleus ---
-	if int(mutation_levels.get("split", 0)) > 0:
+			var tox_col := Color(0.65, 1.0, 0.20, 0.75 * a) if not has_toxic_clones else Color(0.40, 1.0, 0.50, 0.85 * a)
+			draw_circle(pp, rv * 1.6, Color(tox_col.r, tox_col.g, tox_col.b, 0.20 * a))
+			draw_circle(pp, rv, tox_col)
+			if not is_low_quality:
+				var drip_end := pp + Vector2(0, eff_r * 0.12 * (0.5 + 0.5 * sin(t * 3.2 + fi)))
+				draw_line(pp, drip_end, Color(tox_col.r, tox_col.g, tox_col.b, 0.40 * a), 1.3)
+				if has_toxic_clones:
+					# Toxic clone mini-nucleus inside vesicle
+					draw_circle(pp, rv * 0.35, Color(1.0, 1.0, 0.80, 0.80 * a))
+
+	# --- 7. Split: mitotic furrow with sister nuclei & chromatin bridge ---
+	var split_lv := int(mutation_levels.get("split", 0))
+	if split_lv > 0:
+		var has_toxic_clones := bool(active_synergies.get("toxic_clones", false))
 		var groove_ang := t * 0.4
 		var groove_dir := Vector2.from_angle(groove_ang)
 		var groove_perp := groove_dir.orthogonal()
-		# Constriction groove across body
-		var groove_depth := 0.5 + 0.5 * sin(t * 1.5)
-		for i in range(8):
-			var fi := float(i) / 7.0 - 0.5
-			var gp := groove_perp * (eff_r * fi * 1.4)
-			var indent := groove_dir * (eff_r * 0.03 * groove_depth * (1.0 - fi * fi * 4.0))
-			draw_circle(gp + indent, eff_r * 0.02, Color(0.85, 0.80, 1.0, 0.35 * a * groove_depth))
-		# Budding daughter nucleus
-		var bud_pos := groove_dir * (eff_r * 0.35)
-		var bud_r := eff_r * (0.11 + 0.03 * sin(t * 2.0))
-		draw_circle(bud_pos, bud_r * 1.3, Color(1.0, 0.95, 0.80, 0.20 * a))
-		draw_circle(bud_pos, bud_r, Color(1.0, 0.98, 0.85, 0.65 * a))
+		var groove_depth := (0.45 + 0.10 * float(split_lv)) * (0.5 + 0.5 * sin(t * 1.6))
 
-	# --- Freeze: crystalline ice facets on membrane ---
-	if int(mutation_levels.get("freeze", 0)) > 0:
-		for i in range(6):
+		# Mitotic cleavage constriction across body
+		var pt_cnt := 5 if is_low_quality else 8
+		for i in range(pt_cnt):
+			var fi := float(i) / float(pt_cnt - 1) - 0.5
+			var gp := groove_perp * (eff_r * fi * 1.4)
+			var indent := groove_dir * (eff_r * 0.04 * groove_depth * (1.0 - fi * fi * 4.0))
+			draw_circle(gp + indent, eff_r * 0.022, Color(0.85, 0.80, 1.0, 0.38 * a * groove_depth))
+
+		# Sister budding nucleus connected by chromatin bridge
+		var bud_pos := groove_dir * (eff_r * 0.38)
+		var bud_r := eff_r * (0.12 + 0.025 * float(split_lv) + 0.02 * sin(t * 2.2))
+		var bud_col := Color(1.0, 0.98, 0.85, 0.70 * a) if not has_toxic_clones else Color(0.70, 1.0, 0.60, 0.85 * a)
+
+		# Chromatin spindle bridge between primary core and daughter nucleus
+		draw_line(Vector2.ZERO, bud_pos, Color(bud_col.r, bud_col.g, bud_col.b, 0.35 * a), 1.6)
+		draw_circle(bud_pos, bud_r * 1.4, Color(bud_col.r, bud_col.g, bud_col.b, 0.22 * a))
+		draw_circle(bud_pos, bud_r, bud_col)
+		if not is_low_quality:
+			draw_circle(bud_pos - Vector2(bud_r * 0.3, bud_r * 0.3), bud_r * 0.3, Color(1.0, 1.0, 1.0, 0.75 * a))
+
+	# --- 8. Freeze: crystalline ice facets with frost lattice ---
+	var freeze_lv := int(mutation_levels.get("freeze", 0))
+	if freeze_lv > 0:
+		var has_ice_armor := bool(active_synergies.get("ice_armor", false))
+		var crystal_cnt := 4 if is_low_quality else (5 + mini(freeze_lv, 3))
+		var crystal_pts: Array[Vector2] = []
+
+		for i in range(crystal_cnt):
 			var fi := float(i)
-			var fa := fi * (TAU / 6.0) + t * 0.15
+			var fa := fi * (TAU / float(crystal_cnt)) + t * 0.15
 			var fp := Vector2.from_angle(fa) * (eff_r * 1.02)
-			var fperp := Vector2.from_angle(fa).orthogonal()
-			# Hexagonal ice crystal
-			var cr := eff_r * (0.06 + 0.02 * sin(t * 0.8 + fi * 1.3))
+			crystal_pts.append(fp)
+			var cr := eff_r * (0.065 + float(freeze_lv) * 0.008 + 0.015 * sin(t * 0.9 + fi * 1.4))
+
 			var pts := PackedVector2Array()
 			for j in range(6):
 				var ca := float(j) * (TAU / 6.0) + fa
 				pts.append(fp + Vector2.from_angle(ca) * cr)
-			draw_colored_polygon(pts, Color(0.82, 0.95, 1.0, 0.55 * a))
-			draw_polyline(pts, Color(0.90, 0.98, 1.0, 0.70 * a), 1.0)
-			# Inner sparkle
-			draw_circle(fp, cr * 0.3, Color(1.0, 1.0, 1.0, 0.45 * a))
 
-	# --- Mimicry: camouflage ripple along membrane ---
-	if int(mutation_levels.get("mimicry", 0)) > 0:
-		# Adaptive camouflage: subtle rippling pattern
-		var camo_a := 0.3 + 0.2 * sin(t * 1.5)
-		for i in range(12):
+			draw_colored_polygon(pts, Color(0.82, 0.95, 1.0, 0.60 * a))
+			if not is_low_quality:
+				draw_polyline(pts, Color(0.92, 0.99, 1.0, 0.80 * a), 1.1)
+				draw_circle(fp, cr * 0.32, Color(1.0, 1.0, 1.0, 0.55 * a))
+
+		# Ice Armor synergy: crystalline frost web connecting facets
+		if has_ice_armor and not is_low_quality and crystal_pts.size() > 2:
+			for i in range(crystal_pts.size()):
+				var next_p := crystal_pts[(i + 1) % crystal_pts.size()]
+				draw_line(crystal_pts[i], next_p, Color(0.85, 0.98, 1.0, 0.35 * a), 1.2)
+
+	# --- 9. Mimicry: adaptive chromatophore dots ---
+	var mimic_lv := int(mutation_levels.get("mimicry", 0))
+	if mimic_lv > 0:
+		var dot_cnt := 6 if is_low_quality else (8 + mini(mimic_lv, 4) * 2)
+		var camo_a := 0.32 + 0.18 * sin(t * 1.6)
+
+		for i in range(dot_cnt):
 			var fi := float(i)
-			var ca := fi * (TAU / 12.0) + sin(t * 0.3 + fi * 0.5) * 0.2
-			var cp := Vector2.from_angle(ca) * (eff_r * (0.90 + 0.05 * sin(t * 2.0 + fi * 1.3)))
-			var cr := eff_r * (0.04 + 0.02 * sin(t * 1.7 + fi * 2.1))
-			# Sampled environment color approximation (shifts through greens/darks)
+			var ca := fi * (TAU / float(dot_cnt)) + sin(t * 0.35 + fi * 0.6) * 0.22
+			var cp := Vector2.from_angle(ca) * (eff_r * (0.88 + 0.06 * sin(t * 2.2 + fi * 1.4)))
+			var cr := eff_r * (0.040 + 0.018 * sin(t * 1.8 + fi * 2.2))
 			var env_hue := 0.33 + 0.08 * sin(t * 0.5 + fi * 0.7)
 			var env_col := Color.from_hsv(env_hue, 0.35, 0.45, camo_a * a)
 			draw_circle(cp, cr, env_col)

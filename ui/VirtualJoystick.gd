@@ -188,7 +188,9 @@ func _update_drag(local_pos: Vector2) -> void:
 		output_vector = Vector2.ZERO
 	else:
 		var remapped := clampf((mag - deadzone) / maxf(0.01, 1.0 - deadzone), 0.0, 1.0)
-		output_vector = (raw_vec / mag) * remapped
+		# Modern dual-stage analog ease: soft fine control near center, full punch at max reach
+		var curved := pow(remapped, 1.30)
+		output_vector = (raw_vec / mag) * curved
 	queue_redraw()
 
 

@@ -117,7 +117,7 @@ var _boss_ram_cd: float = 0.0
 ## every physics frame; kept small and portrait-friendly.
 var _camera_look_ahead: Vector2 = Vector2.ZERO
 const LOOK_AHEAD_PX: float = 48.0
-const LOOK_AHEAD_SPEED: float = 2.8
+const LOOK_AHEAD_SPEED: float = 5.2
 var _tracked_miniboss: EnemyEntity = null
 
 # --- game feel -------------------------------------------------------------------
@@ -187,7 +187,7 @@ func _ready() -> void:
 	camera = Camera2D.new()
 	camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 7.5
+	camera.position_smoothing_speed = 8.8
 	# No limit_* on purpose. The forest has no edge, so clamping the camera to one
 	# would reintroduce the border the world was just rebuilt to lose.
 	player.add_child(camera)
@@ -572,9 +572,11 @@ func _physics_process(delta: float) -> void:
 		# Camera leads gently in the direction of travel so the player sees where
 		# they are going. The offset settles back to zero when the slime idles.
 		var vel := player.velocity
+		var vel_spd := vel.length()
 		var target_ahead := Vector2.ZERO
-		if vel.length() > 35.0:
-			target_ahead = vel.normalized() * LOOK_AHEAD_PX
+		if vel_spd > 28.0:
+			var spd_ratio := clampf((vel_spd - 28.0) / 160.0, 0.0, 1.0)
+			target_ahead = vel.normalized() * (LOOK_AHEAD_PX * smoothstep(0.0, 1.0, spd_ratio))
 		_camera_look_ahead = _camera_look_ahead.lerp(target_ahead, 1.0 - exp(-LOOK_AHEAD_SPEED * delta))
 		camera.position = _camera_look_ahead
 

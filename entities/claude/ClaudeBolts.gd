@@ -26,16 +26,20 @@ func set_radius(r0: float) -> void:
 	_r0 = r0
 
 
-func fire(targets: Array[Vector2], r0: float, level: int) -> void:
+func fire(targets: Array[Vector2], r0: float, level: int, em_storm: bool = false) -> void:
 	_r0 = r0
 	var list: Array[Vector2] = targets.duplicate()
 	if list.is_empty():
 		# Nothing to hit: a short crown of arcs shows the discharge happened.
 		var base := _rng.randf() * TAU
-		for i in range(3 + mini(level, 3)):
-			list.append(Vector2.from_angle(base + TAU * float(i) / float(3 + mini(level, 3)) + _rng.randf_range(-0.25, 0.25)) * r0 * _rng.randf_range(2.0, 2.6))
+		var arc_count := (4 + mini(level, 4)) if em_storm else (3 + mini(level, 3))
+		for i in range(arc_count):
+			var spread := (TAU * float(i) / float(arc_count)) + _rng.randf_range(-0.25, 0.25)
+			var reach_mult := _rng.randf_range(2.4, 3.2) if em_storm else _rng.randf_range(2.0, 2.6)
+			list.append(Vector2.from_angle(base + spread) * r0 * reach_mult)
+	var max_bolts := 12 if em_storm else 8
 	for t in list:
-		if _bolts.size() >= 8:
+		if _bolts.size() >= max_bolts:
 			break
 		var dir := t.normalized() if t.length_squared() > 0.01 else Vector2.RIGHT
 		_bolts.append({
@@ -46,6 +50,7 @@ func fire(targets: Array[Vector2], r0: float, level: int) -> void:
 			"seed": _rng.randi(),
 			"pts": PackedVector2Array(),
 			"branch": PackedVector2Array(),
+			"is_em": em_storm,
 		})
 		_rebuild(_bolts[_bolts.size() - 1])
 
@@ -108,15 +113,25 @@ func _draw() -> void:
 		var pts: PackedVector2Array = b["pts"]
 		var fork: PackedVector2Array = b["branch"]
 		var w := maxf(_r0 * 0.05, 1.4)
-		draw_polyline(pts, Color(0.30, 0.62, 1.0, 0.16 * f), w * 5.0, true)
-		draw_polyline(pts, Color(0.50, 0.86, 1.0, 0.45 * f), w * 2.2, true)
-		draw_polyline(pts, Color(0.92, 1.0, 1.0, 0.95 * f), w, true)
+		var is_em: bool = bool(b.get("is_em", false))
+
+		# Colors: EM storm uses blazing solar-amber core with blue magnetic fringe
+		var col_halo := Color(1.0, 0.75, 0.20, 0.22 * f) if is_em else Color(0.30, 0.62, 1.0, 0.16 * f)
+		var col_body := Color(1.0, 0.90, 0.40, 0.60 * f) if is_em else Color(0.50, 0.86, 1.0, 0.45 * f)
+		var col_core := Color(1.0, 1.0, 0.85, 0.98 * f) if is_em else Color(0.92, 1.0, 1.0, 0.95 * f)
+
+		draw_polyline(pts, col_halo, w * 5.0, true)
+		draw_polyline(pts, col_body, w * 2.2, true)
+		draw_polyline(pts, col_core, w, true)
 		if fork.size() > 1:
-			draw_polyline(fork, Color(0.50, 0.86, 1.0, 0.35 * f), w * 1.4, true)
-			draw_polyline(fork, Color(0.95, 1.0, 1.0, 0.8 * f), w * 0.6, true)
+			draw_polyline(fork, col_body * 0.8, w * 1.4, true)
+			draw_polyline(fork, col_core, w * 0.6, true)
 		var from: Vector2 = b["from"]
-		draw_circle(from, _r0 * 0.20, Color(0.45, 0.80, 1.0, 0.22 * f))
-		draw_circle(from, _r0 * 0.09, Color(0.95, 1.0, 1.0, 0.7 * f))
+		draw_circle(from, _r0 * 0.20, col_halo)
+		draw_circle(from, _r0 * 0.09, col_core * 0.8)
+		if is_em:
+			# Magnetic field pulse ring at bolt emission point
+			draw_arc(from, _r0 * (0.25 + 0.35 * (1.0 - fade)), 0.0, TAU, 16, Color(1.0, 0.85, 0.35, 0.40 * f), 1.2)
 		var to: Vector2 = b["to"]
-		draw_circle(to, _r0 * 0.15, Color(0.45, 0.80, 1.0, 0.25 * f))
-		draw_circle(to, _r0 * 0.055, Color(1.0, 1.0, 1.0, 0.8 * f))
+		draw_circle(to, _r0 * 0.15, col_halo)
+		draw_circle(to, _r0 * 0.055, col_core)

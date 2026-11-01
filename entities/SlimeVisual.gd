@@ -218,11 +218,16 @@ func trigger_evolution() -> void:
 	gulp_bulge = 0.35
 
 
-func trigger_wall_bump(normal: Vector2) -> void:
+func trigger_wall_bump(normal: Vector2, impact_speed: float = 0.0) -> void:
+	var strength := clampf(impact_speed / 300.0, 0.20, 0.40) if impact_speed > 0.0 else 0.24
 	if absf(normal.x) > absf(normal.y):
-		squash_stretch = Vector2(0.76, 1.24)
+		squash_stretch = Vector2(1.0 - strength, 1.0 + strength)
 	else:
-		squash_stretch = Vector2(1.24, 0.76)
+		squash_stretch = Vector2(1.0 + strength, 1.0 - strength)
+
+
+func apply_wall_contact(_normal: Vector2, _depth: float, _delta: float) -> void:
+	pass
 
 
 func _process(delta: float) -> void:
@@ -421,24 +426,7 @@ func _draw_foreground() -> void:
 
 	# 6. Expressive High-Contrast Eyes & Specular Catchlights (drawn crisp over cytoplasm!)
 	# (skipped when a style renders its own face: custom_face)
-	if not is_dying and not custom_face:
-		var look_off := look_dir.normalized() * (eff_r * 0.16)
-		var eye_sep := eff_r * 0.33
-		var eye_y := -eff_r * 0.10
-		var eye_r := clampf(eff_r * 0.18, 4.0, 8.8)
-		for side: float in [-1.0, 1.0]:
-			var ep := Vector2(side * eye_sep, eye_y) + look_off
-			if hurt_flash > 0.35:
-				var sx := -side * eye_r * 0.55
-				_fg_overlay.draw_line(ep + Vector2(-sx, -eye_r * 0.65), ep + Vector2(sx, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.6)
-				_fg_overlay.draw_line(ep + Vector2(-sx, eye_r * 0.65), ep + Vector2(sx, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.6)
-			elif _blink_open < 0.3:
-				_fg_overlay.draw_line(ep + Vector2(-eye_r, 0.0), ep + Vector2(eye_r, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.4)
-			else:
-				_fg_overlay.draw_circle(ep, eye_r * 1.14, Color(0.92, 1.0, 0.96, 0.52 * alpha_mult))
-				_fg_overlay.draw_circle(ep, eye_r, Color(0.04, 0.09, 0.14, alpha_mult))
-				_fg_overlay.draw_circle(ep + Vector2(-eye_r * 0.30, -eye_r * 0.30), eye_r * 0.38, Color(1.0, 1.0, 1.0, alpha_mult))
-				_fg_overlay.draw_circle(ep + Vector2(eye_r * 0.24, eye_r * 0.26), eye_r * 0.16, Color(0.75, 1.0, 0.95, 0.85 * alpha_mult))
+	_draw_face(eff_r, alpha_mult)
 
 	# 7. Shield dome & Evolution burst ring
 	# The static dome is skipped when the organic style owns the shield
@@ -460,3 +448,26 @@ func _draw_foreground() -> void:
 		var cp := cd * (eff_r + 32.0 + 3.0 * sin(_anim_time * 5.0))
 		var perp := cd.orthogonal() * 7.5
 		_fg_overlay.draw_colored_polygon(PackedVector2Array([cp + cd * 11.5, cp - cd * 4.0 + perp, cp - cd * 4.0 - perp]), Color(compass_color.r, compass_color.g, compass_color.b, 0.92))
+
+
+## Expressive High-Contrast Eyes & Specular Catchlights drawn on _fg_overlay.
+func _draw_face(eff_r: float, alpha_mult: float) -> void:
+	if is_dying or custom_face:
+		return
+	var look_off := look_dir.normalized() * (eff_r * 0.16)
+	var eye_sep := eff_r * 0.33
+	var eye_y := -eff_r * 0.10
+	var eye_r := clampf(eff_r * 0.18, 4.0, 8.8)
+	for side: float in [-1.0, 1.0]:
+		var ep := Vector2(side * eye_sep, eye_y) + look_off
+		if hurt_flash > 0.35:
+			var sx := -side * eye_r * 0.55
+			_fg_overlay.draw_line(ep + Vector2(-sx, -eye_r * 0.65), ep + Vector2(sx, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.6)
+			_fg_overlay.draw_line(ep + Vector2(-sx, eye_r * 0.65), ep + Vector2(sx, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.6)
+		elif _blink_open < 0.3:
+			_fg_overlay.draw_line(ep + Vector2(-eye_r, 0.0), ep + Vector2(eye_r, 0.0), Color(0.05, 0.10, 0.15, alpha_mult), 2.4)
+		else:
+			_fg_overlay.draw_circle(ep, eye_r * 1.14, Color(0.92, 1.0, 0.96, 0.52 * alpha_mult))
+			_fg_overlay.draw_circle(ep, eye_r, Color(0.04, 0.09, 0.14, alpha_mult))
+			_fg_overlay.draw_circle(ep + Vector2(-eye_r * 0.30, -eye_r * 0.30), eye_r * 0.38, Color(1.0, 1.0, 1.0, alpha_mult))
+			_fg_overlay.draw_circle(ep + Vector2(eye_r * 0.24, eye_r * 0.26), eye_r * 0.16, Color(0.75, 1.0, 0.95, 0.85 * alpha_mult))
