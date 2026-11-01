@@ -203,15 +203,15 @@ void fragment() {
 		float fine = (fine_rgb.r + fine_rgb.g + fine_rgb.b) / 3.0 / max(0.001, floor_mean);
 		float macro = (macro_rgb.r + macro_rgb.g + macro_rgb.b) / 3.0 / max(0.001, floor_mean);
 
-		// Harmonized detail and broad modulation: maintains organic moss grain
-		// while eliminating harsh military-camouflage splotches and dirty dark blotches.
-		float detail = mix(1.0, clamp(fine, 0.72, 1.34), 0.42 * floor_strength);
-		float broad = mix(1.0, clamp(macro, 0.82, 1.22), 0.26 * floor_strength);
+		// Harmonized detail and broad modulation: softens harsh high-frequency grain
+		// while emphasizing broad, velvety moss cushions and gentle woodland undulations.
+		float detail = mix(1.0, clamp(fine, 0.80, 1.22), 0.28 * floor_strength);
+		float broad = mix(1.0, clamp(macro, 0.78, 1.25), 0.36 * floor_strength);
 
 		col *= detail * broad;
 
 		// Rich velvety emerald-gold moss tinting in the highlights
-		col = mix(col, col * vec3(0.95, 1.14, 0.96), clamp(fine - 1.0, 0.0, 1.0) * 0.62 * floor_strength);
+		col = mix(col, col * vec3(0.95, 1.14, 0.96), clamp(fine - 1.0, 0.0, 1.0) * 0.48 * floor_strength);
 
 		if (floor_relief > 0.01) {
 			// The baked slopes are gentle (the height field is smooth), so they

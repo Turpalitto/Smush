@@ -1486,9 +1486,8 @@ func _draw() -> void:
 				var ang := (TAU / 10.0) * float(i) + sin(float(i) * 2.3) * 0.12
 				var rp := Vector2.from_angle(ang) * ring_r
 				var pulse := 0.65 + 0.35 * sin(_anim_time * 1.4 + float(i) * 1.1)
-				draw_circle(rp, 18.0, Color(0.28, 0.85, 0.68, 0.045 * pulse * gfade))
-				draw_circle(rp, 4.2, Color(0.58, 1.0, 0.86, 0.24 * pulse * gfade))
-				draw_circle(rp + Vector2(6.5, -4.0), 2.6, Color(0.76, 1.0, 0.90, 0.20 * pulse * gfade))
+				draw_circle(rp, 16.0, Color(0.20, 0.62, 0.50, 0.035 * pulse * gfade))
+				draw_circle(rp, 6.0, Color(0.35, 0.85, 0.70, 0.055 * pulse * gfade))
 
 	# Northern Ancient Guardian Shrine (world landmark at (0, -480))
 	var shrine_d := p.distance_to(SHRINE_POS)
@@ -1623,12 +1622,12 @@ func _draw() -> void:
 			fits_dash = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, true)
 		var gcol := Color(0.42, 1.0, 0.84) if fits_walk else (Color(1.0, 0.84, 0.36) if fits_dash else Color(1.0, 0.38, 0.44))
 		var gpulse := 0.80 + 0.20 * sin(_anim_time * 1.8 + gc.x * 0.01)
-		draw_circle(gc, 36.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.055 * gfade))
-		draw_circle(gc, 20.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.095 * gfade))
+		draw_circle(gc, 36.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.040 * gfade))
+		draw_circle(gc, 20.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.065 * gfade))
 		for mi in range(3):
 			var ma := _anim_time * 1.1 + float(mi) * (TAU / 3.0)
 			var mp := gc + Vector2(cos(ma) * 14.0, sin(ma) * 9.0)
-			draw_circle(mp, 2.4, Color(gcol.r, gcol.g, gcol.b, 0.34 * gpulse * gfade))
+			draw_circle(mp, 2.0, Color(gcol.r, gcol.g, gcol.b, 0.12 * gpulse * gfade))
 
 	# Physical Obstacles (Rune Stones, Mana Crystals, Root Pillars). The painted
 	# sprite is a child node, so this pass only adds the contact shadow — and a

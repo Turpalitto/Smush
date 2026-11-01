@@ -57,6 +57,11 @@ func _ready() -> void:
 
 func bind_arena(p_arena: ArenaController) -> void:
 	arena = p_arena
+	if _hp_bar != null:
+		if arena != null and arena.mode_id == "zen":
+			_hp_bar.visible = false
+		else:
+			_hp_bar.visible = true
 
 
 func _build_layout() -> void:
@@ -105,6 +110,8 @@ func _build_layout() -> void:
 	_hp_bar.custom_minimum_size = Vector2(0, 24)
 	_hp_bar.show_percentage = false
 	_hp_bar.add_theme_stylebox_override("fill", UIThemeBuilder.make_box(Color(0.94, 0.32, 0.44), Color(1.0, 0.68, 0.74, 0.45), 10, 1, 2, 2))
+	if arena != null and arena.mode_id == "zen":
+		_hp_bar.visible = false
 	stats_col.add_child(_hp_bar)
 
 	_hp_label = Label.new()
@@ -294,8 +301,9 @@ func _connect_signals() -> void:
 	Events.essence_collected.connect(func(_amt: int, total: int) -> void:
 		_essence_label.text = "✦ %d" % total
 	)
-	Events.run_started.connect(func(_mode: String) -> void:
+	Events.run_started.connect(func(p_mode: String) -> void:
 		wake_hud()
+		_hp_bar.visible = (p_mode != "zen")
 		_boss_box.visible = false
 		_toast_panel.visible = false
 		_toast_timer = 0.0
