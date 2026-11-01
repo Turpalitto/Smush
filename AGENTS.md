@@ -18,6 +18,7 @@
 
 ## Контекст проекта
 
+- Актуальное направление владельца, 01.11.2026: работать с `main`; главная цель — красивый мир, расслабление и постепенное красивое усиление слизи. Не добавлять сложные механики. Магию, физику и химию прежде всего выражать через простые реакции и визуальные ощущения. Подробный рабочий промт и выводы осмотра: `docs/production/RELAXATION_BRIEF.md`; это уточнение цели, а не замена фаз и gates основного плана.
 - Проверить текущую ветку и HEAD; сохранять выбранную владельцем ветку и чужой WIP. Старая ссылка на `arena/6d0cda1c-smush` не является командой переключить текущую рабочую копию.
 - The primary product is the native offline Godot game at the repository root. `web/` is a secondary implementation retained from the uploaded archive.
 - The owner's current priority is the game itself: controls, absorption/growth, mutation choices, enemies, boss combat, run pacing, visuals and sound.

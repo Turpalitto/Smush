@@ -18,6 +18,7 @@ extends Node
 ##                 photographed at its peak instead of after it ended.
 ##   SWAP_STYLE    organic | original   (default organic)
 ##   SWAP_SEED     run seed              (default 424242 — identical forests for A/B)
+##   SWAP_MODE     standard | quick | endless | zen (default standard)
 ##   SWAP_MASS     set player mass       (default: leave the run's start mass)
 ##   SWAP_STAGE    1..15 = mass at that stage threshold (+0.05), exact ladder pose
 ##   SWAP_MUT      csv mutation ids to enable at SWAP_MLEVEL (set directly on
@@ -170,7 +171,8 @@ func _boot() -> void:
 		await get_tree().process_frame
 
 	var run_seed := _env_int("SWAP_SEED", SEED_DEFAULT)
-	main._start_run("standard", run_seed)
+	var run_mode := GameModes.normalize(OS.get_environment("SWAP_MODE"))
+	main._start_run(run_mode, run_seed)
 	# The arena turns PLAYING a frame or two after _start_run, but a focus-out
 	# notification at boot can pause it before that (GameManager's mobile
 	# background safety). Twelve frames was too tight under load — one run in
@@ -624,6 +626,9 @@ func _save_png(path: String) -> int:
 	_last_img = img
 	var err := img.save_png(path)
 	var vis := main.arena.player.visual
+	print("SWAP_BASELINE mode=%s seed=%d zoom=%s organic_quality=%d fx_quality=%s elapsed=%.4f frozen=%s" % [
+		main.arena.mode_id, main.arena.world._world_seed, str(main.arena.camera.zoom), quality,
+		str(SaveData.get_setting("fx_quality", "high")), _elapsed, str(get_tree().paused)])
 	print("SWAP_SHOT %s %dx%d style=%s stage=%d mass=%.1f err=%d" % [
 		path, img.get_width(), img.get_height(),
 		# The real class, not the tool's own flag: after a live switch they differ.

@@ -1,0 +1,9 @@
+Godot Engine v4.5.stable.official.876b29033 - https://godotengine.org
+Metal 3.2 - Forward Mobile - Using Device #0: Apple - Apple M5 (Apple9)
+
+SWAP visual=organic mutations={  } mass=10.1
+SWAP_BASELINE mode=zen seed=424242 zoom=(1.038745, 1.038745) organic_quality=2 fx_quality=high elapsed=1.3167 frozen=true
+SWAP_SHOT /Users/turpal/Documents/smush/reports/production/baseline/2026-11-01/main/stage01_organic.png 540x1080 style=organic stage=1 mass=10.1 err=0
+SWAP_BASELINE mode=zen seed=424242 zoom=(1.038745, 1.038745) organic_quality=2 fx_quality=high elapsed=1.3667 frozen=true
+SWAP_SHOT /Users/turpal/Documents/smush/reports/production/baseline/2026-11-01/main/stage01_original.png 540x1080 style=original stage=1 mass=10.1 err=0
+SWAP_AB tag=stage01 organic=/Users/turpal/Documents/smush/reports/production/baseline/2026-11-01/main/stage01_organic.png original=/Users/turpal/Documents/smush/reports/production/baseline/2026-11-01/main/stage01_original.png err=0/0 delta=127 paused=true

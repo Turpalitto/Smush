@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "protocol_version": "1.0",
+  "updated_at": "2026-11-01T14:20:27Z",
+  "nodes": [
+    {
+      "id": "project",
+      "kind": "project",
+      "name": "smush",
+      "managed": true
+    },
+    {
+      "id": "stack:unknown",
+      "kind": "stack",
+      "name": "Unknown",
+      "managed": true
+    }
+  ],
+  "edges": [
+    {
+      "source": "project",
+      "target": "stack:unknown",
+      "type": "uses"
+    }
+  ]
+}
