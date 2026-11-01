@@ -31,5 +31,6 @@ Prepare a calm forest and stage 8 comparison, then obtain the art choice specifi
 
 ## Recent significant changes
 
+- 2026-11-01: Consolidated main, removed external worktrees, softened floor shading, decluttered zen HUD
 - 2026-11-01: Switched to main at owner request; captured Pixel 3 and five growth stages; reviewed existing GLM and Claude labs; added capture mode and metadata; recorded relaxation brief and baseline
 - Project Memory initialized; no code changes were made.
