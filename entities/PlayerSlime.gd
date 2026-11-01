@@ -514,7 +514,9 @@ func complete_absorption(entity_id: String, mass_gain: float, xp_gain: float, es
 	if entity_id == "spore_orb":
 		Audio.play_orb_chime()
 	else:
-		Audio.play_sfx("absorb", randf_range(0.92, 1.18))
+		# Harmonize creature absorption sound with active pentatonic scale ladder
+		var harmonic_pitch := 0.94 + 0.05 * float(Audio.chime_step() % 5)
+		Audio.play_sfx("absorb", harmonic_pitch)
 	var evo_mult := 1.0 + SaveData.get_upgrade_bonus("evolution_rate")
 	add_evolution_xp(xp_gain * evo_mult)
 

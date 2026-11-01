@@ -154,12 +154,16 @@ func trigger_evolution() -> void:
 func trigger_swallow(local_entry: Vector2, prey_color: Color, prey_size: float) -> void:
 	var dir := local_entry.normalized() if local_entry.length_squared() > 0.001 else Vector2.DOWN
 	var a := dir.angle()
-	_ring.push(a, -0.085, 1.5)
-	_ring.impulse(a, 5.5, 1.6)
-	_ring.impulse_all(0.6)
-	_ripple_a = Vector4(dir.x * 0.95, dir.y * 0.95, 0.0, 1.0)
+	_ring.push(a, -0.095, 1.6)
+	_ring.impulse(a, 6.2, 1.8)
+	_ring.impulse_all(0.8)
+	_ripple_a = Vector4(dir.x * 0.95, dir.y * 0.95, 0.0, 1.35)
 	_gulp_eye = 1.0
-	gulp_bulge = maxf(gulp_bulge, 0.16)
+	gulp_bulge = maxf(gulp_bulge, 0.20)
+	# Visceral recoil on swallow: internal organelles receive a jolt and rebound
+	_lag_v += dir * 1.8
+	_lag += dir * 0.08
+	_core_energy = minf(_core_energy + 0.32, 1.2)
 	var r0 := _body_radius()
 	_swallowed.append({
 		"from": (dir * r0 * 0.88),
@@ -263,12 +267,12 @@ func _process(delta: float) -> void:
 			_accel = _accel.lerp(Vector2.ZERO, 1.0 - exp(-dt / 0.09))
 	var a_n := (_accel / ACCEL_REF).limit_length(1.2)
 
-	# Interior inertia: a damped spring, so contents overshoot when you brake.
-	var lag_target := -a_n * 0.20
-	var lag_force := (lag_target - _lag) * 64.0 - _lag_v * 5.2
+	# Interior inertia: a damped spring, so contents overshoot when you brake or turn.
+	var lag_target := -a_n * 0.25
+	var lag_force := (lag_target - _lag) * 72.0 - _lag_v * 6.2
 	_lag_v += lag_force * dt
 	_lag += _lag_v * dt
-	_lag = _lag.limit_length(0.34)
+	_lag = _lag.limit_length(0.36)
 
 	# Frame angle follows the motion smoothly instead of snapping at 15 px/s.
 	if speed > 15.0:

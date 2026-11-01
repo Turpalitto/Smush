@@ -1324,7 +1324,23 @@ func _step_bend(swayer: Dictionary, rel: Vector2, dist2: float, delta: float) ->
 	var dist := sqrt(dist2)
 	if dist > 1.0 and dist < BEND_RANGE:
 		var fall := 1.0 - dist / BEND_RANGE
-		lean = BEND_MAX * (rel.x / dist) * fall * fall
+		var static_lean: float = BEND_MAX * (rel.x / dist) * fall * fall
+		lean = static_lean
+
+		# Dynamic wake parting when the slime is swimming through undergrowth
+		if _player != null and is_instance_valid(_player):
+			var vel: Vector2 = _player.get("velocity") if _player.get("velocity") != null else Vector2.ZERO
+			var spd := vel.length()
+			if spd > 25.0:
+				var mdir := vel / spd
+				var norm := Vector2(-mdir.y, mdir.x)
+				var lat := rel.dot(norm)
+				var fwd := rel.dot(mdir)
+				if fwd > -20.0 and absf(lat) < BEND_RANGE * 0.7:
+					var part_dir := 1.0 if lat >= 0.0 else -1.0
+					var wake_k := clampf(spd / 180.0, 0.0, 1.4)
+					var dynamic_parting: float = BEND_MAX * part_dir * fall * fall * (0.8 + 0.4 * wake_k)
+					lean = lerpf(static_lean, dynamic_parting, clampf(fwd / (BEND_RANGE * 0.5), 0.0, 0.85))
 
 	# A real spring, integrated. Underdamped, so the plant overshoots and settles
 	# instead of tracking the slime like a lever — the overshoot is the whole effect.
