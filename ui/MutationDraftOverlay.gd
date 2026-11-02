@@ -248,7 +248,7 @@ func _populate_choices(choices: Array) -> void:
 		wrap.add_child(btn)
 		# The wrapper's resize callback fits the card once layout resolves its
 		# initial zero-width slot, avoiding the style's minimum-width overflow.
-		btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 		_cards.append(btn)
 
 		var hbox := HBoxContainer.new()
