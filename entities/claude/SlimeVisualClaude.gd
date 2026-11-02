@@ -22,6 +22,7 @@ extends SlimeVisual
 ## Physical radius, mass and ability numbers are never read or written here.
 
 const BODY_UNIT: float = 1.04     ## drawn body radius / game radius (old style: ~1.07)
+const SOFT_GLOW: Texture2D = preload("res://resources/effects/soft_glow.tres")
 const EXTENT: float = 1.5         ## quad half-size in body radii
 const FACE_Y: float = -0.13       ## eye line, in body radii (negative = up)
 const EYE_SEP: float = 0.335
@@ -749,22 +750,20 @@ func _draw_ground() -> void:
 	var a := stealth_alpha * (1.0 - death_progress)
 	var sq := squash_stretch
 	var evo_t01 := clampf((clampf(growth_t, 1.0, 15.0) - 1.0) / 14.0, 0.0, 1.0)
-	# Shadow: fewer rings at baby stage (cleaner small look)
+	# A continuous contact shadow, restrained while the slime is small.
 	var shadow_strength := lerpf(0.4, 1.0, smoothstep(0.0, 0.4, evo_t01))
 	var off := Vector2(0.10, 0.34) * r0
 	draw_set_transform(off, 0.0, Vector2(sq.x * 0.98, sq.y * 0.62))
-	for i in range(7):
-		var f := float(i) / 6.0
-		var rr := r0 * lerpf(1.28, 0.70, f)
-		draw_circle(Vector2.ZERO, rr, Color(0.02, 0.02, 0.09, (0.045 + 0.035 * f) * a * shadow_strength))
+	var shadow_extent := Vector2.ONE * r0 * 1.45
+	draw_texture_rect(SOFT_GLOW, Rect2(-shadow_extent, shadow_extent * 2.0), false,
+		Color(0.02, 0.02, 0.09, 0.38 * a * shadow_strength))
 	# Glow pool: scales with bioluminescence evolution
 	var glow_evo := smoothstep(0.1, 0.7, evo_t01)
 	draw_set_transform(Vector2(0.0, r0 * 0.30), 0.0, Vector2(1.0, 0.70))
 	var glow_a := (0.02 + 0.06 * glow_evo + 0.07 * clampf(_core_energy, 0.0, 1.0)) * a
-	for i in range(4):
-		var f2 := float(i) / 3.0
-		draw_circle(Vector2.ZERO, r0 * lerpf(2.0, 1.25, f2),
-			Color(_body_color.r, _body_color.g, _body_color.b, glow_a * (0.5 + 0.5 * f2)))
+	var glow_extent := Vector2.ONE * r0 * 2.2
+	draw_texture_rect(SOFT_GLOW, Rect2(-glow_extent, glow_extent * 2.0), false,
+		Color(_body_color.r, _body_color.g, _body_color.b, glow_a * 2.4))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

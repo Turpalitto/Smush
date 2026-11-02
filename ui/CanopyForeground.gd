@@ -21,6 +21,7 @@ var _tex_broadleaf: Texture2D = null
 var _tex_fern: Texture2D = null
 
 const MOTE_COUNT: int = 10
+const SOFT_GLOW: Texture2D = preload("res://resources/effects/soft_glow.tres")
 const LEAF_COUNT: int = 14
 const BUTTERFLY_COUNT: int = 5
 const STARDUST_COUNT: int = 12
@@ -358,8 +359,9 @@ func _draw_butterflies(vp: Vector2) -> void:
 		var wing_span := maxf(0.12, absf(flap))
 
 		# Luminous bioluminescent aura around the fluttering creature
-		_painter.draw_circle(screen_p, sz * 2.5, Color(hue.r, hue.g, hue.b, 0.09))
-		_painter.draw_circle(screen_p, sz * 1.5, Color(hue.r, hue.g, hue.b, 0.18))
+		var glow_extent := Vector2.ONE * sz * 2.8
+		_painter.draw_texture_rect(SOFT_GLOW, Rect2(screen_p - glow_extent, glow_extent * 2.0), false,
+			Color(hue.r, hue.g, hue.b, 0.22))
 
 		_painter.draw_set_transform(screen_p, flight_ang, Vector2(wing_span, 1.0))
 
@@ -423,9 +425,9 @@ func _draw_bokeh_motes(vp: Vector2, half_span: float) -> void:
 		var pulse := 0.55 + 0.45 * sin(_time * 1.15 + float(m["phase"]))
 		var mcol := cool_mote.lerp(warm_mote, clampf(float(m["warm"]) * 0.45 + _growth * 0.55, 0.0, 1.0))
 		var a := 0.032 * pulse
-		_painter.draw_circle(screen_p, r, Color(mcol.r, mcol.g, mcol.b, a * 0.55))
-		_painter.draw_circle(screen_p, r * 0.68, Color(mcol.r, mcol.g, mcol.b, a))
-		_painter.draw_circle(screen_p, r * 0.34, Color(1.0, 0.99, 0.92, a * 0.85))
+		var extent := Vector2.ONE * r
+		_painter.draw_texture_rect(SOFT_GLOW, Rect2(screen_p - extent, extent * 2.0), false,
+			Color(mcol.r, mcol.g, mcol.b, a * 1.6))
 
 
 func _draw_star_dust(vp: Vector2) -> void:

@@ -51,6 +51,9 @@ extends Node
 ##   SWAP_HP       override player max HP (survivability for long boss clips)
 ##   SWAP_QUALITY  0|1|2 organic quality (default 2)
 ##   SWAP_SIZE     WxH window size
+##   SWAP_ISOLATED 1 = fresh throwaway profile, never writes the player's save
+##   SWAP_LOCALE   ru | en (only with SWAP_ISOLATED=1)
+##   SWAP_FX       low | high (only with SWAP_ISOLATED=1)
 ##   SWAP_PERF_ONE original | organic | organic:0..2 — stress the arena (32 enemies
 ##                 + boss + 45 orbs), vsync off, print avg/p50/p95/max frame ms.
 ##                 ONE STYLE PER PROCESS: measuring several configurations inside a
@@ -164,6 +167,15 @@ func _boot() -> void:
 		if nuc_bits.size() == 3:
 			_nucleus_override = Vector3(float(nuc_bits[0]), float(nuc_bits[1]), float(nuc_bits[2]))
 
+	if OS.get_environment("SWAP_ISOLATED") == "1":
+		SaveData.set_custom_paths("user://visual_capture.json", "user://visual_capture.bak", "user://visual_capture.tmp")
+		SaveData.data = SaveData.create_default_data()
+		var locale := OS.get_environment("SWAP_LOCALE")
+		if locale in ["ru", "en"]:
+			SaveData.set_setting("locale", locale)
+		var fx := OS.get_environment("SWAP_FX")
+		if fx in ["low", "high"]:
+			SaveData.set_setting("fx_quality", fx)
 	var packed := load("res://scenes/Main.tscn") as PackedScene
 	main = packed.instantiate() as MainRoot
 	get_tree().root.add_child(main)
@@ -644,6 +656,14 @@ func _capture_now() -> void:
 	_captured = true
 	await _wait_frames(3)
 	var err := _save_png(_out_path)
+	# Drain the audio thread before tearing down a movie/screenshot process.
+	# Otherwise active Vorbis loops retain their packet sequences at engine exit.
+	Audio.set_process(false)
+	for child in Audio.get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+			child.stream = null
+	await _wait_frames(8)
 	get_tree().quit(0 if err == OK else 4)
 
 

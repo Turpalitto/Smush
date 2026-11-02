@@ -16,6 +16,7 @@ extends Node2D
 ## Side of one streaming chunk. 512 px is ~4 screen widths of ground: big enough
 ## that a chunk boundary crossing is rare, small enough that a chunk is cheap.
 const CHUNK_SIZE: float = 512.0
+const SOFT_GLOW: Texture2D = preload("res://resources/effects/soft_glow.tres")
 ## Chunks kept around the player, and the radius past which they are freed. The gap
 ## between the two is hysteresis: a chunk is never built and freed on the same step,
 ## and the fogged ring at radius 4-5 is already full while the new one fills in.
@@ -1495,15 +1496,13 @@ func _draw() -> void:
 	if glade_d < DRAW_RADIUS:
 		var gfade := _fog_fade(glade_d)
 		if gfade > 0.01:
-			draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.86, Color(0.10, 0.28, 0.24, 0.11 * gfade))
-			draw_circle(Vector2.ZERO, SAFE_SPAWN_RADIUS * 0.56, Color(0.16, 0.42, 0.35, 0.08 * gfade))
+			_draw_soft_light(Vector2.ZERO, SAFE_SPAWN_RADIUS, Color(0.16, 0.42, 0.35, 0.15 * gfade))
 			var ring_r := SAFE_SPAWN_RADIUS * 0.74
 			for i in range(10):
 				var ang := (TAU / 10.0) * float(i) + sin(float(i) * 2.3) * 0.12
 				var rp := Vector2.from_angle(ang) * ring_r
 				var pulse := 0.65 + 0.35 * sin(_anim_time * 1.4 + float(i) * 1.1)
-				draw_circle(rp, 16.0, Color(0.20, 0.62, 0.50, 0.035 * pulse * gfade))
-				draw_circle(rp, 6.0, Color(0.35, 0.85, 0.70, 0.055 * pulse * gfade))
+				_draw_soft_light(rp, 20.0, Color(0.35, 0.85, 0.70, 0.07 * pulse * gfade))
 
 	# Northern Ancient Guardian Shrine (world landmark at (0, -480))
 	var shrine_d := p.distance_to(SHRINE_POS)
@@ -1511,15 +1510,14 @@ func _draw() -> void:
 		var sfade := _fog_fade(shrine_d)
 		if sfade > 0.01:
 			var s_pulse := 0.88 + 0.12 * sin(_anim_time * 1.2)
-			draw_circle(SHRINE_POS, 168.0 * s_pulse, Color(0.20, 0.68, 0.58, 0.055 * sfade))
-			draw_circle(SHRINE_POS, 118.0 * s_pulse, Color(0.36, 0.94, 0.78, 0.075 * sfade))
+			_draw_soft_light(SHRINE_POS, 195.0 * s_pulse, Color(0.36, 0.94, 0.78, 0.14 * sfade))
 			_draw_ground_shadow(SHRINE_POS + Vector2(0.0, 18.0), 128.0, 0.32 * sfade)
 			var stex := _prop_texture("ancient_shrine")
 			if stex != null:
 				var s_side := 264.0
 				var s_tint := Color(0.92, 0.98, 0.96, sfade)
 				draw_texture_rect(stex, Rect2(SHRINE_POS - Vector2(s_side * 0.5, s_side * 0.5), Vector2(s_side, s_side)), false, s_tint)
-				draw_circle(SHRINE_POS, 34.0 * s_pulse, Color(0.45, 1.0, 0.90, 0.12 * sfade))
+				_draw_soft_light(SHRINE_POS, 48.0 * s_pulse, Color(0.45, 1.0, 0.90, 0.12 * sfade))
 
 	# Wonders. The halo is drawn even while a landmark is asleep, and that is the
 	# whole reason it can be found: from a screen away it is a soft light in the fog,
@@ -1538,15 +1536,12 @@ func _draw() -> void:
 		var breathe := 0.86 + 0.14 * sin(_anim_time * 1.1 + wpos.x * 0.0043 + wpos.y * 0.0027)
 		var base_r := lerpf(78.0, 124.0, wake)
 		var base_a := lerpf(0.040, 0.082, wake)
-		for gi in range(4):
-			var gr := (base_r + 32.0 * float(gi)) * breathe
-			draw_circle(wpos, gr,
-				Color(gcol.r, gcol.g, gcol.b,
-					base_a * (1.0 - 0.19 * float(gi)) * wfade))
+		_draw_soft_light(wpos, (base_r + 96.0) * breathe,
+			Color(gcol.r, gcol.g, gcol.b, base_a * 2.4 * wfade))
 		_draw_ground_shadow(wpos + Vector2(0.0, 46.0), 58.0, 0.24 * wfade)
 		# Soft ground illumination once it has woken
 		if wake > 0.02:
-			draw_circle(wpos + Vector2(0.0, 46.0), 88.0,
+			_draw_soft_light(wpos + Vector2(0.0, 46.0), 110.0,
 				Color(gcol.r, gcol.g, gcol.b, 0.065 * wake * wfade))
 
 	# Decorative flora: painted props get a contact shadow only; the moss pad is
@@ -1597,24 +1592,17 @@ func _draw() -> void:
 		else:
 			var spec: Dictionary = DECOR_KINDS.get(fkind, {})
 			if fkind >= BLOOM_KIND_MIN:
-				# The bloom set is the only flora that carries its own light. Three
-				# soft discs behind the sprite (chunk children draw on top) are
-				# cheaper than a shader per plant and read as a flower that is lit
-				# from inside rather than as a yellow sticker.
+				# A shared radial glow behind the painted petals.
 				var breathe := 0.82 + 0.18 * sin(_anim_time * 1.4 + fp.x * 0.011 + fp.y * 0.007)
-				for gi in range(3):
-					var gr := (26.0 + 15.0 * float(gi)) * sc * breathe
-					draw_circle(fp, gr, Color(1.0, 0.86, 0.52, (0.022 - 0.006 * float(gi)) * fade))
+				_draw_soft_light(fp, 64.0 * sc * breathe, Color(1.0, 0.86, 0.52, 0.05 * fade))
 			elif fkind == 6:
 				# Glow mushrooms: soft bioluminescent cyan cap radiance illuminating the ground
 				var shroom_pulse := 0.82 + 0.18 * sin(_anim_time * 2.0 + fp.x * 0.015 + fp.y * 0.012)
 				# Proximity reaction: mushrooms brighten as the slime approaches
 				var prox_d := fp.distance_to(p)
 				var prox_k := 1.0 + smoothstep(120.0, 20.0, prox_d) * 1.8
-				for gi in range(3):
-					var gr := (20.0 + 14.0 * float(gi)) * sc * shroom_pulse * (1.0 + (prox_k - 1.0) * 0.35)
-					var ga := (0.040 - 0.011 * float(gi)) * fade * prox_k
-					draw_circle(fp + Vector2(0.0, -8.0 * sc), gr, Color(0.28, 0.88, 0.98, ga))
+				var gr := 56.0 * sc * shroom_pulse * (1.0 + (prox_k - 1.0) * 0.35)
+				_draw_soft_light(fp + Vector2(0.0, -8.0 * sc), gr, Color(0.28, 0.88, 0.98, 0.08 * fade * prox_k))
 			_draw_ground_shadow(fp, float(spec.get("shadow", 19.0)) * sc, 0.20 * fade)
 		# Rising wisps from puddles and blooming flora
 		if (fkind == 1 or (fkind >= BLOOM_KIND_MIN and bloom_f > 0.1)) and fd < DECOR_RADIUS * 0.7:
@@ -1638,8 +1626,7 @@ func _draw() -> void:
 			fits_dash = MassSystem.can_fit_narrow_passage(p_node.mass, hgap, true)
 		var gcol := Color(0.42, 1.0, 0.84) if fits_walk else (Color(1.0, 0.84, 0.36) if fits_dash else Color(1.0, 0.38, 0.44))
 		var gpulse := 0.80 + 0.20 * sin(_anim_time * 1.8 + gc.x * 0.01)
-		draw_circle(gc, 36.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.040 * gfade))
-		draw_circle(gc, 20.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.065 * gfade))
+		_draw_soft_light(gc, 44.0 * gpulse, Color(gcol.r, gcol.g, gcol.b, 0.10 * gfade))
 		for mi in range(3):
 			var ma := _anim_time * 1.1 + float(mi) * (TAU / 3.0)
 			var mp := gc + Vector2(cos(ma) * 14.0, sin(ma) * 9.0)
@@ -1705,15 +1692,10 @@ func _draw() -> void:
 func _draw_growth_life(p: Vector2) -> void:
 	## Fireflies and the grove aura. Both are pure functions of index and time, so
 	## they need no state, cannot drift, and cost nothing when growth is low.
-	##
-	## The aura is deliberately two very faint discs rather than a gradient: a real
-	## radial gradient would need a texture, and at this alpha over a textured floor
-	## the banding is invisible.
 	var warm := Color(0.78, 1.0, 0.82)
 	if growth > 0.45:
 		warm = warm.lerp(Color(1.0, 0.94, 0.70), (growth - 0.45) / 0.55)
-	draw_circle(p, 300.0, Color(warm.r, warm.g, warm.b, 0.020 * growth))
-	draw_circle(p, 190.0, Color(warm.r, warm.g, warm.b, 0.026 * growth))
+	_draw_soft_light(p, 340.0, Color(warm.r, warm.g, warm.b, 0.055 * growth))
 
 	var count := int(round(growth * 26.0))
 	for i in range(count):
@@ -1809,11 +1791,9 @@ func _draw_mist_patches(player: Vector2) -> void:
 			continue
 		var pulse := 0.7 + 0.3 * sin(_anim_time * 0.5 + fi * 1.3)
 		var outer_r := 280.0 + fi * 20.0
-		var inner_r := 150.0 + fi * 14.0
 		var base_a := (0.020 + fi * 0.002) * pulse * fog_a
 		var mpos := player + offset
-		draw_circle(mpos, outer_r, Color(fog_tint.r * 0.9, fog_tint.g * 1.15, fog_tint.b * 1.05, base_a * 0.6))
-		draw_circle(mpos, inner_r, Color(fog_tint.r * 0.85, fog_tint.g * 1.2, fog_tint.b * 1.1, base_a))
+		_draw_soft_light(mpos, outer_r, Color(fog_tint.r * 0.85, fog_tint.g * 1.2, fog_tint.b * 1.1, base_a * 1.4))
 
 
 func _draw_rising_wisps(center: Vector2, kind: int, sc: float, fade: float) -> void:
@@ -1841,11 +1821,16 @@ func _draw_rising_wisps(center: Vector2, kind: int, sc: float, fade: float) -> v
 		draw_circle(wpos, 1.1 * sc, col)
 
 
+func _draw_soft_light(center: Vector2, radius: float, tint: Color) -> void:
+	var extent := Vector2.ONE * radius
+	draw_texture_rect(SOFT_GLOW, Rect2(center - extent, extent * 2.0), false, tint)
+
+
 func _draw_ground_shadow(center: Vector2, radius: float, alpha: float) -> void:
 	# A squashed ellipse, nudged "south" so the prop reads as standing on the floor
 	# rather than lying on it.
 	draw_set_transform(center + Vector2(0.0, radius * 0.30), 0.0, Vector2(1.0, 0.52))
-	draw_circle(Vector2.ZERO, radius, Color(0.0, 0.0, 0.0, alpha))
+	_draw_soft_light(Vector2.ZERO, radius * 1.35, Color(0.0, 0.0, 0.0, alpha))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -1883,12 +1868,9 @@ func _draw_prop_glow(pos: Vector2, r: float, kind: String, fade: float = 1.0, pl
 	if player_pos != Vector2.INF:
 		var pd := pos.distance_to(player_pos)
 		prox_boost = 1.0 + smoothstep(140.0, 30.0, pd) * 1.5
-	for step in range(3):
-		var radius := r * (1.15 + 0.28 * float(step))
-		var alpha := (0.10 - 0.028 * float(step)) * (0.65 + 0.35 * pulse) * fade * prox_boost
-		if alpha <= 0.0:
-			continue
-		draw_circle(pos + Vector2(0.0, -r * 0.15), radius, Color(glow_colour.r, glow_colour.g, glow_colour.b, alpha))
+	var alpha := 0.19 * (0.65 + 0.35 * pulse) * fade * prox_boost
+	_draw_soft_light(pos + Vector2(0.0, -r * 0.15), r * 2.0,
+		Color(glow_colour.r, glow_colour.g, glow_colour.b, alpha))
 	var c_alpha := 0.12 * pulse2 * fade * prox_boost
-	draw_circle(pos + Vector2(0.0, -r * 0.20), r * 0.45, Color(core_colour.r, core_colour.g, core_colour.b, c_alpha))
+	_draw_soft_light(pos + Vector2(0.0, -r * 0.20), r * 0.65, Color(core_colour.r, core_colour.g, core_colour.b, c_alpha))
 

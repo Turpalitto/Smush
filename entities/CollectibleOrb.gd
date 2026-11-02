@@ -10,6 +10,7 @@ const PULL_SPARKS: int = 4
 const SPARK_LIFE: float = 0.34
 const SPARK_EVERY: float = 0.055
 const SPARK_MAX: int = 14
+const SOFT_GLOW: Texture2D = preload("res://resources/effects/soft_glow.tres")
 
 var orb_type: String = "spore" # "spore", "essence", or "dew"
 var mass_value: float = 0.85
@@ -99,15 +100,10 @@ func _shed_sparks(delta: float) -> void:
 
 
 func _draw_glow(radius: float, inner_alpha: float) -> void:
-	## Two concentric discs instead of one. A single draw_circle is a hard-edged
-	## disc, and on a dark floor a hard disc reads as a flat sticker: the eye sees
-	## the rim before it sees the light. The outer disc is wide and faint, the inner
-	## one tight and strong, which is the cheapest radial falloff available without
-	## a shader of its own.
-	draw_circle(Vector2.ZERO, radius * 1.55,
-		Color(orb_color.r, orb_color.g, orb_color.b, inner_alpha * 0.34), true, -1.0, true)
-	draw_circle(Vector2.ZERO, radius,
-		Color(orb_color.r, orb_color.g, orb_color.b, inner_alpha), true, -1.0, true)
+	# Shared radial texture: one draw, no disc rim or per-pickup material.
+	var extent := Vector2.ONE * radius * 1.8
+	draw_texture_rect(SOFT_GLOW, Rect2(-extent, extent * 2.0), false,
+		Color(orb_color.r, orb_color.g, orb_color.b, inner_alpha))
 
 
 func _draw_sparks() -> void:

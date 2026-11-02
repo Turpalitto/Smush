@@ -28,13 +28,10 @@ const FLOOR_LIGHT_PATH: String = "res://resources/art/environment/forest_canopy_
 const FLOOR_LIGHT_MEAN: float = 0.5596
 const FLOOR_DAPPLE: float = 0.46
 const FLOOR_LIGHT_SCALE: float = 1.45
-## Caustics, baked by tools/bake_caustics.py: the net of light that water throws.
-## It is the one layer of the floor that is not the forest — it is the magic under
-## it — so it drifts on its own clock and warms up with the slime.
-const FLOOR_CAUSTICS_PATH: String = "res://resources/art/environment/forest_caustics.png"
+## Soft analytic water light on damp moss, warming with the slime's growth.
 const FLOOR_CAUSTICS_SCALE: float = 0.35
-const FLOOR_CAUSTICS_COLD: float = 0.08
-const FLOOR_CAUSTICS_WARM: float = 0.17
+const FLOOR_CAUSTICS_COLD: float = 0.035
+const FLOOR_CAUSTICS_WARM: float = 0.075
 
 ## --- bioluminescent moss trail ------------------------------------------------
 ## The floor shader draws the glow, so this is only a ring of remembered places:
@@ -44,7 +41,7 @@ const FLOOR_CAUSTICS_WARM: float = 0.17
 const TRAIL_COUNT: int = 16
 const TRAIL_SAMPLE_SEC: float = 0.16
 const TRAIL_FADE_SEC: float = 2.5
-const TRAIL_STRENGTH: float = 1.0
+const TRAIL_STRENGTH: float = 0.42
 ## A sample is only written once the slime has actually gone somewhere, so standing
 ## still lets the trail fade out instead of stacking sixteen points on one spot.
 const TRAIL_MIN_STEP_PX: float = 6.0
@@ -464,13 +461,8 @@ static func apply_floor_texture(mat: ShaderMaterial, strength: float) -> bool:
 		mat.set_shader_parameter("floor_dapple", FLOOR_DAPPLE)
 		mat.set_shader_parameter("floor_mist", FLOOR_MIST)
 
-	# Caustics are the last layer and the most optional: they are the magic, not the
-	# ground, so a build without them is still a forest floor.
-	var caustic_tex := AssetRegistry.get_texture(FLOOR_CAUSTICS_PATH)
-	if caustic_tex != null:
-		mat.set_shader_parameter("floor_caustics", caustic_tex)
-		mat.set_shader_parameter("floor_caustics_scale", FLOOR_CAUSTICS_SCALE)
-		mat.set_shader_parameter("floor_caustics_amount", FLOOR_CAUSTICS_COLD)
+	mat.set_shader_parameter("floor_caustics_scale", FLOOR_CAUSTICS_SCALE)
+	mat.set_shader_parameter("floor_caustics_amount", FLOOR_CAUSTICS_COLD)
 	return true
 
 
@@ -547,7 +539,7 @@ func start_new_run(p_mode: String = "standard", world_seed: int = 0) -> void:
 	SaveData.save_to_disk()
 	Analytics.track("run_started", {"mode": mode_id})
 	Events.run_started.emit(mode_id)
-	tutorial.begin_if_needed()
+	tutorial.begin_if_needed(mode_id)
 	App.change_state(App.State.PLAYING)
 
 

@@ -77,10 +77,8 @@ uniform vec3 trail_cool : source_color = vec3(0.36, 1.0, 0.88);
 uniform vec3 trail_warm : source_color = vec3(1.0, 0.86, 0.48);
 
 // --- caustics -------------------------------------------------------------------
-// Baked in Blender (tools/bake_caustics.py): a seamless net of light, the pattern
-// water throws on the ground. Two layers drift against each other, because one
-// sliding layer reads as the ground moving and two read as the water moving.
-uniform sampler2D floor_caustics : hint_default_white, repeat_enable, filter_linear_mipmap;
+// Analytic wave interference. The old baked mask contained hard filled cells and
+// seams; continuous waves keep the light soft at any camera scale without a map.
 uniform float floor_caustics_amount = 0.0;
 uniform float floor_caustics_scale = 2.6;
 uniform vec3 caustics_tint : source_color = vec3(0.55, 0.86, 0.95);
@@ -283,15 +281,13 @@ void fragment() {
 	}
 
 	if (floor_caustics_amount > 0.001) {
-		// `max(0.05, ...)` and not 1.01: the caustic repeat is deliberately smaller
-		// than one floor tile (the net has to be readable at phone scale), so a
-		// floor of 1.0 here would silently clamp the scale and freeze the drift.
-		vec2 cuv = world_px / (floor_tile_px * max(0.05, floor_caustics_scale));
-		float c1 = texture(floor_caustics, cuv + vec2(TIME * 0.012, TIME * 0.007)).r;
-		float c2 = texture(floor_caustics, cuv * 1.37 - vec2(TIME * 0.009, TIME * 0.015)).r;
-		// Smooth filtering: removes baking zero-pixel noise while preserving crystalline light filaments
-		float caust = smoothstep(0.06, 0.85, c1 * c2 * 1.85);
-		col += caustics_tint * caust * floor_caustics_amount;
+		vec2 cuv = world_px * 6.283185 / (floor_tile_px * max(0.05, floor_caustics_scale));
+		float wave_a = sin(cuv.x + sin(cuv.y * 0.83 + TIME * 0.13) * 1.3);
+		float wave_b = sin(cuv.y * 1.17 + sin(cuv.x * 0.71 - TIME * 0.11) * 1.1);
+		float caust = pow(max(0.0, 1.0 - abs(wave_a + wave_b) * 0.5), 6.0);
+		// Light catches only scattered damp moss, leaving quiet ground between it.
+		float damp = smoothstep(0.52, 0.84, value_noise(wp * 0.62 + vec2(8.1, 3.6)));
+		col += caustics_tint * caust * damp * floor_caustics_amount;
 	}
 
 	if (floor_fog > 0.001) {

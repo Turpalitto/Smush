@@ -1,5 +1,6 @@
 class_name SlimeAura
 extends Node2D
+const SOFT_GLOW: Texture2D = preload("res://resources/effects/soft_glow.tres")
 ## Draws the growth regalia around the slime: the ground sigil, petals, wings,
 ## halo, crown, antlers and orbiting motes.
 ##
@@ -274,13 +275,9 @@ func _draw_ground_pool() -> void:
 	var breathe := 0.9 + 0.1 * sin(_time * 1.3)
 	var r := _radius * (2.4 + 1.5 * g) * breathe
 	var base := Vector2(0.0, _radius * 0.12)
-	for i in range(5):
-		var k := 1.0 - float(i) * 0.16
-		draw_circle(base, r * k,
-			Color(core.r, core.g, core.b, (0.014 + 0.013 * g) * _alpha))
-	# A brighter core disc right under the body: the pool needs a source.
-	draw_circle(base, _radius * (0.85 + 0.20 * g),
-		Color(core.r, core.g, core.b, (0.05 + 0.06 * g) * _alpha))
+	var extent := Vector2.ONE * r
+	draw_texture_rect(SOFT_GLOW, Rect2(base - extent, extent * 2.0), false,
+		Color(core.r, core.g, core.b, (0.09 + 0.12 * g) * _alpha))
 
 
 func _draw_sigil() -> void:

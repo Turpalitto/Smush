@@ -181,6 +181,7 @@ func _fly_in(btn: Button, wrap: Control, index: int) -> void:
 	btn.position = Vector2(0.0, CARD_FLY_OFFSET)
 	wrap.resized.connect(func() -> void:
 		if is_instance_valid(btn):
+			btn.size = wrap.size
 			btn.pivot_offset = wrap.size * 0.5
 	)
 	var t := create_tween()
@@ -234,7 +235,6 @@ func _populate_choices(choices: Array) -> void:
 		_cards_box.add_child(wrap)
 
 		var btn := Button.new()
-		btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		btn.add_theme_stylebox_override("normal",
 			UIThemeBuilder.make_box(card_bg, border_col, 18, 3, 14, 12, halo, 9))
 		btn.add_theme_stylebox_override("hover",
@@ -246,6 +246,9 @@ func _populate_choices(choices: Array) -> void:
 				arena.select_draft_mutation(mid)
 		)
 		wrap.add_child(btn)
+		# The wrapper's resize callback fits the card once layout resolves its
+		# initial zero-width slot, avoiding the style's minimum-width overflow.
+		btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_cards.append(btn)
 
 		var hbox := HBoxContainer.new()

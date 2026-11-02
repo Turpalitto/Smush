@@ -33,6 +33,7 @@ func run_async(tree: SceneTree) -> void:
 	await _test_difficulty_multipliers(tree, main_inst)
 	await _test_miniboss_dismissed_by_boss(tree, main_inst)
 	await _test_endless_and_zen_modes(tree, main_inst)
+	await _test_relaxing_tutorial(tree, main_inst)
 	await _test_moss_trail_and_caustics(tree, main_inst)
 	await _test_biomes_undergrowth_and_wonders(tree, main_inst)
 	await _test_glass_draft_and_breathing_hud(tree, main_inst)
@@ -900,6 +901,9 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 
 	arena.enemy_pool.release_all()
 	player.global_position = Vector2.ZERO
+	# This checks uninterrupted cruising, not collisions with the random forest.
+	var cruise_collision_mask := player.collision_mask
+	player.collision_mask = 0
 	Audio._move_cooldown = 0.0
 	player.move_input = Vector2.RIGHT
 	player.velocity = Vector2(180.0, 0.0)
@@ -912,6 +916,7 @@ func _test_verified_controls_visual_combat_and_audio_polish(tree: SceneTree, mai
 	player.move_input = Vector2.LEFT # sharp reversal!
 	player._physics_process(1.0 / 60.0)
 	assert_lt(Audio._move_cooldown, 0.40, "Sharp direction turn shortens move SFX gate to responsive <=0.38s")
+	player.collision_mask = cruise_collision_mask
 	for p_stream in Audio._sfx_players:
 		p_stream.stop()
 
@@ -1111,70 +1116,11 @@ func _test_endless_and_zen_modes(tree: SceneTree, main: MainRoot) -> void:
 
 
 func _test_moss_trail_and_caustics(tree: SceneTree, main: MainRoot) -> void:
-	## Block 2 of the flow pass: the baked caustics tile and the bioluminescent moss
-	## trail. Both are "invisible if broken" features — a missing sampler just leaves
-	## the floor a little flatter and a missing ring buffer just leaves no glow — so
-	## every number the shader depends on is asserted here rather than eyeballed.
-
-	# --- the caustics tile ---------------------------------------------------------
-	var caustic_tex := AssetRegistry.get_texture(ArenaController.FLOOR_CAUSTICS_PATH)
-	assert_true(caustic_tex != null, "Caustics tile loads through AssetRegistry")
-	if caustic_tex != null:
-		var img := caustic_tex.get_image()
-		assert_true(img != null and not img.is_empty(), "Caustics tile decodes to an image")
-		if img != null and not img.is_empty():
-			if img.is_compressed():
-				img.decompress()
-			var w := img.get_width()
-			var h := img.get_height()
-			assert_eq(w, h, "Caustics tile is square")
-			assert_gte(float(w), 256.0, "Caustics tile is at least 256 px wide")
-			# Sampled every 3rd texel: the whole image is 262k pixels and this suite
-			# runs in the same frame budget as the boss fight.
-			var min_a := 1.0
-			var lum_sum := 0.0
-			var lum_min := 1.0
-			var lum_max := 0.0
-			var lit := 0
-			var n := 0
-			for y in range(0, h, 3):
-				for x in range(0, w, 3):
-					var c := img.get_pixel(x, y)
-					min_a = minf(min_a, c.a)
-					var l := (c.r + c.g + c.b) / 3.0
-					lum_sum += l
-					lum_min = minf(lum_min, l)
-					lum_max = maxf(lum_max, l)
-					if l > 0.5:
-						lit += 1
-					n += 1
-			var mean_l := lum_sum / float(n)
-			var lit_frac := float(lit) / float(n)
-			# The layer is ADDED by the shader, so a transparent tile would silently
-			# darken the floor wherever the shader assumes it is sampling light.
-			assert_eq(min_a, 1.0, "Caustics tile is fully opaque")
-			assert_gt(mean_l, 0.15, "Caustics tile is a light field, not a black square")
-			assert_lt(mean_l, 0.60, "Caustics tile is not a white square")
-			assert_gt(lum_max - lum_min, 0.50, "Caustics tile carries real contrast")
-			assert_gt(lit_frac, 0.10, "Caustics tile has filaments, not just cells")
-			assert_lt(lit_frac, 0.80, "Caustics tile is a net, not a flood fill")
-			# Seamless: the wrapped edge has to be no worse than a normal interior
-			# step, otherwise the repeat prints a visible grid on the floor.
-			var seam_h := 0.0
-			var seam_v := 0.0
-			for i in range(0, w, 2):
-				seam_h += absf(img.get_pixel(0, i).r - img.get_pixel(w - 1, i).r)
-				seam_v += absf(img.get_pixel(i, 0).r - img.get_pixel(i, h - 1).r)
-			seam_h /= float(range(0, w, 2).size())
-			seam_v /= float(range(0, h, 2).size())
-			assert_lt(seam_h, 0.15, "Caustics tile wraps horizontally (seam %.3f)" % seam_h)
-			assert_lt(seam_v, 0.15, "Caustics tile wraps vertically (seam %.3f)" % seam_v)
-
-	# --- the material actually receives it -----------------------------------------
+	## Shader-driven moss trail and analytic water light. Appearance is reviewed
+	## in real captures; headless tests verify the material and growth wiring.
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/forest_canopy.gdshader") as Shader
 	assert_true(ArenaController.apply_floor_texture(mat, 1.0), "Floor material accepts the art set")
-	assert_true(mat.get_shader_parameter("floor_caustics") != null, "Caustics sampler is bound")
 	assert_approx(float(mat.get_shader_parameter("floor_caustics_amount")),
 		ArenaController.FLOOR_CAUSTICS_COLD, 0.0001, "Caustics start at the cold amount")
 	assert_approx(float(mat.get_shader_parameter("floor_caustics_scale")),
@@ -1829,6 +1775,8 @@ func _test_glass_draft_and_breathing_hud(tree: SceneTree, main: MainRoot) -> voi
 		assert_approx(c.modulate.a, 1.0, 0.01, "Card %d is fully opaque once settled" % i)
 		assert_approx(c.position.y, 0.0, 0.6, "Card %d reached its slot" % i)
 		assert_approx(c.scale.x, 1.0, 0.02, "Card %d reached full scale" % i)
+		assert_approx(c.size.x, c.get_parent().size.x, 0.5,
+			"Card %d stays inside its horizontal margin after the fly-in" % i)
 
 	overlay.card_at(0).pressed.emit()
 	await tree.process_frame
@@ -1982,3 +1930,39 @@ func _test_grove_breath_wiring(tree: SceneTree, main: MainRoot) -> void:
 	main._return_to_main_menu()
 	await tree.process_frame
 	assert_false(Audio.grove_is_active(), "Leaving the run stops the grove bed")
+
+
+func _test_relaxing_tutorial(tree: SceneTree, main: MainRoot) -> void:
+	# Observe the public hints, including early evolution and restarting another mode.
+	var hints: Array[String] = []
+	var on_hint := func(_index: int, key: String) -> void: hints.append(key)
+	Events.tutorial_step_shown.connect(on_hint)
+	SaveData.data["stats"]["tutorial_completed"] = false
+	main._start_run("zen")
+	await tree.process_frame
+	var tutorial := main.arena.tutorial
+	assert_eq(hints.back(), "tut.zen.step1", "Zen starts with a gentle movement hint")
+	tutorial._process(1.5)
+	tutorial.notify_player_moved()
+	assert_eq(hints.back(), "tut.zen.step2", "Zen explains simple collection")
+	tutorial._process(2.3)
+	tutorial.notify_entity_absorbed()
+	assert_eq(hints.back(), "tut.zen.step3", "Zen invites exploration without combat instructions")
+	Events.evolution_progress_changed.emit(0.0, 100.0, 1)
+	assert_eq(hints.back(), "tut.zen.step4", "Early evolution keeps the calm hint")
+	tutorial.notify_mutation_picked()
+	assert_false(tutorial.active, "Choosing an upgrade completes the tutorial")
+	tutorial.begin_if_needed("zen")
+	assert_false(tutorial.active, "Completed tutorial does not restart")
+	SaveData.data["stats"]["tutorial_completed"] = false
+	main._start_run("standard")
+	await tree.process_frame
+	assert_eq(hints.back(), "tut.step1", "Switching from zen restores standard guidance")
+	for locale in ["ru", "en"]:
+		SaveData.set_setting("locale", locale)
+		for index in range(1, 5):
+			var key := "tut.zen.step" + str(index)
+			assert_true(Loc.t(key) != key, "Calm tutorial is translated: " + locale + " / " + key)
+	SaveData.set_setting("locale", "ru")
+	tutorial.complete_tutorial()
+	Events.tutorial_step_shown.disconnect(on_hint)

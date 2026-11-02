@@ -6,6 +6,7 @@ extends Node
 var active: bool = false
 var step: int = 0
 var _step_timer: float = 0.0
+var _text_prefix: String = "tut.step"
 
 
 func _ready() -> void:
@@ -13,11 +14,12 @@ func _ready() -> void:
 		if active and lv >= 1 and step < 4:
 			step = 4
 			_step_timer = 0.0
-			Events.tutorial_step_shown.emit(4, "tut.step4")
+			_show_step()
 	)
 
 
-func begin_if_needed() -> void:
+func begin_if_needed(mode: String = "standard") -> void:
+	_text_prefix = "tut.zen.step" if mode == "zen" else "tut.step"
 	var done: bool = bool(SaveData.data.get("stats", {}).get("tutorial_completed", false))
 	if done:
 		active = false
@@ -26,21 +28,25 @@ func begin_if_needed() -> void:
 	step = 1
 	_step_timer = 0.0
 	Analytics.track("tutorial_started")
-	Events.tutorial_step_shown.emit(1, "tut.step1")
+	_show_step()
+
+
+func _show_step() -> void:
+	Events.tutorial_step_shown.emit(step, _text_prefix + str(step))
 
 
 func notify_player_moved() -> void:
 	if active and step == 1 and _step_timer >= 1.4:
 		step = 2
 		_step_timer = 0.0
-		Events.tutorial_step_shown.emit(2, "tut.step2")
+		_show_step()
 
 
 func notify_entity_absorbed() -> void:
 	if active and step == 2 and _step_timer >= 2.2:
 		step = 3
 		_step_timer = 0.0
-		Events.tutorial_step_shown.emit(3, "tut.step3")
+		_show_step()
 
 
 func notify_mutation_picked() -> void:
@@ -54,7 +60,8 @@ func _process(delta: float) -> void:
 	_step_timer += delta
 	if step == 3 and _step_timer >= 6.5:
 		step = 4
-		Events.tutorial_step_shown.emit(4, "tut.step4")
+		_step_timer = 0.0
+		_show_step()
 	elif step == 4 and _step_timer >= 13.0:
 		complete_tutorial()
 

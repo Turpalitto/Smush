@@ -138,6 +138,10 @@
     "privacy.body": "SLIME RUSH: EVOLUTION works completely offline.\n\n1. Data Collection: We do not collect names, emails, precise location, contacts, or personal identifiers.\n2. Analytics: Only with your explicit consent, anonymous gameplay events (run duration, chosen mutations, boss outcomes) are logged to tune game balance. Toggle consent anytime in Settings.\n3. Ads & Billing: Voluntary rewarded ads (Google AdMob) and purchases (Google Play Billing) run through official platform SDKs when online.\n4. Local Saves: Progression is stored locally on your device.\n5. Version: 1.0.0 (Godot 4.5). All visual and audio assets are original.",
 
     "tut.step1": "Drag one finger anywhere in the lower screen area to steer your slime!",
+  "tut.zen.step1": "Slide a finger across the lower screen. Your slime will follow.",
+  "tut.zen.step2": "Gather glowing drops and tiny mushrooms to help your slime grow.",
+  "tut.zen.step3": "Explore at your own pace. Plants and crystals respond as you pass.",
+  "tut.zen.step4": "Choose an upgrade you like, then carry on exploring.",
     "tut.step2": "Absorb tiny mushrooms and fireflies to grow mass and fill Evolution.",
     "tut.step3": "Careful! Armored and larger foes require mutations, stuns, or smart dodging.",
     "tut.step4": "Awesome! Pick your first mutation — combining pairs unlocks super synergies!",
