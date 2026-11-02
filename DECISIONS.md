@@ -31,3 +31,12 @@ Date: 2026-11-01
 ### Decision
 
 Owner 2026-11-01: work on main; beautiful world, relaxation, simple mechanics, gradual beautiful slime growth. Express magic physics and chemistry through sensory reactions, not complex systems. Browser ChatGPT only for image generation.
+
+## ADR-11021923 — Recorded decision
+
+Status: Accepted
+Date: 2026-11-02
+
+### Decision
+
+Preserve simple gameplay and existing growth formulas; continue verification on Mac as requested; no commit or push

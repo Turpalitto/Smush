@@ -1,0 +1,6 @@
+Godot Engine v4.5.stable.official.876b29033 - https://godotengine.org
+Metal 3.2 - Forward Mobile - Using Device #0: Apple - Apple M5 (Apple9)
+
+SWAP visual=organic mutations={  } mass=52.0
+SWAP_BASELINE mode=zen seed=424242 zoom=(0.940506, 0.940506) organic_quality=2 fx_quality=high elapsed=4.1333 frozen=false
+SWAP_SHOT /tmp/smush-20261102-motion.png 540x1080 style=organic stage=8 mass=55.6 err=0

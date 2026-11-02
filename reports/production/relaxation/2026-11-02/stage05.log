@@ -1,0 +1,10 @@
+Godot Engine v4.5.stable.official.876b29033 - https://godotengine.org
+Metal 3.2 - Forward Mobile - Using Device #0: Apple - Apple M5 (Apple9)
+
+SWAP visual=organic mutations={  } mass=32.0
+SWAP_BASELINE mode=zen seed=424242 zoom=(0.991908, 0.991908) organic_quality=2 fx_quality=high elapsed=2.1333 frozen=false
+SWAP_SHOT /Users/turpal/Documents/smush/reports/production/relaxation/2026-11-02/stage05.png 540x1080 style=organic stage=5 mass=32.0 err=0
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2514)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:795)

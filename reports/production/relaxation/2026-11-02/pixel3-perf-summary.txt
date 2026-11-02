@@ -1,0 +1,1 @@
+126 intervals over 15.408s; displayed FPS=8.2; median=114.59ms; p95=180.16ms. Short rolling SurfaceFlinger sample, not sustained performance.
