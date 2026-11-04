@@ -24,6 +24,7 @@ uniform vec2 moon_world = vec2(0.0, -400.0);   // where the moon's reflection co
 uniform vec2 slime_pos = vec2(1.0e6);           // duckweed parts around the slime
 uniform float part_radius = 70.0;
 uniform float duck_amount = 0.0;
+uniform float lite = 0.0;   // 1 = cheap water for slow phones: one caustic layer, no glints, streaks or duckweed
 uniform vec4 duck_colour : source_color = vec4(0.34, 0.78, 0.30, 1.0);
 
 varying vec2 world;
@@ -45,22 +46,29 @@ void fragment() {
 
 	// caustics: two drifting copies multiplied, so the network breathes
 	float c1 = texture(caustic, world / tile_world + vec2(t * 0.012, t * 0.007)).r;
-	float c2 = texture(caustic, world / (tile_world * 0.63) - vec2(t * 0.009, t * 0.011)).r;
-	float c = c1 * c2 * 1.5;
+	float c2 = c1;
+	if (lite < 0.5) {
+		c2 = texture(caustic, world / (tile_world * 0.63) - vec2(t * 0.009, t * 0.011)).r;
+	}
+	float c = (lite < 0.5) ? c1 * c2 * 1.5 : c1 * c1 * 1.3;
 	col += caustic_colour.rgb * c * caustic_strength * (1.0 + sh * 0.9 + dive * 1.6) * (1.0 - depth * 0.55);
 
 	// moon glints: sharp peaks of a fast-moving fine layer
-	float g = texture(caustic, world / 160.0 + vec2(t * 0.03, -t * 0.02)).r;
-	col += vec3(0.85, 0.95, 1.0) * pow(g, 6.0) * 0.22;
+	if (lite < 0.5) {
+		float g = texture(caustic, world / 160.0 + vec2(t * 0.03, -t * 0.02)).r;
+		col += vec3(0.85, 0.95, 1.0) * pow(g, 6.0) * 0.22;
+	}
 
 	// moon reflection: a column of horizontal streaks fading with distance from the moon
 	vec2 m = world - moon_world;
-	float streak = texture(caustic, vec2(world.x / 300.0, world.y / 70.0 + t * 0.035)).r;
+	float streak = (lite < 0.5) ? texture(caustic, vec2(world.x / 300.0, world.y / 70.0 + t * 0.035)).r : 0.0;
 	float column = exp(-pow(m.x / 95.0, 2.0)) * exp(-pow(m.y / 380.0, 2.0));
 	col += vec3(0.75, 0.9, 1.0) * pow(streak, 2.0) * column * 1.3 * (1.0 - dive);
 	col += vec3(0.45, 0.6, 0.95) * column * 0.12;
 
 	// duckweed: small green blobs in patches; they open up around the slime
+	float duck = 0.0;
+	if (lite < 0.5 && duck_amount > 0.001) {
 	float patch = smoothstep(0.55, 0.85, 0.5 + 0.5 * sin(world.x * 0.0105 + sin(world.y * 0.0079) * 2.3) * sin(world.y * 0.0121 + 1.7 + sin(world.x * 0.006)));
 	vec2 cell = floor(world / 15.0);
 	vec2 local = fract(world / 15.0) - 0.5;
@@ -68,7 +76,8 @@ void fragment() {
 	vec2 jitter = vec2(fract(rnd * 17.0), fract(rnd * 41.0)) - 0.5;
 	float dots = (rnd > 0.42) ? smoothstep(0.34, 0.16, length(local - jitter * 0.4)) : 0.0;
 	float open_up = smoothstep(part_radius * 0.55, part_radius, distance(world, slime_pos));
-	float duck = patch * dots * open_up;
+	duck = patch * dots * open_up;
+	}
 	// duckweed stays off until painted leaves exist (a pure shader version read as noise)
 	col = mix(col, duck_colour.rgb * (0.75 + 0.25 * sin(t + world.x)), duck * duck_amount);
 

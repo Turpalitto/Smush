@@ -598,6 +598,60 @@ func _test_mutations(tree: SceneTree) -> void:
 	assert_true(mf.dash(), "The dash works")
 	assert_true(pl.is_dashing, "…and the slime is dashing")
 	assert_false(mf.dash(), "The dash has a cooldown")
+	# lotuses open as the slime comes near and close again when it leaves
+	var lotus: Dictionary = {}
+	for fl in lab.floaters:
+		if fl.get("lotus", false):
+			lotus = fl
+			break
+	assert_false(lotus.is_empty(), "There are lotuses among the floaters")
+	if not lotus.is_empty():
+		var ln: Node2D = lotus["node"]
+		lab.player.global_position = ln.global_position + Vector2(40.0, 40.0)
+		for _i in range(40):
+			lab._update_floaters(0.1)
+		assert_gt(float(lotus["bloom"]), 0.8, "A lotus opens when the slime is close")
+		lab.player.global_position = ln.global_position + Vector2(900.0, 0.0)
+		for _i in range(80):
+			lab._update_floaters(0.1)
+		assert_lt(float(lotus["bloom"]), 0.2, "…and closes again when it leaves")
+	# plants lean along the slime's recent path
+	lab.player.global_position = Vector2(500.0, -300.0)
+	for _i in range(40):
+		lab._update_plant_trail(0.1, lab.player.global_position)
+		lab.player.global_position += Vector2(30.0, 0.0)
+	assert_eq(lab._trail.size(), 6, "The path trail keeps six points")
+	assert_lt(lab._trail[0].distance_to(lab.player.global_position), 90.0, "…newest first, near the slime")
+	assert_gt(lab._trail[0].x, lab._trail[5].x, "…older points lie behind")
+	# the shore is soft: hitting the world's edge rebounds a little
+	var bnd: Rect2 = lab.play_bounds()
+	lab.player.velocity = Vector2(300.0, 0.0)
+	var edge_pos := Vector2(bnd.end.x + 40.0, bnd.position.y + bnd.size.y * 0.5)
+	var bumps0: int = lab.bumps
+	var kept: Vector2 = lab.constrain_player_position(edge_pos, 20.0, false)
+	assert_lt(kept.x, bnd.end.x, "The shore holds the slime inside")
+	assert_lt(lab.player.velocity.x, 0.0, "…and the slime rebounds off it")
+	assert_gt(lab.player.velocity.x, -300.0 * 0.5, "…softly, not elastically")
+	assert_gt(lab.bumps, bumps0, "A hard hit counts as a bump")
+	# cheap-water fallback for slow phones
+	var wm: ShaderMaterial = lab.water.material
+	assert_false(lab.water_lite, "Water starts in full quality")
+	lab.set_water_lite(true)
+	assert_approx(float(wm.get_shader_parameter("lite")), 1.0, 0.001, "Lite switches the shader to the cheap path")
+	lab.set_water_lite(false)
+	lab._watch_frame_time(LakeProto25D.LITE_WINDOW_SEC + 0.1)   # one very slow frame over the window
+	assert_true(lab.water_lite, "A sustained slow stretch drops to lite water")
+	lab.set_water_lite(false)
+	# thumb buttons follow the state and call the same methods as the keys
+	var th: LakeTouchHud = lab.touch_hud
+	th._process(0.016)
+	assert_true(th.dash_button.visible, "The dash thumb button shows once the mutation is owned")
+	assert_lt(th.dash_button.modulate.a, 1.0, "…and dims while cooling down")
+	assert_false(th.nova_button.visible, "The Nova button stays hidden until a spirit is caught")
+	lab.legends.nova_ready = true
+	th._process(0.016)
+	assert_true(th.nova_button.visible, "The Nova button appears when the Nova is loaded")
+	lab.legends.nova_ready = false
 	lab.queue_free()
 	await tree.process_frame
 

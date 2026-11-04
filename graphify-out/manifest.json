@@ -32,11 +32,10 @@
     "ast_empty": true
   },
   "memory/.project-memory.json": {
-    "mtime": 1793813013.3829336,
-    "seen": 1793813039.690424,
-    "ast_hash": "36a794c1775c8e0e9abaac87aedcb4d9",
-    "semantic_hash": "36a794c1775c8e0e9abaac87aedcb4d9",
-    "ast_empty": true
+    "mtime": 1793813291.1997454,
+    "seen": 1793815051.5322938,
+    "ast_hash": "c292310b4d5dc663656b88238833aa9b",
+    "semantic_hash": "c292310b4d5dc663656b88238833aa9b"
   },
   "reports/production/baseline/2026-11-01/main/manifest.json": {
     "mtime": 1793543457.2018101,
@@ -328,394 +327,520 @@
     "semantic_hash": "01b3d5b2d9fd067be104af605c935a20",
     "ast_empty": true
   },
-  "audio/music/forest_breath.ogg": {
-    "mtime": 1792776423.7573264,
-    "seen": 1793813039.691296,
-    "ast_hash": "eff71fd80dd2351e5ecd7cee6fcec6ab",
-    "semantic_hash": "eff71fd80dd2351e5ecd7cee6fcec6ab"
-  },
-  "audio/music/theme_boss.ogg": {
-    "mtime": 1792766642.9007213,
-    "seen": 1793813039.691324,
-    "ast_hash": "873c1ffa01883d7531d86d8e5286d813",
-    "semantic_hash": "873c1ffa01883d7531d86d8e5286d813"
-  },
-  "audio/music/theme_menu.ogg": {
-    "mtime": 1792766642.9028256,
-    "seen": 1793813039.691348,
-    "ast_hash": "468301ec7bb7ef23eee587e258dd0f28",
-    "semantic_hash": "468301ec7bb7ef23eee587e258dd0f28"
-  },
-  "audio/music/theme_run.ogg": {
-    "mtime": 1792766642.905601,
-    "seen": 1793813039.691372,
-    "ast_hash": "9252aa1d895d567c8d7715e1c12c6716",
-    "semantic_hash": "9252aa1d895d567c8d7715e1c12c6716"
-  },
-  "audio/music/theme_zen.ogg": {
-    "mtime": 1792772180.3186975,
-    "seen": 1793813039.691396,
-    "ast_hash": "2b2515ee4248c5a9bce551707964a4ab",
-    "semantic_hash": "2b2515ee4248c5a9bce551707964a4ab"
-  },
-  "audio/music/water/water_finale.ogg": {
-    "mtime": 1793812876.1352649,
-    "seen": 1793813039.691419,
-    "ast_hash": "31483c94114223f7464f1e9596106691",
-    "semantic_hash": "31483c94114223f7464f1e9596106691"
-  },
-  "audio/music/water/water_glade.ogg": {
-    "mtime": 1793812869.78562,
-    "seen": 1793813039.691446,
-    "ast_hash": "ba8a53abb6bdc8353fa9d2fae7576443",
-    "semantic_hash": "ba8a53abb6bdc8353fa9d2fae7576443"
-  },
-  "audio/music/water/water_grove.ogg": {
-    "mtime": 1793812871.563788,
-    "seen": 1793813039.691471,
-    "ast_hash": "e4e95b39eee3ef4e843163f7a975bd7b",
-    "semantic_hash": "e4e95b39eee3ef4e843163f7a975bd7b"
-  },
-  "audio/music/water/water_lake.ogg": {
-    "mtime": 1793812873.6126723,
-    "seen": 1793813039.6914968,
-    "ast_hash": "ccc504f6ced0903df42fd2da1f7329bf",
-    "semantic_hash": "ccc504f6ced0903df42fd2da1f7329bf"
-  },
-  "audio/sfx/absorb.wav": {
-    "mtime": 1792682008.9148254,
-    "seen": 1793813039.691524,
-    "ast_hash": "ad56888ea0de57dd41eb2b154df3dd12",
-    "semantic_hash": "ad56888ea0de57dd41eb2b154df3dd12"
-  },
-  "audio/sfx/attack.wav": {
-    "mtime": 1792682008.9149039,
-    "seen": 1793813039.6915479,
-    "ast_hash": "a384ed16491e6d5223851d8916b7093f",
-    "semantic_hash": "a384ed16491e6d5223851d8916b7093f"
-  },
-  "audio/sfx/boss_warning.wav": {
-    "mtime": 1792682008.9150658,
-    "seen": 1793813039.691572,
-    "ast_hash": "aa9dc19f91440fbed4ad744844bd27cc",
-    "semantic_hash": "aa9dc19f91440fbed4ad744844bd27cc"
-  },
-  "audio/sfx/button_click.wav": {
-    "mtime": 1792682008.9151378,
-    "seen": 1793813039.691595,
-    "ast_hash": "73d1bf72996a514573670fb34c55b685",
-    "semantic_hash": "73d1bf72996a514573670fb34c55b685"
-  },
-  "audio/sfx/defeat.wav": {
-    "mtime": 1792682008.9153285,
-    "seen": 1793813039.691617,
-    "ast_hash": "f0064c1840a9a7de3eb477c37744a32f",
-    "semantic_hash": "f0064c1840a9a7de3eb477c37744a32f"
-  },
-  "audio/sfx/evo_01.wav": {
-    "mtime": 1792766642.9070344,
-    "seen": 1793813039.6916428,
-    "ast_hash": "2c56818344fd6e9ce6fce0806efc0075",
-    "semantic_hash": "2c56818344fd6e9ce6fce0806efc0075"
-  },
-  "audio/sfx/evo_02.wav": {
-    "mtime": 1792766642.9078288,
-    "seen": 1793813039.6916668,
-    "ast_hash": "70b7500efe431e13f07258061ce3083f",
-    "semantic_hash": "70b7500efe431e13f07258061ce3083f"
-  },
-  "audio/sfx/evo_03.wav": {
-    "mtime": 1792766642.9086354,
-    "seen": 1793813039.691692,
-    "ast_hash": "74b475d16b22d5ec65277bfd10405f30",
-    "semantic_hash": "74b475d16b22d5ec65277bfd10405f30"
-  },
-  "audio/sfx/evo_04.wav": {
-    "mtime": 1792766642.9095223,
-    "seen": 1793813039.691714,
-    "ast_hash": "9449345d1525f7fbd3b690d7d3106a5b",
-    "semantic_hash": "9449345d1525f7fbd3b690d7d3106a5b"
-  },
-  "audio/sfx/evo_05.wav": {
-    "mtime": 1792766642.9099507,
-    "seen": 1793813039.6917372,
-    "ast_hash": "46674b4fdf4e7a50150cb9ba5ccb3c78",
-    "semantic_hash": "46674b4fdf4e7a50150cb9ba5ccb3c78"
-  },
-  "audio/sfx/evo_06.wav": {
-    "mtime": 1792766642.9105613,
-    "seen": 1793813039.691759,
-    "ast_hash": "6d3377acc07901821fa5916b29a32d7d",
-    "semantic_hash": "6d3377acc07901821fa5916b29a32d7d"
-  },
-  "audio/sfx/evo_07.wav": {
-    "mtime": 1792766642.9110973,
-    "seen": 1793813039.691781,
-    "ast_hash": "9cca882c93ec31943975146e2b005af7",
-    "semantic_hash": "9cca882c93ec31943975146e2b005af7"
-  },
-  "audio/sfx/evo_08.wav": {
-    "mtime": 1792766642.9115565,
-    "seen": 1793813039.691804,
-    "ast_hash": "1afe2a7b832eb09bbf23c214f46ea533",
-    "semantic_hash": "1afe2a7b832eb09bbf23c214f46ea533"
-  },
-  "audio/sfx/evo_09.wav": {
-    "mtime": 1792766642.9120386,
-    "seen": 1793813039.6918259,
-    "ast_hash": "058e39a9e3b9ac51241b5b89460abe01",
-    "semantic_hash": "058e39a9e3b9ac51241b5b89460abe01"
-  },
-  "audio/sfx/evo_10.wav": {
-    "mtime": 1792766642.9122925,
-    "seen": 1793813039.691848,
-    "ast_hash": "9b66cccf865b823b91195578456aa767",
-    "semantic_hash": "9b66cccf865b823b91195578456aa767"
-  },
-  "audio/sfx/evo_11.wav": {
-    "mtime": 1792766642.9127004,
-    "seen": 1793813039.691873,
-    "ast_hash": "ba4048143ec8c194fbf8abdfe859ac90",
-    "semantic_hash": "ba4048143ec8c194fbf8abdfe859ac90"
-  },
-  "audio/sfx/evo_12.wav": {
-    "mtime": 1792766642.9129417,
-    "seen": 1793813039.6918972,
-    "ast_hash": "939abf9d551a33351e098f33b171e005",
-    "semantic_hash": "939abf9d551a33351e098f33b171e005"
-  },
-  "audio/sfx/evo_13.wav": {
-    "mtime": 1792766642.9132915,
-    "seen": 1793813039.6919198,
-    "ast_hash": "b96bf3f6208e0f0aa83c8a86d0103ea0",
-    "semantic_hash": "b96bf3f6208e0f0aa83c8a86d0103ea0"
-  },
-  "audio/sfx/evo_14.wav": {
-    "mtime": 1792766642.9136417,
-    "seen": 1793813039.691942,
-    "ast_hash": "6c3dfe6fa2853087acdae226ba747c02",
-    "semantic_hash": "6c3dfe6fa2853087acdae226ba747c02"
-  },
-  "audio/sfx/evo_15.wav": {
-    "mtime": 1792766642.9140987,
-    "seen": 1793813039.6919649,
-    "ast_hash": "6f4fe6d6501a5154d16f2846e71973f9",
-    "semantic_hash": "6f4fe6d6501a5154d16f2846e71973f9"
-  },
-  "audio/sfx/evolution.wav": {
-    "mtime": 1792682008.9154897,
-    "seen": 1793813039.691987,
-    "ast_hash": "3dbef7eeba73ad419cf8229e89fdd5ab",
-    "semantic_hash": "3dbef7eeba73ad419cf8229e89fdd5ab"
-  },
-  "audio/sfx/hurt.wav": {
-    "mtime": 1792682008.9156034,
-    "seen": 1793813039.692009,
-    "ast_hash": "8ef1c08e182972ec03ecf4227900d015",
-    "semantic_hash": "8ef1c08e182972ec03ecf4227900d015"
-  },
-  "audio/sfx/move_pulse.wav": {
-    "mtime": 1792682008.9156988,
-    "seen": 1793813039.692032,
-    "ast_hash": "4ca8fa4568b153555730839532e2aace",
-    "semantic_hash": "4ca8fa4568b153555730839532e2aace"
-  },
-  "audio/sfx/mutation_pick.wav": {
-    "mtime": 1792682008.9158196,
-    "seen": 1793813039.692054,
-    "ast_hash": "963eebb3b507dc88e7fea070a24eb368",
-    "semantic_hash": "963eebb3b507dc88e7fea070a24eb368"
-  },
-  "audio/sfx/orb_chime_01.wav": {
-    "mtime": 1792772180.3189955,
-    "seen": 1793813039.692078,
-    "ast_hash": "184d1e68c56107b7a4ce0907085370d3",
-    "semantic_hash": "184d1e68c56107b7a4ce0907085370d3"
-  },
-  "audio/sfx/orb_chime_02.wav": {
-    "mtime": 1792772180.3192527,
-    "seen": 1793813039.692101,
-    "ast_hash": "e10e8f247cfdb61585c8981a5106b6ab",
-    "semantic_hash": "e10e8f247cfdb61585c8981a5106b6ab"
-  },
-  "audio/sfx/orb_chime_03.wav": {
-    "mtime": 1792772180.3194766,
-    "seen": 1793813039.692124,
-    "ast_hash": "e3230c0640b7cd26480e9fc2acce237e",
-    "semantic_hash": "e3230c0640b7cd26480e9fc2acce237e"
-  },
-  "audio/sfx/orb_chime_04.wav": {
-    "mtime": 1792772180.3196933,
-    "seen": 1793813039.6921458,
-    "ast_hash": "3a84341df1f4b315c837bc36304c8dc4",
-    "semantic_hash": "3a84341df1f4b315c837bc36304c8dc4"
-  },
-  "audio/sfx/orb_chime_05.wav": {
-    "mtime": 1792772180.319903,
-    "seen": 1793813039.692169,
-    "ast_hash": "64c8bb0a88ad08e103a8b70ce8638ade",
-    "semantic_hash": "64c8bb0a88ad08e103a8b70ce8638ade"
-  },
-  "audio/sfx/orb_chime_06.wav": {
-    "mtime": 1792772180.320131,
-    "seen": 1793813039.692191,
-    "ast_hash": "0e7aac18cc349c48dc3c84970b719d98",
-    "semantic_hash": "0e7aac18cc349c48dc3c84970b719d98"
-  },
-  "audio/sfx/orb_chime_07.wav": {
-    "mtime": 1792772180.3203611,
-    "seen": 1793813039.692213,
-    "ast_hash": "78a820e65a9bd8f52f3b5b28d1596bbc",
-    "semantic_hash": "78a820e65a9bd8f52f3b5b28d1596bbc"
-  },
-  "audio/sfx/orb_chime_08.wav": {
-    "mtime": 1792772180.320564,
-    "seen": 1793813039.692235,
-    "ast_hash": "03b0f8caae28ac01f59a133e38176e0f",
-    "semantic_hash": "03b0f8caae28ac01f59a133e38176e0f"
-  },
-  "audio/sfx/shield_break.wav": {
-    "mtime": 1792682008.915908,
-    "seen": 1793813039.692257,
-    "ast_hash": "dc5ad7fa8482f8edf134fa8b9fb1d105",
-    "semantic_hash": "dc5ad7fa8482f8edf134fa8b9fb1d105"
-  },
-  "audio/sfx/victory.wav": {
-    "mtime": 1792682008.9160979,
-    "seen": 1793813039.692279,
-    "ast_hash": "a482a65a87354421ef7942d8d2216a97",
-    "semantic_hash": "a482a65a87354421ef7942d8d2216a97"
-  },
-  "audio/sfx/water/ambience_surface.wav": {
-    "mtime": 1793806671.780949,
-    "seen": 1793813039.6923032,
-    "ast_hash": "ad5c0e5b17fbde7cd0e71ed98044e9ce",
-    "semantic_hash": "ad5c0e5b17fbde7cd0e71ed98044e9ce"
-  },
-  "audio/sfx/water/ambience_underwater.wav": {
-    "mtime": 1793806672.034723,
-    "seen": 1793813039.69233,
-    "ast_hash": "e900753c859d13e5174bd6e7235a5b0f",
-    "semantic_hash": "e900753c859d13e5174bd6e7235a5b0f"
-  },
-  "audio/sfx/water/water_bubble_01.wav": {
-    "mtime": 1793806671.3179932,
-    "seen": 1793813039.692356,
-    "ast_hash": "3b0bca5c51c74c58254897e29777ef75",
-    "semantic_hash": "3b0bca5c51c74c58254897e29777ef75"
-  },
-  "audio/sfx/water/water_bubble_02.wav": {
-    "mtime": 1793806671.3186743,
-    "seen": 1793813039.692383,
-    "ast_hash": "be80a73596dbffd2f26e44da3180a505",
-    "semantic_hash": "be80a73596dbffd2f26e44da3180a505"
-  },
-  "audio/sfx/water/water_bubble_03.wav": {
-    "mtime": 1793806671.3193476,
-    "seen": 1793813039.692408,
-    "ast_hash": "348bb6f1d5bd93f971d15c1ee00c149b",
-    "semantic_hash": "348bb6f1d5bd93f971d15c1ee00c149b"
-  },
-  "audio/sfx/water/water_dive.wav": {
-    "mtime": 1793806671.3864498,
-    "seen": 1793813039.692432,
-    "ast_hash": "271a1a1efd76e53b06bbb8ffdd5e3310",
-    "semantic_hash": "271a1a1efd76e53b06bbb8ffdd5e3310"
-  },
-  "audio/sfx/water/water_drip_01.wav": {
-    "mtime": 1793806671.30641,
-    "seen": 1793813039.692457,
-    "ast_hash": "ee91a685001a2f55c8e240735eb64ba7",
-    "semantic_hash": "ee91a685001a2f55c8e240735eb64ba7"
-  },
-  "audio/sfx/water/water_drip_02.wav": {
-    "mtime": 1793806671.3110335,
-    "seen": 1793813039.692482,
-    "ast_hash": "b58f12975468d20949fb17275ceb56df",
-    "semantic_hash": "b58f12975468d20949fb17275ceb56df"
-  },
-  "audio/sfx/water/water_drip_03.wav": {
-    "mtime": 1793806671.3158429,
-    "seen": 1793813039.692506,
-    "ast_hash": "b0b6b4d521dd0432e283ec154fbf887e",
-    "semantic_hash": "b0b6b4d521dd0432e283ec154fbf887e"
-  },
-  "audio/sfx/water/water_glide.wav": {
-    "mtime": 1793806672.2074215,
-    "seen": 1793813039.692535,
-    "ast_hash": "632386115a951d93ea5c6d6e52cec1c4",
-    "semantic_hash": "632386115a951d93ea5c6d6e52cec1c4"
-  },
-  "audio/sfx/water/water_plip_01.wav": {
-    "mtime": 1793806671.3164928,
-    "seen": 1793813039.6925619,
-    "ast_hash": "e117c29f5aa96cfe9ff1572822363e2a",
-    "semantic_hash": "e117c29f5aa96cfe9ff1572822363e2a"
-  },
-  "audio/sfx/water/water_plip_02.wav": {
-    "mtime": 1793806671.3170266,
-    "seen": 1793813039.692588,
-    "ast_hash": "31ff39405c2df98c50ab11d443e40921",
-    "semantic_hash": "31ff39405c2df98c50ab11d443e40921"
-  },
-  "audio/sfx/water/water_plip_03.wav": {
-    "mtime": 1793806671.3175156,
-    "seen": 1793813039.6926131,
-    "ast_hash": "c6b6f40d81f3aed4143605a33b394ab0",
-    "semantic_hash": "c6b6f40d81f3aed4143605a33b394ab0"
-  },
-  "audio/sfx/water/water_splash_large.wav": {
-    "mtime": 1793806671.3509412,
-    "seen": 1793813039.692637,
-    "ast_hash": "0a7a66e75c34321ede7cebf81dade8ff",
-    "semantic_hash": "0a7a66e75c34321ede7cebf81dade8ff"
-  },
-  "audio/sfx/water/water_splash_small.wav": {
-    "mtime": 1793806671.3320508,
-    "seen": 1793813039.692662,
-    "ast_hash": "ddc093a8f678e439c3133ef6cc8880ec",
-    "semantic_hash": "ddc093a8f678e439c3133ef6cc8880ec"
-  },
-  "audio/sfx/water/water_surface.wav": {
-    "mtime": 1793806671.425095,
-    "seen": 1793813039.692686,
-    "ast_hash": "618ceb7fb77a94605b7a1cf8e309514f",
-    "semantic_hash": "618ceb7fb77a94605b7a1cf8e309514f"
-  },
-  "audio/sfx/wonder_chime_01.wav": {
-    "mtime": 1792775085.5932114,
-    "seen": 1793813039.6927109,
-    "ast_hash": "f87d275258938ab0be6007f62bc37499",
-    "semantic_hash": "f87d275258938ab0be6007f62bc37499"
-  },
-  "audio/sfx/wonder_chime_02.wav": {
-    "mtime": 1792775085.5936365,
-    "seen": 1793813039.692735,
-    "ast_hash": "656e94c913cc8e73d2d038f27e69c0e3",
-    "semantic_hash": "656e94c913cc8e73d2d038f27e69c0e3"
-  },
-  "audio/sfx/wonder_chime_03.wav": {
-    "mtime": 1792775085.5940652,
-    "seen": 1793813039.692758,
-    "ast_hash": "0f236e0ed1785b5b0ba3263f4e662c08",
-    "semantic_hash": "0f236e0ed1785b5b0ba3263f4e662c08"
-  },
-  "reports/production/grove-study/2026-11-03/smush-grove-motion.mp4": {
-    "mtime": 1793678359.738377,
-    "seen": 1793813039.692781,
-    "ast_hash": "e067848c492d0e6b35b89644bb0f7d9c",
-    "semantic_hash": "e067848c492d0e6b35b89644bb0f7d9c"
-  },
-  "reports/production/relaxation/2026-11-02/pixel3-motion.mp4": {
-    "mtime": 1793604312.1592653,
-    "seen": 1793813039.6928132,
-    "ast_hash": "54a1b96b0113419a4843728d371fb2e6",
-    "semantic_hash": "54a1b96b0113419a4843728d371fb2e6"
-  },
-  "reports/production/relaxation/2026-11-02/smush-relax-motion.mp4": {
-    "mtime": 1793604043.0572886,
-    "seen": 1793813039.692843,
-    "ast_hash": "573366442953c29adf72ddfb99bff9e7",
-    "semantic_hash": "573366442953c29adf72ddfb99bff9e7"
+  ".claude/agents/visual-acceptance-reviewer.md": {
+    "mtime": 1793810731.031592,
+    "seen": 1793815051.533321,
+    "ast_hash": "ae62c2d53b895b558eca8ce08d3011a9",
+    "semantic_hash": "ae62c2d53b895b558eca8ce08d3011a9"
+  },
+  ".claude/skills/qa/SKILL.md": {
+    "mtime": 1793812437.9191992,
+    "seen": 1793815051.533323,
+    "ast_hash": "4823045e4cba44f3fceeb81a30da27b5",
+    "semantic_hash": "4823045e4cba44f3fceeb81a30da27b5"
+  },
+  ".workbuddy-ai/memory/2026-10-22.md": {
+    "mtime": 1792766642.8938951,
+    "seen": 1793815051.533324,
+    "ast_hash": "e60ff3b8f5f50d3f4ccebc4efc924a76",
+    "semantic_hash": "e60ff3b8f5f50d3f4ccebc4efc924a76"
+  },
+  ".workbuddy-ai/memory/2026-10-23.md": {
+    "mtime": 1792777137.442814,
+    "seen": 1793815051.533325,
+    "ast_hash": "e9d646f113ee36f20430360a79b86448",
+    "semantic_hash": "e9d646f113ee36f20430360a79b86448"
+  },
+  "AGENTS.md": {
+    "mtime": 1793708209.1155567,
+    "seen": 1793815051.5333261,
+    "ast_hash": "502ec2da854da0bce5dfa172aa99347b",
+    "semantic_hash": "502ec2da854da0bce5dfa172aa99347b"
+  },
+  "ARCHITECTURE.md": {
+    "mtime": 1792767426.4041166,
+    "seen": 1793815051.533327,
+    "ast_hash": "e529281b7f59c9398be5870997075e36",
+    "semantic_hash": "e529281b7f59c9398be5870997075e36"
+  },
+  "CLAUDE.md": {
+    "mtime": 1793565283.8692832,
+    "seen": 1793815051.5333278,
+    "ast_hash": "5c27369b226fcf2be8a6cfe52224e767",
+    "semantic_hash": "5c27369b226fcf2be8a6cfe52224e767"
+  },
+  "CLAUDE_EVOLUTION_REVIEW.md": {
+    "mtime": 1793542805.2036102,
+    "seen": 1793815051.533329,
+    "ast_hash": "e2bff9035842d48cf8ee576102c8fc38",
+    "semantic_hash": "e2bff9035842d48cf8ee576102c8fc38"
+  },
+  "DEVELOPMENT_PLAN.md": {
+    "mtime": 1792766642.8943613,
+    "seen": 1793815051.53333,
+    "ast_hash": "99caa79bfea52b9b08c49e334d136b3e",
+    "semantic_hash": "99caa79bfea52b9b08c49e334d136b3e"
+  },
+  "GAMEPLAY_STATUS.md": {
+    "mtime": 1793678488.6055162,
+    "seen": 1793815051.533331,
+    "ast_hash": "df22c1ff041e20797b40f6a12774c01b",
+    "semantic_hash": "df22c1ff041e20797b40f6a12774c01b"
+  },
+  "GAME_DESIGN.md": {
+    "mtime": 1792682008.91285,
+    "seen": 1793815051.5333319,
+    "ast_hash": "a01a2a64aee07cffffba199289b5c671",
+    "semantic_hash": "a01a2a64aee07cffffba199289b5c671"
+  },
+  "INTEGRATION.md": {
+    "mtime": 1792766642.894526,
+    "seen": 1793815051.533333,
+    "ast_hash": "9846914769183cda50f4e2e8285ede93",
+    "semantic_hash": "9846914769183cda50f4e2e8285ede93"
+  },
+  "MONETIZATION.md": {
+    "mtime": 1792766642.8946273,
+    "seen": 1793815051.533334,
+    "ast_hash": "ca1286f85049732a7084fcf74a4d53ef",
+    "semantic_hash": "ca1286f85049732a7084fcf74a4d53ef"
+  },
+  "PROGRESS.md": {
+    "mtime": 1793806864.3192785,
+    "seen": 1793815051.533335,
+    "ast_hash": "2554afaa8ad749d00edc0bf02d145e47",
+    "semantic_hash": "2554afaa8ad749d00edc0bf02d145e47"
+  },
+  "README.md": {
+    "mtime": 1793542805.2055624,
+    "seen": 1793815051.5333362,
+    "ast_hash": "8b369769a4abdce05060acf89696b712",
+    "semantic_hash": "8b369769a4abdce05060acf89696b712"
+  },
+  "RELEASE_CHECKLIST.md": {
+    "mtime": 1792766642.8955917,
+    "seen": 1793815051.533337,
+    "ast_hash": "b77b52c9ff30b48669cd3608cb2bbf0a",
+    "semantic_hash": "b77b52c9ff30b48669cd3608cb2bbf0a"
+  },
+  "RELEASE_STATUS.md": {
+    "mtime": 1792766642.8957675,
+    "seen": 1793815051.533338,
+    "ast_hash": "1d598ead85897b8ab3d7fb5f7926b6c0",
+    "semantic_hash": "1d598ead85897b8ab3d7fb5f7926b6c0"
+  },
+  "SMUSH_AGENT_START.md": {
+    "mtime": 1793813290.742312,
+    "seen": 1793815051.5333388,
+    "ast_hash": "5ec11b1d4ffbedfbfd0a0fcbf7807846",
+    "semantic_hash": "5ec11b1d4ffbedfbfd0a0fcbf7807846"
+  },
+  "SMUSH_ASSET_PIPELINE.md": {
+    "mtime": 1793806864.3161144,
+    "seen": 1793815051.53334,
+    "ast_hash": "e0cddcfa0407d33f579c3ebdd9067cc6",
+    "semantic_hash": "e0cddcfa0407d33f579c3ebdd9067cc6"
+  },
+  "TEST_REPORT.md": {
+    "mtime": 1793806864.3176498,
+    "seen": 1793815051.533341,
+    "ast_hash": "8c2cfd0b79e77d4ffccce9d3e1c61d8c",
+    "semantic_hash": "8c2cfd0b79e77d4ffccce9d3e1c61d8c"
+  },
+  "TODO.md": {
+    "mtime": 1793543456.3961473,
+    "seen": 1793815051.533342,
+    "ast_hash": "a5debb291de678e7a484ad39a54bdf73",
+    "semantic_hash": "a5debb291de678e7a484ad39a54bdf73"
+  },
+  "addons/GodotGooglePlayBilling/UPSTREAM.md": {
+    "mtime": 1792766642.8963044,
+    "seen": 1793815051.533343,
+    "ast_hash": "66f24c8160431f7bc048692f0095fd80",
+    "semantic_hash": "66f24c8160431f7bc048692f0095fd80"
+  },
+  "art_sources/2_5d/raw/flux/ground_prompts.txt": {
+    "mtime": 1793714249.1412578,
+    "seen": 1793815051.533344,
+    "ast_hash": "1f11bb91641f88887b53cb13bbd869c8",
+    "semantic_hash": "1f11bb91641f88887b53cb13bbd869c8"
+  },
+  "deliverables/glm_visual_lab/README.md": {
+    "mtime": 1793542805.2089763,
+    "seen": 1793815051.533345,
+    "ast_hash": "f4f38602a9c823cb6eaeef6ff8bab51f",
+    "semantic_hash": "f4f38602a9c823cb6eaeef6ff8bab51f"
+  },
+  "docs/glm/01_AUDIT.md": {
+    "mtime": 1792868301.506259,
+    "seen": 1793815051.533345,
+    "ast_hash": "94cf1e7919857ecc8a6cb0df95564830",
+    "semantic_hash": "94cf1e7919857ecc8a6cb0df95564830"
+  },
+  "docs/glm/02_VISUAL_DESIGN.md": {
+    "mtime": 1792885532.36561,
+    "seen": 1793815051.533346,
+    "ast_hash": "4736e217c20d343411c0eb68feba7028",
+    "semantic_hash": "4736e217c20d343411c0eb68feba7028"
+  },
+  "docs/glm/03_IMPLEMENTATION.md": {
+    "mtime": 1792885840.042859,
+    "seen": 1793815051.5333471,
+    "ast_hash": "d63cecfea0f655811221eff24317f13a",
+    "semantic_hash": "d63cecfea0f655811221eff24317f13a"
+  },
+  "docs/glm/04_TEST_RESULTS.md": {
+    "mtime": 1792944988.8273625,
+    "seen": 1793815051.533348,
+    "ast_hash": "3715539e4c1b263baf059fc2eaf1678a",
+    "semantic_hash": "3715539e4c1b263baf059fc2eaf1678a"
+  },
+  "docs/glm/05_HANDOFF_TO_CODEX.md": {
+    "mtime": 1792904247.5268996,
+    "seen": 1793815051.533349,
+    "ast_hash": "822bc5f51484276e56a0f8e892e0b168",
+    "semantic_hash": "822bc5f51484276e56a0f8e892e0b168"
+  },
+  "docs/glm/06_VISUAL_ACCEPTANCE.md": {
+    "mtime": 1792945876.2155151,
+    "seen": 1793815051.53335,
+    "ast_hash": "dc36092ea4d0e3f07e5846308e13e1dc",
+    "semantic_hash": "dc36092ea4d0e3f07e5846308e13e1dc"
+  },
+  "docs/glm/07_FACE_NUCLEUS_VARIANTS.md": {
+    "mtime": 1792948067.761887,
+    "seen": 1793815051.533351,
+    "ast_hash": "89ad3b153146540a55403a35dd54ab22",
+    "semantic_hash": "89ad3b153146540a55403a35dd54ab22"
+  },
+  "docs/glm/WORKBUDDY_HANDOFF_2026-10-25.md": {
+    "mtime": 1792942171.6559646,
+    "seen": 1793815051.533352,
+    "ast_hash": "f5e1fec788b6ee24e303eaa990049dd8",
+    "semantic_hash": "f5e1fec788b6ee24e303eaa990049dd8"
+  },
+  "docs/history/2026-10-22-before-reconciliation-DEVELOPMENT_PLAN.md": {
+    "mtime": 1792766642.916026,
+    "seen": 1793815051.5333529,
+    "ast_hash": "b70544d816088e3c4d0215275fc2dd3b",
+    "semantic_hash": "b70544d816088e3c4d0215275fc2dd3b"
+  },
+  "docs/history/2026-10-22-before-reconciliation-PROGRESS.md": {
+    "mtime": 1792766642.9161289,
+    "seen": 1793815051.533355,
+    "ast_hash": "bce5ab1038b3038f6a63990a2abbd39e",
+    "semantic_hash": "bce5ab1038b3038f6a63990a2abbd39e"
+  },
+  "docs/production/00_BASELINE.md": {
+    "mtime": 1793543365.308623,
+    "seen": 1793815051.533356,
+    "ast_hash": "998530a3cac168c9807c3a4071ea610d",
+    "semantic_hash": "998530a3cac168c9807c3a4071ea610d"
+  },
+  "docs/production/01_ART_DIRECTION.md": {
+    "mtime": 1793694946.8102188,
+    "seen": 1793815051.533356,
+    "ast_hash": "53d2807095bde700a05ce186d4553902",
+    "semantic_hash": "53d2807095bde700a05ce186d4553902"
+  },
+  "docs/production/02_RENDER_SPIKE.md": {
+    "mtime": 1793708189.6548488,
+    "seen": 1793815051.5333571,
+    "ast_hash": "a6e101f34ef5b915192c2f0cf552e8af",
+    "semantic_hash": "a6e101f34ef5b915192c2f0cf552e8af"
+  },
+  "docs/production/03_HERO_AND_FOREST.md": {
+    "mtime": 1793806904.1998465,
+    "seen": 1793815051.533358,
+    "ast_hash": "7b1eeb909c2394b535945bb6abd776c8",
+    "semantic_hash": "7b1eeb909c2394b535945bb6abd776c8"
+  },
+  "docs/production/04_LAKE_DIRECTION_PLAN.md": {
+    "mtime": 1793813290.7414591,
+    "seen": 1793815051.533359,
+    "ast_hash": "8bf81aaabc2ca04c02904f4be05dcb16",
+    "semantic_hash": "8bf81aaabc2ca04c02904f4be05dcb16"
+  },
+  "docs/production/ART_PROMPT_STYLE.md": {
+    "mtime": 1793717614.1673625,
+    "seen": 1793815051.5333602,
+    "ast_hash": "c1fd8e2e638749f064157941c46ad5f6",
+    "semantic_hash": "c1fd8e2e638749f064157941c46ad5f6"
+  },
+  "docs/production/GROVE_FOOD_STUDY_2026-11-03.md": {
+    "mtime": 1793678488.6036422,
+    "seen": 1793815051.533361,
+    "ast_hash": "0a378f9682ceb3138b0e075b647f0b33",
+    "semantic_hash": "0a378f9682ceb3138b0e075b647f0b33"
+  },
+  "docs/production/RELAXATION_BRIEF.md": {
+    "mtime": 1793543365.3067613,
+    "seen": 1793815051.533362,
+    "ast_hash": "95637b85e1dea4522003c5f0fe486978",
+    "semantic_hash": "95637b85e1dea4522003c5f0fe486978"
+  },
+  "docs/production/RELAXATION_FINISH_2026-11-02.md": {
+    "mtime": 1793645763.7833254,
+    "seen": 1793815051.5333629,
+    "ast_hash": "41a921bf7f0c283d63336c2cd0ab6063",
+    "semantic_hash": "41a921bf7f0c283d63336c2cd0ab6063"
+  },
+  "docs/production/VERIFICATION_2026-11-02.md": {
+    "mtime": 1793561098.302963,
+    "seen": 1793815051.5333629,
+    "ast_hash": "6704492f361b82a64b01da74f4d02d01",
+    "semantic_hash": "6704492f361b82a64b01da74f4d02d01"
+  },
+  "docs/security/P0-next-16.4.3.md": {
+    "mtime": 1792948184.6780677,
+    "seen": 1793815051.533364,
+    "ast_hash": "2f175e6ca28a2e25767023fda0fccd86",
+    "semantic_hash": "2f175e6ca28a2e25767023fda0fccd86"
+  },
+  "licenses/GODOT_LICENSE.txt": {
+    "mtime": 1792766642.9180915,
+    "seen": 1793815051.533365,
+    "ast_hash": "429628d6598a258acb0c2524e08a3036",
+    "semantic_hash": "429628d6598a258acb0c2524e08a3036"
+  },
+  "memory/README.md": {
+    "mtime": 1793542827.9446557,
+    "seen": 1793815051.533366,
+    "ast_hash": "55ab479d45e66bdec4d68c56bf88d66e",
+    "semantic_hash": "55ab479d45e66bdec4d68c56bf88d66e"
+  },
+  "memory/sessions/2026-11-01_19-30_audit-main-visual-baseline-and-define-a-simple-r.md": {
+    "mtime": 1793543415.5912414,
+    "seen": 1793815051.5333672,
+    "ast_hash": "7894465a5fb6aa1427de1fff6462267f",
+    "semantic_hash": "7894465a5fb6aa1427de1fff6462267f"
+  },
+  "memory/sessions/2026-11-01_20-11_verify-calm-world-and-single-repo-consolidation.md": {
+    "mtime": 1793545864.5902622,
+    "seen": 1793815051.533368,
+    "ast_hash": "2dc106e5fbc80abb704c94de927049d2",
+    "semantic_hash": "2dc106e5fbc80abb704c94de927049d2"
+  },
+  "memory/sessions/2026-11-01_20-58_session.md": {
+    "mtime": 1793548711.3388746,
+    "seen": 1793815051.533369,
+    "ast_hash": "8ef6280d030690021137e4d7f253c9f8",
+    "semantic_hash": "8ef6280d030690021137e4d7f253c9f8"
+  },
+  "memory/sessions/2026-11-02_00-24_verify-completion-of-relaxing-world-and-stage-8-.md": {
+    "mtime": 1793561098.6056755,
+    "seen": 1793815051.533369,
+    "ast_hash": "fdeeda7420baf5d45c8311f05aa66979",
+    "semantic_hash": "fdeeda7420baf5d45c8311f05aa66979"
+  },
+  "memory/sessions/2026-11-02_19-23_relaxation-polish-mac-verification.md": {
+    "mtime": 1793629392.684,
+    "seen": 1793815051.53337,
+    "ast_hash": "6e23b3f961c9a7a0a7f465db33c7302d",
+    "semantic_hash": "6e23b3f961c9a7a0a7f465db33c7302d"
+  },
+  "memory/sessions/2026-11-03_09-01_grove-food-art-study.md": {
+    "mtime": 1793678489.2882879,
+    "seen": 1793815051.533372,
+    "ast_hash": "c70b0f4e4555ec31fef8c30edc7dc199",
+    "semantic_hash": "c70b0f4e4555ec31fef8c30edc7dc199"
+  },
+  "memory/sessions/2026-11-03_17-16_plan-1-2-2-5d-handoff.md": {
+    "mtime": 1793708209.5848253,
+    "seen": 1793815051.533372,
+    "ast_hash": "f5078ffb36a2598b28872e2db771b9d2",
+    "semantic_hash": "f5078ffb36a2598b28872e2db771b9d2"
+  },
+  "memory/sessions/2026-11-04_16-18_evaluate-lake-direction-concepts-only-no-asset-r.md": {
+    "mtime": 1793791088.3256352,
+    "seen": 1793815051.5333729,
+    "ast_hash": "adee66d801b0e5070ff46a821c4c5a68",
+    "semantic_hash": "adee66d801b0e5070ff46a821c4c5a68"
+  },
+  "memory/sessions/2026-11-04_16-19_lake-direction-approved-by-owner-propose-plan.md": {
+    "mtime": 1793791174.0870147,
+    "seen": 1793815051.533374,
+    "ast_hash": "46df0f4a7d0992d8459640e9ba0e05e2",
+    "semantic_hash": "46df0f4a7d0992d8459640e9ba0e05e2"
+  },
+  "memory/sessions/2026-11-04_16-20_apply-approved-lake-plan-to-smush-agent-start.md": {
+    "mtime": 1793791235.3482182,
+    "seen": 1793815051.533375,
+    "ast_hash": "04ce32e24e54c5697e3bfa2b12fe5b51",
+    "semantic_hash": "04ce32e24e54c5697e3bfa2b12fe5b51"
+  },
+  "memory/sessions/2026-11-04_16-32_lake-plan-step-0-water-shader-prototype.md": {
+    "mtime": 1793791928.916079,
+    "seen": 1793815051.533376,
+    "ast_hash": "b4c996f77466a4f8e0ad51350978bef0",
+    "semantic_hash": "b4c996f77466a4f8e0ad51350978bef0"
+  },
+  "memory/sessions/2026-11-04_17-02_lake-prototype-tuned-to-concept.md": {
+    "mtime": 1793793743.2086363,
+    "seen": 1793815051.533377,
+    "ast_hash": "e050080582c2010161fa18a1f872ade6",
+    "semantic_hash": "e050080582c2010161fa18a1f872ade6"
+  },
+  "memory/sessions/2026-11-04_18-10_lake-plan-step-1-painted-water-kit.md": {
+    "mtime": 1793797836.661653,
+    "seen": 1793815051.5333781,
+    "ast_hash": "3f288234d6e4bcc4a339e5a40a7317f5",
+    "semantic_hash": "3f288234d6e4bcc4a339e5a40a7317f5"
+  },
+  "memory/sessions/2026-11-04_18-20_lake-plan-step-2-painted-surface-sprites.md": {
+    "mtime": 1793798400.5111105,
+    "seen": 1793815051.533379,
+    "ast_hash": "ff31ce50252bb67b35cb690d2433feab",
+    "semantic_hash": "ff31ce50252bb67b35cb690d2433feab"
+  },
+  "memory/sessions/2026-11-04_18-41_lake-plan-step-3-underwater-layer.md": {
+    "mtime": 1793799690.4475408,
+    "seen": 1793815051.53338,
+    "ast_hash": "d76b7e6fa5118ec3d88846537ba6fa49",
+    "semantic_hash": "d76b7e6fa5118ec3d88846537ba6fa49"
+  },
+  "memory/sessions/2026-11-04_18-52_lake-plan-step-4-flooded-grove.md": {
+    "mtime": 1793800351.189577,
+    "seen": 1793815051.5333812,
+    "ast_hash": "bafe5f5a5d03dd7aba63ad7258c3d897",
+    "semantic_hash": "bafe5f5a5d03dd7aba63ad7258c3d897"
+  },
+  "memory/sessions/2026-11-04_19-23_lake-plan-step-6-underwater-finale-dive.md": {
+    "mtime": 1793802200.8028078,
+    "seen": 1793815051.533382,
+    "ast_hash": "c6e08b3b8a1acaab11fa45ea1852d65a",
+    "semantic_hash": "c6e08b3b8a1acaab11fa45ea1852d65a"
+  },
+  "memory/sessions/2026-11-04_19-45_lake-texture-memory-budget.md": {
+    "mtime": 1793803554.7145145,
+    "seen": 1793815051.533383,
+    "ast_hash": "8035c34835923fdc1c8baf92b6277473",
+    "semantic_hash": "8035c34835923fdc1c8baf92b6277473"
+  },
+  "memory/sessions/2026-11-04_20-41_pre-integration-polish-in-lab-sound-glide-physic.md": {
+    "mtime": 1793806904.3791347,
+    "seen": 1793815051.533383,
+    "ast_hash": "ba5c99f7ce436234796a8a494d7275a0",
+    "semantic_hash": "ba5c99f7ce436234796a8a494d7275a0"
+  },
+  "memory/sessions/2026-11-04_20-54_lake-lab-region-streaming.md": {
+    "mtime": 1793807658.093854,
+    "seen": 1793815051.5333838,
+    "ast_hash": "c456b14835853aae77b46b263871171b",
+    "semantic_hash": "c456b14835853aae77b46b263871171b"
+  },
+  "memory/sessions/2026-11-04_21-04_lake-lab-zone-1-dewy-glade-prologue.md": {
+    "mtime": 1793808250.358355,
+    "seen": 1793815051.533385,
+    "ast_hash": "bda767b791a297e90d8f9dacb09ea786",
+    "semantic_hash": "bda767b791a297e90d8f9dacb09ea786"
+  },
+  "memory/sessions/2026-11-04_21-11_lake-lab-soft-collisions-and-current.md": {
+    "mtime": 1793808698.4056084,
+    "seen": 1793815051.533386,
+    "ast_hash": "ddf2d12a3f3e98aafd483dc32e7863a3",
+    "semantic_hash": "ddf2d12a3f3e98aafd483dc32e7863a3"
+  },
+  "memory/sessions/2026-11-04_21-23_lake-lab-legends-rare-spirits-auras-lunar-nova.md": {
+    "mtime": 1793809430.6947184,
+    "seen": 1793815051.533387,
+    "ast_hash": "b043ba9cf5efec80bd6313bad547903a",
+    "semantic_hash": "b043ba9cf5efec80bd6313bad547903a"
+  },
+  "memory/sessions/2026-11-04_21-28_lake-lab-real-enemies-boss-hazards-via-arena-con.md": {
+    "mtime": 1793809720.910047,
+    "seen": 1793815051.5333881,
+    "ast_hash": "bc0f5847a9957d70da39c4d9e578e64a",
+    "semantic_hash": "bc0f5847a9957d70da39c4d9e578e64a"
+  },
+  "memory/sessions/2026-11-04_21-33_lake-lab-eat-real-enemies-boss-ram.md": {
+    "mtime": 1793810003.1280146,
+    "seen": 1793815051.533389,
+    "ast_hash": "b8307b0755dec9a21c3dbea6fc430e8a",
+    "semantic_hash": "b8307b0755dec9a21c3dbea6fc430e8a"
+  },
+  "memory/sessions/2026-11-04_21-37_lake-lab-waves-and-difficulty-ramp.md": {
+    "mtime": 1793810270.8878362,
+    "seen": 1793815051.53339,
+    "ast_hash": "02ee89fe10283c5585e4b332c3390f39",
+    "semantic_hash": "02ee89fe10283c5585e4b332c3390f39"
+  },
+  "memory/sessions/2026-11-04_21-44_lake-lab-mutations-on-the-painted-2-5d-hero.md": {
+    "mtime": 1793810693.2220109,
+    "seen": 1793815051.53339,
+    "ast_hash": "ad30e3df3054d60139e75f7447197e55",
+    "semantic_hash": "ad30e3df3054d60139e75f7447197e55"
+  },
+  "memory/sessions/2026-11-04_21-50_lake-lab-evolution-xp-and-the-real-mutation-draf.md": {
+    "mtime": 1793811057.4544675,
+    "seen": 1793815051.533391,
+    "ast_hash": "00aa68aee1b1940c8e16a5c0d379e05e",
+    "semantic_hash": "00aa68aee1b1940c8e16a5c0d379e05e"
+  },
+  "memory/sessions/2026-11-04_22-18_lake-lab-autoplay-bot-full-run-verification.md": {
+    "mtime": 1793812688.726177,
+    "seen": 1793815051.533392,
+    "ast_hash": "f6451f18f0415f17b0dad63f8501af34",
+    "semantic_hash": "f6451f18f0415f17b0dad63f8501af34"
+  },
+  "memory/sessions/2026-11-04_22-23_lake-lab-zone-music-and-synergies.md": {
+    "mtime": 1793813013.3632612,
+    "seen": 1793815051.533393,
+    "ast_hash": "3318f4b737f8390b342691f7522c0142",
+    "semantic_hash": "3318f4b737f8390b342691f7522c0142"
+  },
+  "reports/production/relaxation/2026-11-02/pixel3-latency.txt": {
+    "mtime": 1793604472.462787,
+    "seen": 1793815051.5333939,
+    "ast_hash": "13ea0bb0f8716a60874d2df08a73ce1f",
+    "semantic_hash": "13ea0bb0f8716a60874d2df08a73ce1f"
+  },
+  "reports/production/relaxation/2026-11-02/pixel3-perf-summary.txt": {
+    "mtime": 1793604472.4633565,
+    "seen": 1793815051.5333939,
+    "ast_hash": "bcc82f79fa0eab986f2726e2030f09be",
+    "semantic_hash": "bcc82f79fa0eab986f2726e2030f09be"
+  },
+  "resources/fonts/LICENSE-DejaVu.txt": {
+    "mtime": 1792682008.921187,
+    "seen": 1793815051.533395,
+    "ast_hash": "425865e1c534c5788b1341d401f131d9",
+    "semantic_hash": "425865e1c534c5788b1341d401f131d9"
+  },
+  "tools/bloom_prompts.txt": {
+    "mtime": 1792766643.1640213,
+    "seen": 1793815051.533396,
+    "ast_hash": "08ce499d4a68467be2f44507bc21053d",
+    "semantic_hash": "08ce499d4a68467be2f44507bc21053d"
+  },
+  "tools/creature_prompts.txt": {
+    "mtime": 1792766643.164497,
+    "seen": 1793815051.533397,
+    "ast_hash": "35f0c06edae2c605fa8cabf6035964d8",
+    "semantic_hash": "35f0c06edae2c605fa8cabf6035964d8"
+  },
+  "tools/mutation_icon_prompts.txt": {
+    "mtime": 1792860921.4929419,
+    "seen": 1793815051.533398,
+    "ast_hash": "1ca7bf7c301aff53f913ae0fab7d0043",
+    "semantic_hash": "1ca7bf7c301aff53f913ae0fab7d0043"
+  },
+  "tools/prop_prompts.txt": {
+    "mtime": 1792766643.1664588,
+    "seen": 1793815051.533399,
+    "ast_hash": "d22a97b2d6f0faf4c0ed6dc05d63a657",
+    "semantic_hash": "d22a97b2d6f0faf4c0ed6dc05d63a657"
+  },
+  "tools/undergrowth_prompts.txt": {
+    "mtime": 1792766643.1670747,
+    "seen": 1793815051.5334,
+    "ast_hash": "b630500e326d1f74e1d3803c1438fd9a",
+    "semantic_hash": "b630500e326d1f74e1d3803c1438fd9a"
+  },
+  "tools/wonder_prompts.txt": {
+    "mtime": 1792775085.5965545,
+    "seen": 1793815051.533401,
+    "ast_hash": "e8061cc78ee36122f3a24d1bf23b2d71",
+    "semantic_hash": "e8061cc78ee36122f3a24d1bf23b2d71"
   }
 }

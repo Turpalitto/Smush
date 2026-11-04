@@ -1,127 +1,45 @@
 # Current Context
 
 <!-- PROJECT-MEMORY-KIT:AUTOMATIC -->
-- **Current focus:** Lake lab readiness review
-- **Last completed step:** 05_LAKE_READINESS.md, final comparison frames, checklist statuses, AGENT_START state, MASTER_PLAN lines, ADR-11042300
-- **What changed:** 05_LAKE_READINESS.md, final comparison frames, checklist statuses, AGENT_START state, MASTER_PLAN lines, ADR-11042300
-- **What needs verification:** run_qa.sh 3171 passed 0 failed; bot 6/6
-- **Next logical step:** Wait for owner evaluation
+- **Current focus:** Lake lab: soft shore rebound
+- **Last completed step:** shore rebound, bot re-verified
+- **What changed:** shore rebound, bot re-verified
+- **What needs verification:** run_qa.sh 3188 passed 0 failed; bot seed 3 complete
+- **Next logical step:** Await owner
 - **Important warnings:** Android performance NOT TESTED (emulator aura36 unstable); ChatGPT downloads do not save from in-app browser; Blender lab extension conflicts on port 9876
-- **Affected files:** docs/production/05_LAKE_READINESS.md,docs/production/04_LAKE_DIRECTION_PLAN.md,SMUSH_AGENT_START.md,SMUSH_MASTER_PLAN.md,DECISIONS.md,reports/production/2_5d/compare_lake_final_v1.png
+- **Affected files:** scripts/labs/LakeProto25D.gd,tests/test_lake_proto.gd,docs/production/05_LAKE_READINESS.md
 - **Git status:** M .godot/global_script_class_cache.cfg
- M AGENTS.md
- M DECISIONS.md
- M GAMEPLAY_STATUS.md
- M PROGRESS.md
  M PROJECT_STATE.md
- M SMUSH_AGENT_START.md
- M SMUSH_ASSET_PIPELINE.md
- M SMUSH_MASTER_PLAN.md
- M TEST_REPORT.md
- M export_presets.cfg
- M graph/project_graph.json
+ M docs/production/05_LAKE_READINESS.md
+ D graphify-out/.graphify_analysis.json
+ D graphify-out/.graphify_ast.json
+ D graphify-out/.graphify_chunk_01.json
+ D graphify-out/.graphify_chunk_04.json
+ D graphify-out/.graphify_chunk_05.json
+ D graphify-out/.graphify_detect.json
+ D graphify-out/.graphify_uncached.txt
+ M graphify-out/cache/stat-index.json
+ M graphify-out/graph.json
+ M graphify-out/manifest.json
  M memory/.project-memory.json
  M memory/CURRENT_CONTEXT.md
- M project.godot
- M scripts/labs/ClaudeVisualLab.gd
- M scripts/run_qa.sh
- M tests/TestRunner.gd
- M tests/test_visual_lab.gd
- M tools/build_pck.py
-?? .claude/
-?? .graphifyignore
-?? art_sources/
-?? audio/music/water/
-?? audio/sfx/water/
-?? docs/production/01_ART_DIRECTION.md
-?? docs/production/02_RENDER_SPIKE.md
-?? docs/production/03_HERO_AND_FOREST.md
-?? docs/production/04_LAKE_DIRECTION_PLAN.md
-?? docs/production/05_LAKE_READINESS.md
-?? docs/production/ART_PROMPT_STYLE.md
-?? docs/production/GROVE_FOOD_STUDY_2026-11-03.md
-?? graphify-out/
-?? memory/sessions/2026-11-03_09-01_grove-food-art-study.md
-?? memory/sessions/2026-11-03_17-16_plan-1-2-2-5d-handoff.md
-?? memory/sessions/2026-11-04_16-18_evaluate-lake-direction-concepts-only-no-asset-r.md
-?? memory/sessions/2026-11-04_16-19_lake-direction-approved-by-owner-propose-plan.md
-?? memory/sessions/2026-11-04_16-20_apply-approved-lake-plan-to-smush-agent-start.md
-?? memory/sessions/2026-11-04_16-32_lake-plan-step-0-water-shader-prototype.md
-?? memory/sessions/2026-11-04_17-02_lake-prototype-tuned-to-concept.md
-?? memory/sessions/2026-11-04_18-10_lake-plan-step-1-painted-water-kit.md
-?? memory/sessions/2026-11-04_18-20_lake-plan-step-2-painted-surface-sprites.md
-?? memory/sessions/2026-11-04_18-41_lake-plan-step-3-underwater-layer.md
-?? memory/sessions/2026-11-04_18-52_lake-plan-step-4-flooded-grove.md
-?? memory/sessions/2026-11-04_19-23_lake-plan-step-6-underwater-finale-dive.md
-?? memory/sessions/2026-11-04_19-45_lake-texture-memory-budget.md
-?? memory/sessions/2026-11-04_20-41_pre-integration-polish-in-lab-sound-glide-physic.md
-?? memory/sessions/2026-11-04_20-54_lake-lab-region-streaming.md
-?? memory/sessions/2026-11-04_21-04_lake-lab-zone-1-dewy-glade-prologue.md
-?? memory/sessions/2026-11-04_21-11_lake-lab-soft-collisions-and-current.md
-?? memory/sessions/2026-11-04_21-23_lake-lab-legends-rare-spirits-auras-lunar-nova.md
-?? memory/sessions/2026-11-04_21-28_lake-lab-real-enemies-boss-hazards-via-arena-con.md
-?? memory/sessions/2026-11-04_21-33_lake-lab-eat-real-enemies-boss-ram.md
-?? memory/sessions/2026-11-04_21-37_lake-lab-waves-and-difficulty-ramp.md
-?? memory/sessions/2026-11-04_21-44_lake-lab-mutations-on-the-painted-2-5d-hero.md
-?? memory/sessions/2026-11-04_21-50_lake-lab-evolution-xp-and-the-real-mutation-draf.md
-?? memory/sessions/2026-11-04_22-18_lake-lab-autoplay-bot-full-run-verification.md
-?? memory/sessions/2026-11-04_22-23_lake-lab-zone-music-and-synergies.md
-?? reports/production/2_5d/
-?? reports/production/art_direction/
-?? reports/production/grove-study/
-?? reports/production/hero_forest/
-?? reports/production/render_spike/
-?? resources/art/2_5d/
-?? resources/art/3d/
-?? scenes/labs/Glade25D.tscn
-?? scenes/labs/LakeProto25D.tscn
-?? scenes/labs/Render3DSpike.tscn
-?? scripts/labs/Glade25D.gd
-?? scripts/labs/Glade25D.gd.uid
-?? scripts/labs/GroveStudy.gd
-?? scripts/labs/GroveStudy.gd.uid
-?? scripts/labs/LakeAudio.gd
-?? scripts/labs/LakeAudio.gd.uid
-?? scripts/labs/LakeBot.gd
-?? scripts/labs/LakeBot.gd.uid
-?? scripts/labs/LakeCombat.gd
-?? scripts/labs/LakeCombat.gd.uid
-?? scripts/labs/LakeLegends.gd
-?? scripts/labs/LakeLegends.gd.uid
-?? scripts/labs/LakeMutations.gd
-?? scripts/labs/LakeMutations.gd.uid
-?? scripts/labs/LakeProto25D.gd
-?? scripts/labs/LakeProto25D.gd.uid
-?? scripts/labs/Render3DSpike.gd
-?? scripts/labs/Render3DSpike.gd.uid
-?? scripts/labs/Slime25D.gd
-?? scripts/labs/Slime25D.gd.uid
-?? shaders/fade_top.gdshader
-?? shaders/fade_top.gdshader.uid
-?? shaders/ground_blend.gdshader
-?? shaders/ground_blend.gdshader.uid
-?? shaders/ground_detail.gdshader
-?? shaders/ground_detail.gdshader.uid
-?? shaders/lake_reflect.gdshader
-?? shaders/lake_reflect.gdshader.uid
-?? shaders/lake_water.gdshader
-?? shaders/lake_water.gdshader.uid
-?? shaders/slime25d.gdshader
-?? shaders/slime25d.gdshader.uid
-?? shaders/spike/
-?? shaders/sway.gdshader
-?? shaders/sway.gdshader.uid
-?? tests/test_glade_25d.gd
-?? tests/test_glade_25d.gd.uid
-?? tests/test_lake_proto.gd
-?? tests/test_lake_proto.gd.uid
-?? tests/test_render_spike.gd
-?? tests/test_render_spike.gd.uid
-?? tools/cut_sprites.py
-?? tools/generate_water_music.py
-?? tools/generate_water_sfx.py
-?? tools/make_caustic_tile.py
-?? tools/make_detail_tile.py
-?? tools/process_water_kit.py
-?? tools/set_texture_compression.py
-?? tools/texture_budget.py
+ M scripts/labs/LakeProto25D.gd
+ M shaders/lake_water.gdshader
+ M shaders/sway.gdshader
+ M tests/test_lake_proto.gd
+?? graphify-out/.graphify_labels.json
+?? graphify-out/GRAPH_REPORT.md
+?? graphify-out/cache/last_query_stamp
+?? graphify-out/cache/semantic/
+?? graphify-out/cost.json
+?? graphify-out/graph.html
+?? memory/sessions/2026-11-04_23-04_lake-lab-touch-buttons-and-lite-water-fallback.md
+?? memory/sessions/2026-11-04_23-09_lake-lab-lotus-bloom.md
+?? memory/sessions/2026-11-04_23-18_lake-lab-plants-lean-along-slime-path.md
+?? reports/production/2_5d/compare_water_lite_v1.png
+?? reports/production/2_5d/lotus_bloom.png
+?? reports/production/2_5d/trail.png
+?? reports/production/2_5d/water_full.png
+?? reports/production/2_5d/water_lite.png
+?? scripts/labs/LakeTouchHud.gd
+?? scripts/labs/LakeTouchHud.gd.uid

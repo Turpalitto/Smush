@@ -131,6 +131,7 @@ var _puddle_clock := 0.0
 var _drip_timer := 1.0
 var audio: LakeAudio
 var legends: LakeLegends
+var touch_hud: LakeTouchHud
 var combat: LakeCombat
 var bot: LakeBot
 var mutations_fx: LakeMutations
@@ -157,6 +158,17 @@ var _perf_frames: Array[float] = []
 var _perf_gpu: Array[float] = []
 var _perf_cpu: Array[float] = []
 var _no_water := false
+var water_lite := false
+var _trail := PackedVector2Array()
+var _trail_t := 0.0
+const TRAIL_STEP_SEC := 0.22
+const SHORE_REBOUND := 0.35   # 0 = stops dead at the shore, 1 = perfectly elastic
+var _slow_t := 0.0
+var _slow_n := 0
+const LITE_AFTER_MS := 38.0     # sustained frame time above this (under ~26 FPS) -> cheap water
+const LITE_WINDOW_SEC := 4.0
+const LOTUS_NEAR := 150.0   # a lotus is fully open within this distance of the slime, closed beyond LOTUS_FAR
+const LOTUS_FAR := 340.0
 var _t := 0.0
 var _last_idle_ripple := 0.0
 
@@ -186,6 +198,7 @@ func _water_size() -> Vector2:
 ## Floor = dark seabed + glowing roots and fish shadows + the water surface on top.
 func _build_ground() -> void:
 	_no_water = OS.get_cmdline_user_args().has("--lake-nowater")
+	call_deferred("set_water_lite", OS.get_cmdline_user_args().has("--lake-lite"))
 	var size := _water_size()
 	var seabed := Sprite2D.new()
 	seabed.name = "Seabed"
@@ -380,7 +393,8 @@ func _place_floaters() -> void:
 				_add_glow(node, Color(1.0, 0.8, 0.5), 54.0)
 			elif prop_name.begins_with("wl_lotus"):
 				_add_glow(node, {"wl_lotus_pink": Color(1.0, 0.55, 0.85), "wl_lotus_white": Color(1.0, 0.85, 0.7), "wl_lotus_cyan": Color(0.45, 0.9, 1.0), "wl_lotus_purple": Color(0.75, 0.55, 1.0)}.get(prop_name, Color(1.0, 0.7, 0.9)), 60.0)
-			floaters.append({"node": node, "s0": node.scale, "home": pos, "offset": Vector2.ZERO, "phase": _rng.randf() * TAU})
+			floaters.append({"node": node, "s0": node.scale, "home": pos, "offset": Vector2.ZERO, "phase": _rng.randf() * TAU,
+				"lotus": prop_name.begins_with("wl_lotus") and prop_name != "wl_lotus_bud" and prop_name != "wl_lotus_pod", "bloom": 0.0, "opened": false})
 
 
 func _add_reflection(node: Node2D, prop_name: String) -> void:
@@ -439,6 +453,10 @@ func _build_atmosphere() -> void:
 	legends.name = "LakeLegends"
 	add_child(legends)
 	legends.setup(self)
+	touch_hud = LakeTouchHud.new()
+	touch_hud.name = "LakeTouchHud"
+	add_child(touch_hud)
+	touch_hud.setup(self)
 	player.global_position = START_POS   # the prologue: the slime starts in the dewy glade
 	player.base_accel = WATER_ACCEL
 	player.base_friction = WATER_FRICTION
@@ -485,9 +503,45 @@ func _absorb(f: Dictionary) -> void:
 	spawn_fx("bubbles", at + Vector2(0.0, -14.0), 0.4, 1.3, 0.8)
 
 
+## Plants keep leaning along the slime's path for a moment (shader `trail`, newest first) and spring back.
+func _update_plant_trail(delta: float, pos: Vector2) -> void:
+	if _trail.is_empty():
+		_trail.resize(6)
+		_trail.fill(pos)
+	_trail_t += delta
+	if _trail_t >= TRAIL_STEP_SEC:
+		_trail_t = 0.0
+		_trail.insert(0, pos)
+		_trail.resize(6)
+	for m: ShaderMaterial in _sway_mats.values():
+		m.set_shader_parameter("trail_on", 1.0)
+		m.set_shader_parameter("trail", _trail)
+
+
+## Cheap water for slow devices: fewer texture reads in the shader (see `lite` in lake_water.gdshader).
+func set_water_lite(on: bool) -> void:
+	water_lite = on
+	if water != null and water.material is ShaderMaterial:
+		(water.material as ShaderMaterial).set_shader_parameter("lite", 1.0 if on else 0.0)
+
+
+## Frame-time watchdog: a slow stretch switches the water to the cheap version and it stays so.
+func _watch_frame_time(delta: float) -> void:
+	if water_lite or _no_water or delta <= 0.0:
+		return
+	_slow_t += delta
+	_slow_n += 1
+	if _slow_t >= LITE_WINDOW_SEC:
+		if _slow_t / float(_slow_n) * 1000.0 > LITE_AFTER_MS:
+			set_water_lite(true)
+		_slow_t = 0.0
+		_slow_n = 0
+
+
 func _process(delta: float) -> void:
 	super(delta)
 	_t += delta
+	_watch_frame_time(delta)
 	var pos := player.global_position
 	water.position = pos
 	$Seabed.position = pos
@@ -498,6 +552,7 @@ func _process(delta: float) -> void:
 	elif _t - _last_idle_ripple > 1.1:
 		_last_idle_ripple = _t
 		add_ripple(pos, _mass_strength() * 0.55)
+	_update_plant_trail(delta, pos)
 	var wm := water.material as ShaderMaterial
 	wm.set_shader_parameter("moon_world", pos + Vector2(40.0, -430.0))
 	wm.set_shader_parameter("slime_pos", pos)
@@ -577,6 +632,27 @@ func _update_floaters(delta: float) -> void:
 		var pushed: float = (f["offset"] as Vector2).length() / PART_PUSH
 		node.rotation = clampf((f["offset"] as Vector2).x * 0.006, -0.18, 0.18) + sin(_t * 0.7 + float(f["phase"])) * 0.012
 		node.scale = (f["s0"] as Vector2) * (1.0 - 0.05 * clampf(pushed, 0.0, 1.0))
+		if f.get("lotus", false):
+			_update_lotus_bloom(f, node, d, delta)
+
+
+## Lotuses sit half-closed and open as the slime comes near: they stand taller, brighten and glow, and
+## give one soft ring as they open. Purely visual.
+func _update_lotus_bloom(f: Dictionary, node: Node2D, dist: float, delta: float) -> void:
+	var want := 1.0 - smoothstep(LOTUS_NEAR, LOTUS_FAR, dist)
+	var bloom: float = lerpf(float(f["bloom"]), want, minf(1.0, delta * (2.6 if want > float(f["bloom"]) else 0.9)))
+	f["bloom"] = bloom
+	node.scale *= Vector2(0.94 + 0.08 * bloom, 0.86 + 0.14 * bloom)
+	node.modulate = Color(1, 1, 1, 1).darkened(0.18 * (1.0 - bloom))
+	var gl := node.get_node_or_null("Glow")
+	if gl != null:
+		gl.set_meta("base", 0.16 + 0.34 * bloom)
+	if bloom > 0.7 and not f.get("opened", false):
+		f["opened"] = true
+		if dive < 0.5:
+			spawn_fx("splash_ring", node.global_position + Vector2(0.0, 8.0), 0.45, 0.6, 0.55)
+	elif bloom < 0.25:
+		f["opened"] = false
 
 
 func _update_fish() -> void:
@@ -1087,6 +1163,7 @@ func _register_solid(n: Node) -> void:
 func constrain_player_position(pos: Vector2, radius: float, _dashing: bool) -> Vector2:
 	var b := play_bounds()
 	var p := Vector2(clampf(pos.x, b.position.x + radius, b.end.x - radius), clampf(pos.y, b.position.y + radius, b.end.y - radius))
+	_bounce_off_shore(pos, p, radius)
 	if dive > 0.5:
 		return p   # swimming underwater among the giants: the finale is open, no wall to bump
 	for d in solids:
@@ -1110,6 +1187,32 @@ func constrain_player_position(pos: Vector2, radius: float, _dashing: bool) -> V
 					audio.play("water_plip_02", -14.0, 0.8, 0.25)
 					spawn_fx("ripple_small", p + n * -radius * 0.2, 0.5, 1.0, 0.8)
 	return p
+
+
+## The shore and the world's edges are soft: the slime loses the inward speed, rebounds a little and a ring spreads.
+func _bounce_off_shore(wanted: Vector2, clamped: Vector2, radius: float) -> void:
+	var n := Vector2.ZERO
+	if wanted.x < clamped.x - 0.5:
+		n.x = 1.0
+	elif wanted.x > clamped.x + 0.5:
+		n.x = -1.0
+	if wanted.y < clamped.y - 0.5:
+		n.y = 1.0
+	elif wanted.y > clamped.y + 0.5:
+		n.y = -1.0
+	if n == Vector2.ZERO:
+		return
+	n = n.normalized()
+	var into := player.velocity.dot(-n)
+	if into <= 0.0:
+		return
+	player.velocity += n * into * (1.0 + SHORE_REBOUND)
+	if player.visual != null and into > 40.0:
+		player.visual.trigger_wall_bump(n, into)
+	if into > 60.0:
+		bumps += 1
+		audio.play("water_plip_02", -16.0, 0.75, 0.25)
+		spawn_fx("ripple_small", clamped - n * radius * 0.2, 0.5, 1.0, 0.8)
 
 
 ## Current: a slow swirling flow over the open lake. Resting slime drifts, swimming against it takes effort.

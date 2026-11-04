@@ -48,6 +48,10 @@ Review the new lab comparison with owner. The existing macOS app contains the pr
 
 ## Recent significant changes
 
+- 2026-11-04: shore rebound, bot re-verified
+- 2026-11-04: sway shader trail uniform, lab trail update
+- 2026-11-04: Lotuses open near the slime and close away
+- 2026-11-04: LakeTouchHud, water lite shader mode + frame watchdog, tests
 - 2026-11-04: 05_LAKE_READINESS.md, final comparison frames, checklist statuses, AGENT_START state, MASTER_PLAN lines, ADR-11042300
 - 2026-11-04: 4 synthesised water music loops with zone crossfade; synergies by the game's rule without save writes; 402 tests; plan 13.11
 - 2026-11-04: LakeBot autoplayer; world extended upward for a real finale; focus-pause fix; 6/6 seeds reached the dive with no script errors; 376 tests; plan 13.10
