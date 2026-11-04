@@ -20,6 +20,39 @@ func run_async(tree: SceneTree) -> void:
 	_test_shaders_load()
 	_test_base_visual_untouched()
 	await _test_lab_scene(tree)
+	await _test_grove_food_study(tree)
+
+
+func _test_grove_food_study(tree: SceneTree) -> void:
+	var echo := GroveStudy.FoodEcho.new()
+	for i in range(40):
+		echo.remember(i % 3)
+	assert_eq(echo.echoes.size(), GroveStudy.FoodEcho.MAX_ECHOES, "Food echoes stay bounded during repeated feeding")
+	echo.remember(-1)
+	echo.remember(3)
+	assert_eq(echo.echoes.size(), GroveStudy.FoodEcho.MAX_ECHOES, "Unknown food is ignored")
+	echo.advance(GroveStudy.FoodEcho.LIFETIME)
+	assert_true(echo.echoes.is_empty(), "Food recollection fades completely without permanent clutter")
+	echo.free()
+	var lab := ClaudeVisualLab.new()
+	tree.root.add_child(lab)
+	await tree.process_frame
+	assert_false(lab._grove.visible, "Original lab background remains the default")
+	var initial_mass := lab.mass
+	for kind in range(3):
+		lab._set_grove(kind)
+		assert_eq(lab._grove.mood, kind, "Each grove mood is selectable")
+		var prey := lab.spawn_prey(lab.subjects[0], Vector2.RIGHT * 30.0, ClaudeVisualLab.LabPrey.PState.HOME)
+		prey.food_kind = kind
+		lab.prey_absorbed(prey)
+		prey.free()
+	assert_eq(lab.subjects[0].food_echo.echoes.size(), 3, "All three foods leave an echo after absorption")
+	assert_approx(lab.mass, initial_mass, 0.001, "Art study never changes gameplay mass")
+	lab._set_grove(-1)
+	assert_true(lab._floor_node.visible, "Original background can be restored")
+	assert_false(lab._grove._layer.visible, "Study floor is hidden on return to baseline")
+	lab.free()
+	await tree.process_frame
 
 
 func _test_mass_stage_roundtrip() -> void:

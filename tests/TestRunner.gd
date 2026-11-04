@@ -12,6 +12,9 @@ const GrowthSuite = preload("res://tests/test_growth_ladder.gd")
 const ModesSuite = preload("res://tests/test_modes.gd")
 const ChimesSuite = preload("res://tests/test_audio_chimes.gd")
 const VisualLabSuite = preload("res://tests/test_visual_lab.gd")
+const RenderSpikeSuite = preload("res://tests/test_render_spike.gd")
+const Glade25DSuite = preload("res://tests/test_glade_25d.gd")
+const LakeProtoSuite = preload("res://tests/test_lake_proto.gd")
 const TestSuiteBase = preload("res://tests/TestSuiteBase.gd")
 
 
@@ -66,6 +69,18 @@ func _execute_all() -> void:
 	var s6 := VisualLabSuite.new()
 	await s6.run_async(get_tree())
 	suites.append(s6)
+
+	var s7 := RenderSpikeSuite.new()
+	await s7.run_async(get_tree())
+	suites.append(s7)
+
+	var s8 := Glade25DSuite.new()
+	await s8.run_async(get_tree())
+	suites.append(s8)
+
+	var s9 := LakeProtoSuite.new()
+	await s9.run_async(get_tree())
+	suites.append(s9)
 
 	var total_pass: int = 0
 	var total_fail: int = 0

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "protocol_version": "1.0",
-  "updated_at": "2026-11-01T14:20:27Z",
+  "updated_at": "2026-11-03T04:01:29Z",
   "nodes": [
     {
       "id": "project",
@@ -17,6 +17,11 @@
     }
   ],
   "edges": [
+    {
+      "source": "project",
+      "target": "stack:unknown",
+      "type": "uses"
+    },
     {
       "source": "project",
       "target": "stack:unknown",

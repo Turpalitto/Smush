@@ -1,37 +1,127 @@
 # Current Context
 
 <!-- PROJECT-MEMORY-KIT:AUTOMATIC -->
-- **Current focus:** Finish relaxing-world polish on main and verify on Mac per owner request
-- **Last completed step:** Soft floor light and shared glow texture; calm zen tutorial; capture audio cleanup; fixed mutation-card horizontal overflow
-- **What changed:** Soft floor light and shared glow texture; calm zen tutorial; capture audio cleanup; fixed mutation-card horizontal overflow
-- **What needs verification:** Final source and external PCK: 2297 passed 0 failed each; five stages, narrow/desktop and motion video inspected; exported Mac app menu, movement, growth, shield, pause/resume verified; card overflow regression reproduced then fixed
-- **Next logical step:** Use final Mac build for owner visual/play feedback; investigate Android performance only with stable device access
-- **Final Mac follow-up:** Final exported app reached Freeze mutation and mass 18.3 / stage 2. Fixed cards inspected in portrait and maximized windows. Native screenshots sometimes stayed stale until resize despite gameplay advancing; do not diagnose input failure from an unchanged screenshot alone. Final source/PCK remain 2297/0 without card-anchor warnings.
-- **Important warnings:** Pixel 3 short samples around 8-14 FPS; ADB disconnected after diagnostic APK install, normal APK restoration unverified; no sustained performance or human enjoyment acceptance
-- **Affected files:** shaders/forest_canopy.gdshader,systems/WorldGenerator.gd,systems/TutorialManager.gd,ui/MutationDraftOverlay.gd,tests/test_full_game_integration.gd,docs/production/RELAXATION_FINISH_2026-11-02.md
-- **Git status:** M GAMEPLAY_STATUS.md
+- **Current focus:** Lake lab readiness review
+- **Last completed step:** 05_LAKE_READINESS.md, final comparison frames, checklist statuses, AGENT_START state, MASTER_PLAN lines, ADR-11042300
+- **What changed:** 05_LAKE_READINESS.md, final comparison frames, checklist statuses, AGENT_START state, MASTER_PLAN lines, ADR-11042300
+- **What needs verification:** run_qa.sh 3171 passed 0 failed; bot 6/6
+- **Next logical step:** Wait for owner evaluation
+- **Important warnings:** Android performance NOT TESTED (emulator aura36 unstable); ChatGPT downloads do not save from in-app browser; Blender lab extension conflicts on port 9876
+- **Affected files:** docs/production/05_LAKE_READINESS.md,docs/production/04_LAKE_DIRECTION_PLAN.md,SMUSH_AGENT_START.md,SMUSH_MASTER_PLAN.md,DECISIONS.md,reports/production/2_5d/compare_lake_final_v1.png
+- **Git status:** M .godot/global_script_class_cache.cfg
+ M AGENTS.md
+ M DECISIONS.md
+ M GAMEPLAY_STATUS.md
  M PROGRESS.md
  M PROJECT_STATE.md
+ M SMUSH_AGENT_START.md
+ M SMUSH_ASSET_PIPELINE.md
+ M SMUSH_MASTER_PLAN.md
  M TEST_REPORT.md
- M entities/CollectibleOrb.gd
- M entities/SlimeAura.gd
- M entities/claude/SlimeVisualClaude.gd
+ M export_presets.cfg
+ M graph/project_graph.json
  M memory/.project-memory.json
  M memory/CURRENT_CONTEXT.md
- M resources/localization/en.json
- M resources/localization/ru.json
- M scenes/ArenaController.gd
- M shaders/forest_canopy.gdshader
- M systems/TutorialManager.gd
- M systems/WorldGenerator.gd
- M tests/test_full_game_integration.gd
- M tools/style_swap_capture.gd
- M ui/CanopyForeground.gd
- M ui/MutationDraftOverlay.gd
-?? docs/production/RELAXATION_FINISH_2026-11-02.md
-?? docs/production/VERIFICATION_2026-11-02.md
-?? memory/sessions/2026-11-01_20-58_session.md
-?? memory/sessions/2026-11-02_00-24_verify-completion-of-relaxing-world-and-stage-8-.md
-?? reports/production/relaxation/
-?? reports/production/verification/
-?? resources/effects/
+ M project.godot
+ M scripts/labs/ClaudeVisualLab.gd
+ M scripts/run_qa.sh
+ M tests/TestRunner.gd
+ M tests/test_visual_lab.gd
+ M tools/build_pck.py
+?? .claude/
+?? .graphifyignore
+?? art_sources/
+?? audio/music/water/
+?? audio/sfx/water/
+?? docs/production/01_ART_DIRECTION.md
+?? docs/production/02_RENDER_SPIKE.md
+?? docs/production/03_HERO_AND_FOREST.md
+?? docs/production/04_LAKE_DIRECTION_PLAN.md
+?? docs/production/05_LAKE_READINESS.md
+?? docs/production/ART_PROMPT_STYLE.md
+?? docs/production/GROVE_FOOD_STUDY_2026-11-03.md
+?? graphify-out/
+?? memory/sessions/2026-11-03_09-01_grove-food-art-study.md
+?? memory/sessions/2026-11-03_17-16_plan-1-2-2-5d-handoff.md
+?? memory/sessions/2026-11-04_16-18_evaluate-lake-direction-concepts-only-no-asset-r.md
+?? memory/sessions/2026-11-04_16-19_lake-direction-approved-by-owner-propose-plan.md
+?? memory/sessions/2026-11-04_16-20_apply-approved-lake-plan-to-smush-agent-start.md
+?? memory/sessions/2026-11-04_16-32_lake-plan-step-0-water-shader-prototype.md
+?? memory/sessions/2026-11-04_17-02_lake-prototype-tuned-to-concept.md
+?? memory/sessions/2026-11-04_18-10_lake-plan-step-1-painted-water-kit.md
+?? memory/sessions/2026-11-04_18-20_lake-plan-step-2-painted-surface-sprites.md
+?? memory/sessions/2026-11-04_18-41_lake-plan-step-3-underwater-layer.md
+?? memory/sessions/2026-11-04_18-52_lake-plan-step-4-flooded-grove.md
+?? memory/sessions/2026-11-04_19-23_lake-plan-step-6-underwater-finale-dive.md
+?? memory/sessions/2026-11-04_19-45_lake-texture-memory-budget.md
+?? memory/sessions/2026-11-04_20-41_pre-integration-polish-in-lab-sound-glide-physic.md
+?? memory/sessions/2026-11-04_20-54_lake-lab-region-streaming.md
+?? memory/sessions/2026-11-04_21-04_lake-lab-zone-1-dewy-glade-prologue.md
+?? memory/sessions/2026-11-04_21-11_lake-lab-soft-collisions-and-current.md
+?? memory/sessions/2026-11-04_21-23_lake-lab-legends-rare-spirits-auras-lunar-nova.md
+?? memory/sessions/2026-11-04_21-28_lake-lab-real-enemies-boss-hazards-via-arena-con.md
+?? memory/sessions/2026-11-04_21-33_lake-lab-eat-real-enemies-boss-ram.md
+?? memory/sessions/2026-11-04_21-37_lake-lab-waves-and-difficulty-ramp.md
+?? memory/sessions/2026-11-04_21-44_lake-lab-mutations-on-the-painted-2-5d-hero.md
+?? memory/sessions/2026-11-04_21-50_lake-lab-evolution-xp-and-the-real-mutation-draf.md
+?? memory/sessions/2026-11-04_22-18_lake-lab-autoplay-bot-full-run-verification.md
+?? memory/sessions/2026-11-04_22-23_lake-lab-zone-music-and-synergies.md
+?? reports/production/2_5d/
+?? reports/production/art_direction/
+?? reports/production/grove-study/
+?? reports/production/hero_forest/
+?? reports/production/render_spike/
+?? resources/art/2_5d/
+?? resources/art/3d/
+?? scenes/labs/Glade25D.tscn
+?? scenes/labs/LakeProto25D.tscn
+?? scenes/labs/Render3DSpike.tscn
+?? scripts/labs/Glade25D.gd
+?? scripts/labs/Glade25D.gd.uid
+?? scripts/labs/GroveStudy.gd
+?? scripts/labs/GroveStudy.gd.uid
+?? scripts/labs/LakeAudio.gd
+?? scripts/labs/LakeAudio.gd.uid
+?? scripts/labs/LakeBot.gd
+?? scripts/labs/LakeBot.gd.uid
+?? scripts/labs/LakeCombat.gd
+?? scripts/labs/LakeCombat.gd.uid
+?? scripts/labs/LakeLegends.gd
+?? scripts/labs/LakeLegends.gd.uid
+?? scripts/labs/LakeMutations.gd
+?? scripts/labs/LakeMutations.gd.uid
+?? scripts/labs/LakeProto25D.gd
+?? scripts/labs/LakeProto25D.gd.uid
+?? scripts/labs/Render3DSpike.gd
+?? scripts/labs/Render3DSpike.gd.uid
+?? scripts/labs/Slime25D.gd
+?? scripts/labs/Slime25D.gd.uid
+?? shaders/fade_top.gdshader
+?? shaders/fade_top.gdshader.uid
+?? shaders/ground_blend.gdshader
+?? shaders/ground_blend.gdshader.uid
+?? shaders/ground_detail.gdshader
+?? shaders/ground_detail.gdshader.uid
+?? shaders/lake_reflect.gdshader
+?? shaders/lake_reflect.gdshader.uid
+?? shaders/lake_water.gdshader
+?? shaders/lake_water.gdshader.uid
+?? shaders/slime25d.gdshader
+?? shaders/slime25d.gdshader.uid
+?? shaders/spike/
+?? shaders/sway.gdshader
+?? shaders/sway.gdshader.uid
+?? tests/test_glade_25d.gd
+?? tests/test_glade_25d.gd.uid
+?? tests/test_lake_proto.gd
+?? tests/test_lake_proto.gd.uid
+?? tests/test_render_spike.gd
+?? tests/test_render_spike.gd.uid
+?? tools/cut_sprites.py
+?? tools/generate_water_music.py
+?? tools/generate_water_sfx.py
+?? tools/make_caustic_tile.py
+?? tools/make_detail_tile.py
+?? tools/process_water_kit.py
+?? tools/set_texture_compression.py
+?? tools/texture_budget.py

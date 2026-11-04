@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dcoht8k833yhq"
+
+[deps]
+
+files=["res://art_sources/2_5d/concepts/lake_direction/manifest.source.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.generator.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.license.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.prompt.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.date.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.editor.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.revision.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.approved.translation"]
+
+source_file="res://art_sources/2_5d/concepts/lake_direction/manifest.csv"
+dest_files=["res://art_sources/2_5d/concepts/lake_direction/manifest.source.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.generator.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.license.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.prompt.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.date.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.editor.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.revision.translation", "res://art_sources/2_5d/concepts/lake_direction/manifest.approved.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,10 @@
+# graphify: only code + docs. Images (~719, ~600 MB) and audio/video are excluded
+# (each image would need its own LLM subagent; audio is game SFX/music).
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.wav
+*.ogg
+*.mp3
+*.mp4

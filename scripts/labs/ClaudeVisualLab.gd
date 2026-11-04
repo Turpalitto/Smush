@@ -20,6 +20,8 @@ extends Node2D
 ##   CL_QUALITY=0|1|2    CL_STAGE=1..15 (default 8)   CL_UI=0|1 (default 0 when CL_SHOT)
 ##   CL_SIZE=WxH         CL_QUIT_AT=<sec> quit after that scenario time (movie mode)
 ##   CL_PERF=1           frame-time grid over style x quality, then quit
+##   CL_GROVE=moss|amber|dusk  opt-in calm-world art study (baseline by default)
+##   CL_FOOD=0|1|2        light / spores / minerals; CL_SCENE=food for a feed demo
 ##   Determinism: run with --fixed-fps 60 so the scenario clock advances 1/60 per frame.
 
 enum Style { OLD, CLAUDE, GLM, COMPARE }
@@ -41,6 +43,7 @@ class Subject extends RefCounted:
 	var electro_cd: float = 2.0
 	var tendril_tick: float = 0.0
 	var label: String = ""
+	var food_echo: GroveStudy.FoodEcho
 
 var style: int = Style.CLAUDE
 var quality: int = 2
@@ -82,16 +85,22 @@ var _quality_opt: OptionButton
 var _stage_slider: HSlider
 var _stage_lbl: Label
 var _mut_checks: Dictionary = {}
+var _grove: GroveStudy
+var _food_kind: int = 0
+var _grove_choice: OptionButton
 
 
 func _ready() -> void:
 	seed(20261025)
 	RenderingServer.set_default_clear_color(Color("#0d1714"))
-	_floor_tex = load(FLOOR_PATH) as Texture2D
+	_floor_tex = AssetRegistry.get_texture(FLOOR_PATH)
 	_floor_node = Node2D.new()
 	_floor_node.name = "Floor"
 	_floor_node.draw.connect(_draw_floor)
 	add_child(_floor_node)
+	_grove = GroveStudy.new()
+	add_child(_grove)
+	_set_grove(-1)
 
 	var headless_cap := not OS.get_environment("CL_SHOT").is_empty() or not OS.get_environment("CL_PERF").is_empty() or not OS.get_environment("CL_QUIT_AT").is_empty()
 	var ui_env := OS.get_environment("CL_UI")
@@ -148,6 +157,11 @@ func _rebuild_subjects() -> void:
 				sub.label = "CLAUDE"
 		sub.visual.name = "SlimeVisual"
 		sub.root.add_child(sub.visual)
+		if sub.visual is SlimeVisualClaude:
+			sub.food_echo = GroveStudy.FoodEcho.new()
+			sub.food_echo.visual = sub.visual as SlimeVisualClaude
+			sub.visual.add_child(sub.food_echo)
+			sub.visual.move_child(sub.food_echo, (sub.visual as SlimeVisualClaude)._eyes_rect.get_index())
 		subjects.append(sub)
 	for s in subjects:
 		_configure_subject(s)
@@ -221,6 +235,8 @@ func _process(delta: float) -> void:
 		_tick_subject(s, delta)
 	_update_camera(1.0 - exp(-6.0 * delta))
 	_floor_node.queue_redraw()
+	if _grove.visible:
+		_grove.update_view(cam_pos, zoom, EvolutionStages.env_for_mass(mass), sim_t)
 	_check_capture()
 
 	_info_tick += delta
@@ -231,6 +247,8 @@ func _process(delta: float) -> void:
 
 func _tick_subject(s: Subject, delta: float) -> void:
 	var v := s.visual
+	if s.food_echo != null:
+		s.food_echo.advance(delta)
 	s.vel = s.vel.lerp(s.target_vel, 1.0 - exp(-KICK_RESPONSE * delta))
 	if s.target_vel == Vector2.ZERO and s.vel.length() < 3.0:
 		s.vel = Vector2.ZERO
@@ -324,6 +342,8 @@ func prey_absorbed(pr: LabPrey) -> void:
 	else:
 		s.visual.trigger_gulp()
 	last_event_t["absorb"] = sim_t
+	if pr.food_kind >= 0 and s.food_echo != null:
+		s.food_echo.remember(pr.food_kind)
 
 
 ## --- demo actions (shared by UI, keys and scripted scenes) ------------------------------
@@ -334,6 +354,23 @@ func act_absorb(big: bool = false) -> void:
 		var r := s.visual.radius
 		var col := Color(1.0, 0.55, 0.62) if not big else Color(0.98, 0.82, 0.40)
 		spawn_prey(s, Vector2(side * (r + 62.0), randf_range(-24.0, 24.0)), LabPrey.PState.HOME, col, 14.0 if big else 9.0)
+
+
+func act_feed(kind: int) -> void:
+	for s in subjects:
+		var pr := spawn_prey(s, Vector2(s.visual.radius + 62.0, 18.0), LabPrey.PState.HOME,
+			GroveStudy.FOOD_COLORS[kind], 8.0)
+		pr.food_kind = kind
+
+
+func _set_grove(index: int) -> void:
+	_grove.visible = index >= 0
+	_grove._layer.visible = index >= 0
+	_floor_node.visible = index < 0
+	if _grove_choice != null:
+		_grove_choice.select(index + 1)
+	if index >= 0:
+		_grove.set_mood(index)
 
 
 func act_hurt() -> void:
@@ -386,6 +423,8 @@ func set_mutation(id: String, on: bool) -> void:
 
 func clear_prey() -> void:
 	for s in subjects:
+		if s.food_echo != null:
+			s.food_echo.echoes.clear()
 		for p in s.prey.get_children():
 			p.queue_free()
 
@@ -412,6 +451,8 @@ func _run_event(e: Dictionary) -> void:
 			act_kick(e["v"] as Vector2)
 		"absorb":
 			act_absorb(bool(e.get("big", false)))
+		"food":
+			act_feed(_food_kind)
 		"hurt":
 			act_hurt()
 		"evolve":
@@ -479,6 +520,8 @@ func start_showcase() -> void:
 func _scene_script(name: String) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	match name:
+		"food":
+			ev = [{"t": 0.2, "do": "food"}, {"t": 1.8, "do": "food"}, {"t": 3.4, "do": "food"}]
 		"motion":
 			ev = [{"t": 0.3, "do": "vel", "v": Vector2(330, 0)}]
 		"absorb":
@@ -565,6 +608,10 @@ func _apply_env_early() -> void:
 
 
 func _apply_env_late() -> void:
+	var grove_id := OS.get_environment("CL_GROVE")
+	if grove_id in ["moss", "amber", "dusk"]:
+		_set_grove(["moss", "amber", "dusk"].find(grove_id))
+	_food_kind = clampi(int(OS.get_environment("CL_FOOD")), 0, 2)
 	set_mass_from_stage(stage_t)
 	_stage_slider.set_value_no_signal(stage_t)
 	_stage_lbl.text = "%.1f" % stage_t
@@ -594,8 +641,11 @@ func _apply_env_late() -> void:
 
 
 func _check_capture() -> void:
+	if _captured:
+		return
 	if _quit_at >= 0.0 and sim_t >= _quit_at and _capture_path.is_empty():
-		get_tree().quit(0)
+		_captured = true
+		_finish_capture(0)
 		return
 	if _capture_path.is_empty() or _captured:
 		return
@@ -623,7 +673,19 @@ func _check_capture() -> void:
 	var err := img.save_png(_capture_path)
 	print("CL_SHOT %s %dx%d style=%s stage=%.1f mass=%.1f quality=%d t=%.3f err=%d" % [
 		_capture_path, img.get_width(), img.get_height(), str(style), stage_t, mass, quality, sim_t, err])
-	get_tree().quit(0 if err == OK else 4)
+	_finish_capture(0 if err == OK else 4)
+
+
+func _finish_capture(code: int) -> void:
+	# Allow the audio thread to release active Vorbis streams before standalone exit.
+	Audio.set_process(false)
+	for child in Audio.get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+			child.stream = null
+	for _i in range(8):
+		await get_tree().process_frame
+	get_tree().quit(code)
 
 
 func _run_perf() -> void:
@@ -798,6 +860,25 @@ func _build_ui() -> Control:
 	cp.pressed.connect(clear_prey)
 	row6.add_child(cp)
 	box.add_child(row6)
+	var grove_row := HBoxContainer.new()
+	_grove_choice = OptionButton.new()
+	_grove_choice.add_item("Исходный фон")
+	for title in GroveStudy.NAMES:
+		_grove_choice.add_item(title)
+	_grove_choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_grove_choice.item_selected.connect(func(i: int) -> void: _set_grove(i - 1))
+	grove_row.add_child(_grove_choice)
+	box.add_child(grove_row)
+	var food_row := HBoxContainer.new()
+	for i in range(GroveStudy.FOOD_NAMES.size()):
+		var feed := Button.new()
+		feed.text = GroveStudy.FOOD_NAMES[i]
+		feed.add_theme_font_size_override("font_size", 16)
+		feed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var kind := i
+		feed.pressed.connect(func() -> void: act_feed(kind))
+		food_row.add_child(feed)
+	box.add_child(food_row)
 	return root
 
 
@@ -862,6 +943,7 @@ class LabPrey extends Node2D:
 	var state: int = PState.HOME
 	var body_color: Color = Color(1.0, 0.55, 0.62)
 	var radius_px: float = 9.0
+	var food_kind: int = -1
 	var is_target_dummy: bool = false
 	var _phase: float = 0.0
 	var _flinch: float = 0.0

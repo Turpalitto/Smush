@@ -1,0 +1,721 @@
+{
+  ".claude/hooks/confirm-git-writes.py": {
+    "mtime": 1793810720.1898823,
+    "seen": 1793813039.690262,
+    "ast_hash": "28631ec0c11e5da6ded339265e656cbb",
+    "semantic_hash": "28631ec0c11e5da6ded339265e656cbb"
+  },
+  ".claude/settings.json": {
+    "mtime": 1793810720.758152,
+    "seen": 1793813039.690349,
+    "ast_hash": "f12860ac2f286a902586d700549602dc",
+    "semantic_hash": "f12860ac2f286a902586d700549602dc",
+    "ast_empty": true
+  },
+  ".github/workflows/android-build.yml": {
+    "mtime": 1792766642.8933997,
+    "seen": 1793813039.6903522,
+    "ast_hash": "98811f83bb512d279215b33ab7b2f245",
+    "semantic_hash": "98811f83bb512d279215b33ab7b2f245"
+  },
+  ".github/workflows/android-package.yml": {
+    "mtime": 1792948705.5304809,
+    "seen": 1793813039.690389,
+    "ast_hash": "cf1073d0d7a0590e1679c1e269aaf36e",
+    "semantic_hash": "cf1073d0d7a0590e1679c1e269aaf36e"
+  },
+  "graph/project_graph.json": {
+    "mtime": 1793678489.0047333,
+    "seen": 1793813039.690423,
+    "ast_hash": "f2ea4fa75e31df759ab799a1781812e2",
+    "semantic_hash": "f2ea4fa75e31df759ab799a1781812e2",
+    "ast_empty": true
+  },
+  "memory/.project-memory.json": {
+    "mtime": 1793813013.3829336,
+    "seen": 1793813039.690424,
+    "ast_hash": "36a794c1775c8e0e9abaac87aedcb4d9",
+    "semantic_hash": "36a794c1775c8e0e9abaac87aedcb4d9",
+    "ast_empty": true
+  },
+  "reports/production/baseline/2026-11-01/main/manifest.json": {
+    "mtime": 1793543457.2018101,
+    "seen": 1793813039.6904252,
+    "ast_hash": "c0a919dc41144ca2559899df3a5af70d",
+    "semantic_hash": "c0a919dc41144ca2559899df3a5af70d"
+  },
+  "resources/data/difficulties.json": {
+    "mtime": 1792766643.150806,
+    "seen": 1793813039.690468,
+    "ast_hash": "1499f90d9f12ea9677c51f3398e79c8a",
+    "semantic_hash": "1499f90d9f12ea9677c51f3398e79c8a",
+    "ast_empty": true
+  },
+  "resources/data/enemies.json": {
+    "mtime": 1792766643.1509125,
+    "seen": 1793813039.690469,
+    "ast_hash": "390d6bf5009fc24de5d062c289f8bffb",
+    "semantic_hash": "390d6bf5009fc24de5d062c289f8bffb",
+    "ast_empty": true
+  },
+  "resources/data/meta_progression.json": {
+    "mtime": 1792766643.1510017,
+    "seen": 1793813039.69047,
+    "ast_hash": "5a018b3983110e431b5af5b21ff87488",
+    "semantic_hash": "5a018b3983110e431b5af5b21ff87488",
+    "ast_empty": true
+  },
+  "resources/data/mutations.json": {
+    "mtime": 1792766643.1510768,
+    "seen": 1793813039.690471,
+    "ast_hash": "f970151fda9dadda8281da7a91206d1e",
+    "semantic_hash": "f970151fda9dadda8281da7a91206d1e",
+    "ast_empty": true
+  },
+  "resources/data/synergies.json": {
+    "mtime": 1792682008.9196045,
+    "seen": 1793813039.690472,
+    "ast_hash": "29099341120e4212849e0c7f031663f9",
+    "semantic_hash": "29099341120e4212849e0c7f031663f9",
+    "ast_empty": true
+  },
+  "resources/localization/en.json": {
+    "mtime": 1793562260.8075788,
+    "seen": 1793813039.6904728,
+    "ast_hash": "c587d21e78ab8a1dca334ea68757f659",
+    "semantic_hash": "c587d21e78ab8a1dca334ea68757f659",
+    "ast_empty": true
+  },
+  "resources/localization/ru.json": {
+    "mtime": 1793562260.8068929,
+    "seen": 1793813039.690474,
+    "ast_hash": "51c4d1e6f68d5b5e35fdd89870deeb96",
+    "semantic_hash": "51c4d1e6f68d5b5e35fdd89870deeb96",
+    "ast_empty": true
+  },
+  "scripts/build_android.sh": {
+    "mtime": 1792766643.15442,
+    "seen": 1793813039.690475,
+    "ast_hash": "0fe03ce099f754f5cefd5b3d15efd104",
+    "semantic_hash": "0fe03ce099f754f5cefd5b3d15efd104"
+  },
+  "scripts/build_linux_playtest.sh": {
+    "mtime": 1792766643.154481,
+    "seen": 1793813039.6905012,
+    "ast_hash": "f763fbf014d565e2875ced8710b78f80",
+    "semantic_hash": "f763fbf014d565e2875ced8710b78f80"
+  },
+  "scripts/build_macos_playtest.sh": {
+    "mtime": 1792766643.154584,
+    "seen": 1793813039.6905248,
+    "ast_hash": "7b0ed1a26a4db9046d2c356ec49be684",
+    "semantic_hash": "7b0ed1a26a4db9046d2c356ec49be684"
+  },
+  "scripts/build_verification_zip.sh": {
+    "mtime": 1792766643.1546397,
+    "seen": 1793813039.690547,
+    "ast_hash": "884c02114b1c391d3a1a051f50dcddaa",
+    "semantic_hash": "884c02114b1c391d3a1a051f50dcddaa"
+  },
+  "scripts/run_automated_playthrough.sh": {
+    "mtime": 1792766643.1546912,
+    "seen": 1793813039.690568,
+    "ast_hash": "c2511299bb99f7b13946533ae3b2b823",
+    "semantic_hash": "c2511299bb99f7b13946533ae3b2b823"
+  },
+  "scripts/run_macos_perf.sh": {
+    "mtime": 1792766643.1547406,
+    "seen": 1793813039.690589,
+    "ast_hash": "73b7e198b235f2837417d0e9a396344a",
+    "semantic_hash": "73b7e198b235f2837417d0e9a396344a"
+  },
+  "scripts/run_macos_playthrough.sh": {
+    "mtime": 1792766643.154791,
+    "seen": 1793813039.69061,
+    "ast_hash": "73d8b06df23231183d992acb53bdd8d2",
+    "semantic_hash": "73d8b06df23231183d992acb53bdd8d2"
+  },
+  "scripts/run_qa.sh": {
+    "mtime": 1793812392.5986774,
+    "seen": 1793813039.690631,
+    "ast_hash": "8ec77a95dec6835a05f9d8110c4ddb32",
+    "semantic_hash": "8ec77a95dec6835a05f9d8110c4ddb32"
+  },
+  "scripts/run_rendered_check.sh": {
+    "mtime": 1792766643.1549044,
+    "seen": 1793813039.690652,
+    "ast_hash": "8ac1b1096b75fbd735c6fdbb45e22205",
+    "semantic_hash": "8ac1b1096b75fbd735c6fdbb45e22205"
+  },
+  "tools/android_preflight.py": {
+    "mtime": 1792766643.162019,
+    "seen": 1793813039.6906738,
+    "ast_hash": "c2b98eef08efd5869db4811ba04aa686",
+    "semantic_hash": "c2b98eef08efd5869db4811ba04aa686"
+  },
+  "tools/bake_canopy_light.py": {
+    "mtime": 1792778282.8450477,
+    "seen": 1793813039.690697,
+    "ast_hash": "735024771124ffa0dba8607473488c15",
+    "semantic_hash": "735024771124ffa0dba8607473488c15"
+  },
+  "tools/bake_caustics.py": {
+    "mtime": 1792772180.325148,
+    "seen": 1793813039.690718,
+    "ast_hash": "1799630f37521fa28913f4006420813d",
+    "semantic_hash": "1799630f37521fa28913f4006420813d"
+  },
+  "tools/bake_floor_ao.py": {
+    "mtime": 1792766643.1639009,
+    "seen": 1793813039.690739,
+    "ast_hash": "5dfa8c8a822511b052281511cabebad3",
+    "semantic_hash": "5dfa8c8a822511b052281511cabebad3"
+  },
+  "tools/build_pck.py": {
+    "mtime": 1793706078.3832524,
+    "seen": 1793813039.69076,
+    "ast_hash": "c902f5fe91d2febce84f3693e9aa2acf",
+    "semantic_hash": "c902f5fe91d2febce84f3693e9aa2acf"
+  },
+  "tools/claude_crop.py": {
+    "mtime": 1793542805.2340255,
+    "seen": 1793813039.69078,
+    "ast_hash": "32242994e6d9f6b2751d630627a9cf24",
+    "semantic_hash": "32242994e6d9f6b2751d630627a9cf24"
+  },
+  "tools/claude_shot.sh": {
+    "mtime": 1793542805.234259,
+    "seen": 1793813039.690801,
+    "ast_hash": "01f5e58cd20932305eb7e11f97992cd8",
+    "semantic_hash": "01f5e58cd20932305eb7e11f97992cd8"
+  },
+  "tools/configure_android.py": {
+    "mtime": 1792766643.164367,
+    "seen": 1793813039.6908228,
+    "ast_hash": "3ae5ecc8b301abb69bc32ea3ecbeccfa",
+    "semantic_hash": "3ae5ecc8b301abb69bc32ea3ecbeccfa"
+  },
+  "tools/cut_sprites.py": {
+    "mtime": 1793808087.7535026,
+    "seen": 1793813039.6908429,
+    "ast_hash": "f5c782438352425c29d40e02c349b716",
+    "semantic_hash": "f5c782438352425c29d40e02c349b716"
+  },
+  "tools/generate_assets.py": {
+    "mtime": 1792682008.9287262,
+    "seen": 1793813039.690864,
+    "ast_hash": "1b6cb0c9dc643c31f2199f1b75366c32",
+    "semantic_hash": "1b6cb0c9dc643c31f2199f1b75366c32"
+  },
+  "tools/generate_evolution_bells.py": {
+    "mtime": 1792766643.1651385,
+    "seen": 1793813039.690884,
+    "ast_hash": "1f09e40522cfe2802e84e87899588646",
+    "semantic_hash": "1f09e40522cfe2802e84e87899588646"
+  },
+  "tools/generate_floor_texture.py": {
+    "mtime": 1792766643.1653051,
+    "seen": 1793813039.690905,
+    "ast_hash": "84fabc08fa267d8adf7f4aebe8121548",
+    "semantic_hash": "84fabc08fa267d8adf7f4aebe8121548"
+  },
+  "tools/generate_grove_breath.py": {
+    "mtime": 1792776440.1464875,
+    "seen": 1793813039.690926,
+    "ast_hash": "74d4156a3c37882e9f6cdfc1bb122fa3",
+    "semantic_hash": "74d4156a3c37882e9f6cdfc1bb122fa3"
+  },
+  "tools/generate_music.py": {
+    "mtime": 1792772180.325289,
+    "seen": 1793813039.6909509,
+    "ast_hash": "109816b36919fc958f112e40b16d29e2",
+    "semantic_hash": "109816b36919fc958f112e40b16d29e2"
+  },
+  "tools/generate_orb_chimes.py": {
+    "mtime": 1792772180.3253825,
+    "seen": 1793813039.690971,
+    "ast_hash": "102953ad3b453a5f52f05827afddc9db",
+    "semantic_hash": "102953ad3b453a5f52f05827afddc9db"
+  },
+  "tools/generate_water_music.py": {
+    "mtime": 1793812866.83157,
+    "seen": 1793813039.6909928,
+    "ast_hash": "7be6c63a8a5ce177deaf1e1fa57d7f79",
+    "semantic_hash": "7be6c63a8a5ce177deaf1e1fa57d7f79"
+  },
+  "tools/generate_water_sfx.py": {
+    "mtime": 1793806670.7759519,
+    "seen": 1793813039.691013,
+    "ast_hash": "e08390971d8130261ceac28ccf85581c",
+    "semantic_hash": "e08390971d8130261ceac28ccf85581c"
+  },
+  "tools/generate_wonder_chord.py": {
+    "mtime": 1792775085.5962873,
+    "seen": 1793813039.691034,
+    "ast_hash": "501cab202ec8131261c25f456fc11434",
+    "semantic_hash": "501cab202ec8131261c25f456fc11434"
+  },
+  "tools/growth_ladder_sheet.py": {
+    "mtime": 1792766643.1656275,
+    "seen": 1793813039.691056,
+    "ast_hash": "944bcc3e6706803c09cf74823ca96dab",
+    "semantic_hash": "944bcc3e6706803c09cf74823ca96dab"
+  },
+  "tools/install_admob.py": {
+    "mtime": 1792903801.0215025,
+    "seen": 1793813039.6910799,
+    "ast_hash": "443a44b52e9926347d4ddb8b6af43a0b",
+    "semantic_hash": "443a44b52e9926347d4ddb8b6af43a0b"
+  },
+  "tools/install_android_template.py": {
+    "mtime": 1792766643.1658714,
+    "seen": 1793813039.6911008,
+    "ast_hash": "7533683859bfd4cbdcb0de8b5c40ee26",
+    "semantic_hash": "7533683859bfd4cbdcb0de8b5c40ee26"
+  },
+  "tools/make_caustic_tile.py": {
+    "mtime": 1793791525.207957,
+    "seen": 1793813039.6911218,
+    "ast_hash": "33e63f5b908bd6b90593ba23eb7ef079",
+    "semantic_hash": "33e63f5b908bd6b90593ba23eb7ef079"
+  },
+  "tools/make_detail_tile.py": {
+    "mtime": 1793717563.8487887,
+    "seen": 1793813039.6911418,
+    "ast_hash": "41dba80333d0e187925d47e656786f26",
+    "semantic_hash": "41dba80333d0e187925d47e656786f26"
+  },
+  "tools/process_creature_art.py": {
+    "mtime": 1792766643.1663394,
+    "seen": 1793813039.6911628,
+    "ast_hash": "bc3c88fd761345953b8718c9c92fcb11",
+    "semantic_hash": "bc3c88fd761345953b8718c9c92fcb11"
+  },
+  "tools/process_water_kit.py": {
+    "mtime": 1793809199.8760023,
+    "seen": 1793813039.691185,
+    "ast_hash": "9efef3769d185129c38680626406bff0",
+    "semantic_hash": "9efef3769d185129c38680626406bff0"
+  },
+  "tools/set_texture_compression.py": {
+    "mtime": 1793802239.8967845,
+    "seen": 1793813039.691206,
+    "ast_hash": "1404dc743ff978e7b1bf0e282bbacc82",
+    "semantic_hash": "1404dc743ff978e7b1bf0e282bbacc82"
+  },
+  "tools/style_swap_acceptance.sh": {
+    "mtime": 1792945713.8421073,
+    "seen": 1793813039.691228,
+    "ast_hash": "cc205a10820f8e3e7260477e3e30e258",
+    "semantic_hash": "cc205a10820f8e3e7260477e3e30e258"
+  },
+  "tools/sync_godot_cache.py": {
+    "mtime": 1792766643.1669898,
+    "seen": 1793813039.691254,
+    "ast_hash": "7c6a0ff78c7092938587554ed36ad49f",
+    "semantic_hash": "7c6a0ff78c7092938587554ed36ad49f"
+  },
+  "tools/texture_budget.py": {
+    "mtime": 1793802221.1984339,
+    "seen": 1793813039.691274,
+    "ast_hash": "2a22af62fd3fa87fdc696d838db7d104",
+    "semantic_hash": "2a22af62fd3fa87fdc696d838db7d104"
+  },
+  "tools/wonder_manifest.json": {
+    "mtime": 1792775085.5964837,
+    "seen": 1793813039.691295,
+    "ast_hash": "01b3d5b2d9fd067be104af605c935a20",
+    "semantic_hash": "01b3d5b2d9fd067be104af605c935a20",
+    "ast_empty": true
+  },
+  "audio/music/forest_breath.ogg": {
+    "mtime": 1792776423.7573264,
+    "seen": 1793813039.691296,
+    "ast_hash": "eff71fd80dd2351e5ecd7cee6fcec6ab",
+    "semantic_hash": "eff71fd80dd2351e5ecd7cee6fcec6ab"
+  },
+  "audio/music/theme_boss.ogg": {
+    "mtime": 1792766642.9007213,
+    "seen": 1793813039.691324,
+    "ast_hash": "873c1ffa01883d7531d86d8e5286d813",
+    "semantic_hash": "873c1ffa01883d7531d86d8e5286d813"
+  },
+  "audio/music/theme_menu.ogg": {
+    "mtime": 1792766642.9028256,
+    "seen": 1793813039.691348,
+    "ast_hash": "468301ec7bb7ef23eee587e258dd0f28",
+    "semantic_hash": "468301ec7bb7ef23eee587e258dd0f28"
+  },
+  "audio/music/theme_run.ogg": {
+    "mtime": 1792766642.905601,
+    "seen": 1793813039.691372,
+    "ast_hash": "9252aa1d895d567c8d7715e1c12c6716",
+    "semantic_hash": "9252aa1d895d567c8d7715e1c12c6716"
+  },
+  "audio/music/theme_zen.ogg": {
+    "mtime": 1792772180.3186975,
+    "seen": 1793813039.691396,
+    "ast_hash": "2b2515ee4248c5a9bce551707964a4ab",
+    "semantic_hash": "2b2515ee4248c5a9bce551707964a4ab"
+  },
+  "audio/music/water/water_finale.ogg": {
+    "mtime": 1793812876.1352649,
+    "seen": 1793813039.691419,
+    "ast_hash": "31483c94114223f7464f1e9596106691",
+    "semantic_hash": "31483c94114223f7464f1e9596106691"
+  },
+  "audio/music/water/water_glade.ogg": {
+    "mtime": 1793812869.78562,
+    "seen": 1793813039.691446,
+    "ast_hash": "ba8a53abb6bdc8353fa9d2fae7576443",
+    "semantic_hash": "ba8a53abb6bdc8353fa9d2fae7576443"
+  },
+  "audio/music/water/water_grove.ogg": {
+    "mtime": 1793812871.563788,
+    "seen": 1793813039.691471,
+    "ast_hash": "e4e95b39eee3ef4e843163f7a975bd7b",
+    "semantic_hash": "e4e95b39eee3ef4e843163f7a975bd7b"
+  },
+  "audio/music/water/water_lake.ogg": {
+    "mtime": 1793812873.6126723,
+    "seen": 1793813039.6914968,
+    "ast_hash": "ccc504f6ced0903df42fd2da1f7329bf",
+    "semantic_hash": "ccc504f6ced0903df42fd2da1f7329bf"
+  },
+  "audio/sfx/absorb.wav": {
+    "mtime": 1792682008.9148254,
+    "seen": 1793813039.691524,
+    "ast_hash": "ad56888ea0de57dd41eb2b154df3dd12",
+    "semantic_hash": "ad56888ea0de57dd41eb2b154df3dd12"
+  },
+  "audio/sfx/attack.wav": {
+    "mtime": 1792682008.9149039,
+    "seen": 1793813039.6915479,
+    "ast_hash": "a384ed16491e6d5223851d8916b7093f",
+    "semantic_hash": "a384ed16491e6d5223851d8916b7093f"
+  },
+  "audio/sfx/boss_warning.wav": {
+    "mtime": 1792682008.9150658,
+    "seen": 1793813039.691572,
+    "ast_hash": "aa9dc19f91440fbed4ad744844bd27cc",
+    "semantic_hash": "aa9dc19f91440fbed4ad744844bd27cc"
+  },
+  "audio/sfx/button_click.wav": {
+    "mtime": 1792682008.9151378,
+    "seen": 1793813039.691595,
+    "ast_hash": "73d1bf72996a514573670fb34c55b685",
+    "semantic_hash": "73d1bf72996a514573670fb34c55b685"
+  },
+  "audio/sfx/defeat.wav": {
+    "mtime": 1792682008.9153285,
+    "seen": 1793813039.691617,
+    "ast_hash": "f0064c1840a9a7de3eb477c37744a32f",
+    "semantic_hash": "f0064c1840a9a7de3eb477c37744a32f"
+  },
+  "audio/sfx/evo_01.wav": {
+    "mtime": 1792766642.9070344,
+    "seen": 1793813039.6916428,
+    "ast_hash": "2c56818344fd6e9ce6fce0806efc0075",
+    "semantic_hash": "2c56818344fd6e9ce6fce0806efc0075"
+  },
+  "audio/sfx/evo_02.wav": {
+    "mtime": 1792766642.9078288,
+    "seen": 1793813039.6916668,
+    "ast_hash": "70b7500efe431e13f07258061ce3083f",
+    "semantic_hash": "70b7500efe431e13f07258061ce3083f"
+  },
+  "audio/sfx/evo_03.wav": {
+    "mtime": 1792766642.9086354,
+    "seen": 1793813039.691692,
+    "ast_hash": "74b475d16b22d5ec65277bfd10405f30",
+    "semantic_hash": "74b475d16b22d5ec65277bfd10405f30"
+  },
+  "audio/sfx/evo_04.wav": {
+    "mtime": 1792766642.9095223,
+    "seen": 1793813039.691714,
+    "ast_hash": "9449345d1525f7fbd3b690d7d3106a5b",
+    "semantic_hash": "9449345d1525f7fbd3b690d7d3106a5b"
+  },
+  "audio/sfx/evo_05.wav": {
+    "mtime": 1792766642.9099507,
+    "seen": 1793813039.6917372,
+    "ast_hash": "46674b4fdf4e7a50150cb9ba5ccb3c78",
+    "semantic_hash": "46674b4fdf4e7a50150cb9ba5ccb3c78"
+  },
+  "audio/sfx/evo_06.wav": {
+    "mtime": 1792766642.9105613,
+    "seen": 1793813039.691759,
+    "ast_hash": "6d3377acc07901821fa5916b29a32d7d",
+    "semantic_hash": "6d3377acc07901821fa5916b29a32d7d"
+  },
+  "audio/sfx/evo_07.wav": {
+    "mtime": 1792766642.9110973,
+    "seen": 1793813039.691781,
+    "ast_hash": "9cca882c93ec31943975146e2b005af7",
+    "semantic_hash": "9cca882c93ec31943975146e2b005af7"
+  },
+  "audio/sfx/evo_08.wav": {
+    "mtime": 1792766642.9115565,
+    "seen": 1793813039.691804,
+    "ast_hash": "1afe2a7b832eb09bbf23c214f46ea533",
+    "semantic_hash": "1afe2a7b832eb09bbf23c214f46ea533"
+  },
+  "audio/sfx/evo_09.wav": {
+    "mtime": 1792766642.9120386,
+    "seen": 1793813039.6918259,
+    "ast_hash": "058e39a9e3b9ac51241b5b89460abe01",
+    "semantic_hash": "058e39a9e3b9ac51241b5b89460abe01"
+  },
+  "audio/sfx/evo_10.wav": {
+    "mtime": 1792766642.9122925,
+    "seen": 1793813039.691848,
+    "ast_hash": "9b66cccf865b823b91195578456aa767",
+    "semantic_hash": "9b66cccf865b823b91195578456aa767"
+  },
+  "audio/sfx/evo_11.wav": {
+    "mtime": 1792766642.9127004,
+    "seen": 1793813039.691873,
+    "ast_hash": "ba4048143ec8c194fbf8abdfe859ac90",
+    "semantic_hash": "ba4048143ec8c194fbf8abdfe859ac90"
+  },
+  "audio/sfx/evo_12.wav": {
+    "mtime": 1792766642.9129417,
+    "seen": 1793813039.6918972,
+    "ast_hash": "939abf9d551a33351e098f33b171e005",
+    "semantic_hash": "939abf9d551a33351e098f33b171e005"
+  },
+  "audio/sfx/evo_13.wav": {
+    "mtime": 1792766642.9132915,
+    "seen": 1793813039.6919198,
+    "ast_hash": "b96bf3f6208e0f0aa83c8a86d0103ea0",
+    "semantic_hash": "b96bf3f6208e0f0aa83c8a86d0103ea0"
+  },
+  "audio/sfx/evo_14.wav": {
+    "mtime": 1792766642.9136417,
+    "seen": 1793813039.691942,
+    "ast_hash": "6c3dfe6fa2853087acdae226ba747c02",
+    "semantic_hash": "6c3dfe6fa2853087acdae226ba747c02"
+  },
+  "audio/sfx/evo_15.wav": {
+    "mtime": 1792766642.9140987,
+    "seen": 1793813039.6919649,
+    "ast_hash": "6f4fe6d6501a5154d16f2846e71973f9",
+    "semantic_hash": "6f4fe6d6501a5154d16f2846e71973f9"
+  },
+  "audio/sfx/evolution.wav": {
+    "mtime": 1792682008.9154897,
+    "seen": 1793813039.691987,
+    "ast_hash": "3dbef7eeba73ad419cf8229e89fdd5ab",
+    "semantic_hash": "3dbef7eeba73ad419cf8229e89fdd5ab"
+  },
+  "audio/sfx/hurt.wav": {
+    "mtime": 1792682008.9156034,
+    "seen": 1793813039.692009,
+    "ast_hash": "8ef1c08e182972ec03ecf4227900d015",
+    "semantic_hash": "8ef1c08e182972ec03ecf4227900d015"
+  },
+  "audio/sfx/move_pulse.wav": {
+    "mtime": 1792682008.9156988,
+    "seen": 1793813039.692032,
+    "ast_hash": "4ca8fa4568b153555730839532e2aace",
+    "semantic_hash": "4ca8fa4568b153555730839532e2aace"
+  },
+  "audio/sfx/mutation_pick.wav": {
+    "mtime": 1792682008.9158196,
+    "seen": 1793813039.692054,
+    "ast_hash": "963eebb3b507dc88e7fea070a24eb368",
+    "semantic_hash": "963eebb3b507dc88e7fea070a24eb368"
+  },
+  "audio/sfx/orb_chime_01.wav": {
+    "mtime": 1792772180.3189955,
+    "seen": 1793813039.692078,
+    "ast_hash": "184d1e68c56107b7a4ce0907085370d3",
+    "semantic_hash": "184d1e68c56107b7a4ce0907085370d3"
+  },
+  "audio/sfx/orb_chime_02.wav": {
+    "mtime": 1792772180.3192527,
+    "seen": 1793813039.692101,
+    "ast_hash": "e10e8f247cfdb61585c8981a5106b6ab",
+    "semantic_hash": "e10e8f247cfdb61585c8981a5106b6ab"
+  },
+  "audio/sfx/orb_chime_03.wav": {
+    "mtime": 1792772180.3194766,
+    "seen": 1793813039.692124,
+    "ast_hash": "e3230c0640b7cd26480e9fc2acce237e",
+    "semantic_hash": "e3230c0640b7cd26480e9fc2acce237e"
+  },
+  "audio/sfx/orb_chime_04.wav": {
+    "mtime": 1792772180.3196933,
+    "seen": 1793813039.6921458,
+    "ast_hash": "3a84341df1f4b315c837bc36304c8dc4",
+    "semantic_hash": "3a84341df1f4b315c837bc36304c8dc4"
+  },
+  "audio/sfx/orb_chime_05.wav": {
+    "mtime": 1792772180.319903,
+    "seen": 1793813039.692169,
+    "ast_hash": "64c8bb0a88ad08e103a8b70ce8638ade",
+    "semantic_hash": "64c8bb0a88ad08e103a8b70ce8638ade"
+  },
+  "audio/sfx/orb_chime_06.wav": {
+    "mtime": 1792772180.320131,
+    "seen": 1793813039.692191,
+    "ast_hash": "0e7aac18cc349c48dc3c84970b719d98",
+    "semantic_hash": "0e7aac18cc349c48dc3c84970b719d98"
+  },
+  "audio/sfx/orb_chime_07.wav": {
+    "mtime": 1792772180.3203611,
+    "seen": 1793813039.692213,
+    "ast_hash": "78a820e65a9bd8f52f3b5b28d1596bbc",
+    "semantic_hash": "78a820e65a9bd8f52f3b5b28d1596bbc"
+  },
+  "audio/sfx/orb_chime_08.wav": {
+    "mtime": 1792772180.320564,
+    "seen": 1793813039.692235,
+    "ast_hash": "03b0f8caae28ac01f59a133e38176e0f",
+    "semantic_hash": "03b0f8caae28ac01f59a133e38176e0f"
+  },
+  "audio/sfx/shield_break.wav": {
+    "mtime": 1792682008.915908,
+    "seen": 1793813039.692257,
+    "ast_hash": "dc5ad7fa8482f8edf134fa8b9fb1d105",
+    "semantic_hash": "dc5ad7fa8482f8edf134fa8b9fb1d105"
+  },
+  "audio/sfx/victory.wav": {
+    "mtime": 1792682008.9160979,
+    "seen": 1793813039.692279,
+    "ast_hash": "a482a65a87354421ef7942d8d2216a97",
+    "semantic_hash": "a482a65a87354421ef7942d8d2216a97"
+  },
+  "audio/sfx/water/ambience_surface.wav": {
+    "mtime": 1793806671.780949,
+    "seen": 1793813039.6923032,
+    "ast_hash": "ad5c0e5b17fbde7cd0e71ed98044e9ce",
+    "semantic_hash": "ad5c0e5b17fbde7cd0e71ed98044e9ce"
+  },
+  "audio/sfx/water/ambience_underwater.wav": {
+    "mtime": 1793806672.034723,
+    "seen": 1793813039.69233,
+    "ast_hash": "e900753c859d13e5174bd6e7235a5b0f",
+    "semantic_hash": "e900753c859d13e5174bd6e7235a5b0f"
+  },
+  "audio/sfx/water/water_bubble_01.wav": {
+    "mtime": 1793806671.3179932,
+    "seen": 1793813039.692356,
+    "ast_hash": "3b0bca5c51c74c58254897e29777ef75",
+    "semantic_hash": "3b0bca5c51c74c58254897e29777ef75"
+  },
+  "audio/sfx/water/water_bubble_02.wav": {
+    "mtime": 1793806671.3186743,
+    "seen": 1793813039.692383,
+    "ast_hash": "be80a73596dbffd2f26e44da3180a505",
+    "semantic_hash": "be80a73596dbffd2f26e44da3180a505"
+  },
+  "audio/sfx/water/water_bubble_03.wav": {
+    "mtime": 1793806671.3193476,
+    "seen": 1793813039.692408,
+    "ast_hash": "348bb6f1d5bd93f971d15c1ee00c149b",
+    "semantic_hash": "348bb6f1d5bd93f971d15c1ee00c149b"
+  },
+  "audio/sfx/water/water_dive.wav": {
+    "mtime": 1793806671.3864498,
+    "seen": 1793813039.692432,
+    "ast_hash": "271a1a1efd76e53b06bbb8ffdd5e3310",
+    "semantic_hash": "271a1a1efd76e53b06bbb8ffdd5e3310"
+  },
+  "audio/sfx/water/water_drip_01.wav": {
+    "mtime": 1793806671.30641,
+    "seen": 1793813039.692457,
+    "ast_hash": "ee91a685001a2f55c8e240735eb64ba7",
+    "semantic_hash": "ee91a685001a2f55c8e240735eb64ba7"
+  },
+  "audio/sfx/water/water_drip_02.wav": {
+    "mtime": 1793806671.3110335,
+    "seen": 1793813039.692482,
+    "ast_hash": "b58f12975468d20949fb17275ceb56df",
+    "semantic_hash": "b58f12975468d20949fb17275ceb56df"
+  },
+  "audio/sfx/water/water_drip_03.wav": {
+    "mtime": 1793806671.3158429,
+    "seen": 1793813039.692506,
+    "ast_hash": "b0b6b4d521dd0432e283ec154fbf887e",
+    "semantic_hash": "b0b6b4d521dd0432e283ec154fbf887e"
+  },
+  "audio/sfx/water/water_glide.wav": {
+    "mtime": 1793806672.2074215,
+    "seen": 1793813039.692535,
+    "ast_hash": "632386115a951d93ea5c6d6e52cec1c4",
+    "semantic_hash": "632386115a951d93ea5c6d6e52cec1c4"
+  },
+  "audio/sfx/water/water_plip_01.wav": {
+    "mtime": 1793806671.3164928,
+    "seen": 1793813039.6925619,
+    "ast_hash": "e117c29f5aa96cfe9ff1572822363e2a",
+    "semantic_hash": "e117c29f5aa96cfe9ff1572822363e2a"
+  },
+  "audio/sfx/water/water_plip_02.wav": {
+    "mtime": 1793806671.3170266,
+    "seen": 1793813039.692588,
+    "ast_hash": "31ff39405c2df98c50ab11d443e40921",
+    "semantic_hash": "31ff39405c2df98c50ab11d443e40921"
+  },
+  "audio/sfx/water/water_plip_03.wav": {
+    "mtime": 1793806671.3175156,
+    "seen": 1793813039.6926131,
+    "ast_hash": "c6b6f40d81f3aed4143605a33b394ab0",
+    "semantic_hash": "c6b6f40d81f3aed4143605a33b394ab0"
+  },
+  "audio/sfx/water/water_splash_large.wav": {
+    "mtime": 1793806671.3509412,
+    "seen": 1793813039.692637,
+    "ast_hash": "0a7a66e75c34321ede7cebf81dade8ff",
+    "semantic_hash": "0a7a66e75c34321ede7cebf81dade8ff"
+  },
+  "audio/sfx/water/water_splash_small.wav": {
+    "mtime": 1793806671.3320508,
+    "seen": 1793813039.692662,
+    "ast_hash": "ddc093a8f678e439c3133ef6cc8880ec",
+    "semantic_hash": "ddc093a8f678e439c3133ef6cc8880ec"
+  },
+  "audio/sfx/water/water_surface.wav": {
+    "mtime": 1793806671.425095,
+    "seen": 1793813039.692686,
+    "ast_hash": "618ceb7fb77a94605b7a1cf8e309514f",
+    "semantic_hash": "618ceb7fb77a94605b7a1cf8e309514f"
+  },
+  "audio/sfx/wonder_chime_01.wav": {
+    "mtime": 1792775085.5932114,
+    "seen": 1793813039.6927109,
+    "ast_hash": "f87d275258938ab0be6007f62bc37499",
+    "semantic_hash": "f87d275258938ab0be6007f62bc37499"
+  },
+  "audio/sfx/wonder_chime_02.wav": {
+    "mtime": 1792775085.5936365,
+    "seen": 1793813039.692735,
+    "ast_hash": "656e94c913cc8e73d2d038f27e69c0e3",
+    "semantic_hash": "656e94c913cc8e73d2d038f27e69c0e3"
+  },
+  "audio/sfx/wonder_chime_03.wav": {
+    "mtime": 1792775085.5940652,
+    "seen": 1793813039.692758,
+    "ast_hash": "0f236e0ed1785b5b0ba3263f4e662c08",
+    "semantic_hash": "0f236e0ed1785b5b0ba3263f4e662c08"
+  },
+  "reports/production/grove-study/2026-11-03/smush-grove-motion.mp4": {
+    "mtime": 1793678359.738377,
+    "seen": 1793813039.692781,
+    "ast_hash": "e067848c492d0e6b35b89644bb0f7d9c",
+    "semantic_hash": "e067848c492d0e6b35b89644bb0f7d9c"
+  },
+  "reports/production/relaxation/2026-11-02/pixel3-motion.mp4": {
+    "mtime": 1793604312.1592653,
+    "seen": 1793813039.6928132,
+    "ast_hash": "54a1b96b0113419a4843728d371fb2e6",
+    "semantic_hash": "54a1b96b0113419a4843728d371fb2e6"
+  },
+  "reports/production/relaxation/2026-11-02/smush-relax-motion.mp4": {
+    "mtime": 1793604043.0572886,
+    "seen": 1793813039.692843,
+    "ast_hash": "573366442953c29adf72ddfb99bff9e7",
+    "semantic_hash": "573366442953c29adf72ddfb99bff9e7"
+  }
+}

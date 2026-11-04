@@ -1,0 +1,11 @@
+Godot Engine v4.5.stable.official.876b29033 - https://godotengine.org
+Metal 3.2 - Forward Mobile - Using Device #0: Apple - Apple M5 (Apple9)
+
+Movie Maker mode enabled, recording movie at 30 FPS...
+--------------------------------------------------------------------------------
+Done recording movie at path: /tmp/smush-grove-motion.avi
+279 frames at 30 FPS (movie length: 00:00:09:09), recorded in 00:00:05 (180% of real-time speed).
+CPU render time: 0.03 seconds (average: 0.12 ms/frame)
+GPU render time: 0.00 seconds (average: 0.00 ms/frame)
+Encoding time: 1.03 seconds (average: 3.69 ms/frame)
+--------------------------------------------------------------------------------
